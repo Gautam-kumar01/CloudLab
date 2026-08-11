@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 export default function Home() {
   const [terminalText, setTerminalText] = useState<string>('');
@@ -43,8 +44,8 @@ cloudlab@workspace:~/project$ npm run dev
         <div className="flex items-center" style={{ gap: '24px', fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 500 }}>
           <a href="#" style={{ transition: 'color 0.2s' }}>Features</a>
           <a href="#" style={{ transition: 'color 0.2s' }}>Pricing</a>
-          <button style={{ padding: '8px 16px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontWeight: 600 }}>Sign In</button>
-          <button style={{ padding: '8px 16px', background: 'var(--accent-green)', color: '#000', borderRadius: '6px', fontWeight: 600, border: 'none' }}>Get Started</button>
+          <Link href="/sign-in" style={{ padding: '8px 16px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontWeight: 600 }}>Sign In</Link>
+          <Link href="/sign-up" style={{ padding: '8px 16px', background: 'var(--accent-green)', color: '#000', borderRadius: '6px', fontWeight: 600, border: 'none', display: 'inline-block' }}>Get Started</Link>
         </div>
       </nav>
 

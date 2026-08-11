@@ -77,3 +77,7 @@ button {
 .font-mono { font-family: var(--font-mono); }
 .text-green { color: var(--accent-green); }
 
+.project-card:hover {
+  border-color: var(--accent-green) !important;
+  transform: translateY(-2px);
+}

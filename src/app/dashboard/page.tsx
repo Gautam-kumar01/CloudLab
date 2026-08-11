@@ -1,7 +1,8 @@
-'use client';
 import Link from 'next/link';
+import { auth, signOut } from '@/auth';
 
-export default function Dashboard() {
+export default async function Dashboard() {
+  const session = await auth();
   const projects = [
     { id: 1, name: 'react-ecommerce', status: 'Sleeping', lastAccessed: '2 hours ago', language: 'TypeScript' },
     { id: 2, name: 'python-data-api', status: 'Running', lastAccessed: 'Just now', language: 'Python' },
@@ -21,8 +22,19 @@ export default function Dashboard() {
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-green)' }}></div>
             <span>System Operational</span>
           </div>
-          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}>
-            H
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <Link href="/settings" style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', overflow: 'hidden' }}>
+              {session?.user?.image ? (
+                <img src={session.user.image} alt="Avatar" style={{ width: '100%', height: '100%' }} />
+              ) : (
+                session?.user?.name?.[0]?.toUpperCase() || 'U'
+              )}
+            </Link>
+            <form action={async () => { "use server"; await signOut(); }}>
+              <button type="submit" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', background: 'transparent', border: 'none', cursor: 'pointer' }} className="hover:text-white">
+                Logout
+              </button>
+            </form>
           </div>
         </div>
       </nav>
@@ -67,13 +79,6 @@ export default function Dashboard() {
         </div>
 
       </main>
-
-      <style jsx global>{`
-        .project-card:hover {
-          border-color: var(--accent-green) !important;
-          transform: translateY(-2px);
-        }
-      `}</style>
     </div>
   );
 }
