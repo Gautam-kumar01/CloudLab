@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node server.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -13,14 +13,19 @@
     "@monaco-editor/react": "^4.7.0",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "dotenv": "^17.4.2",
     "lucide-react": "^1.31.0",
     "next": "16.3.0",
     "next-auth": "^5.0.0-beta.32",
+    "node-pty": "^1.1.0",
     "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-resizable-panels": "^4.12.2"
+    "react-resizable-panels": "^4.12.2",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
