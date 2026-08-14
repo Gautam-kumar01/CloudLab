@@ -103,12 +103,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing workspaceId or filename' }, { status: 400 });
     }
 
-    // Security check to prevent path traversal
-    if (filename.includes('..')) {
-      return NextResponse.json({ error: 'Invalid filename' }, { status: 400 });
-    }
+    const workspacePath = path.resolve(process.cwd(), 'workspaces', workspaceId);
+    const filePath = path.resolve(workspacePath, filename);
 
-    const workspacePath = path.join(process.cwd(), 'workspaces', workspaceId);
+    // Security check to prevent path traversal
+    if (!filePath.startsWith(workspacePath)) {
+      return NextResponse.json({ error: 'Invalid file path: path traversal detected' }, { status: 403 });
+    }
     
     // Ensure workspace exists
     try {
@@ -116,8 +117,6 @@ export async function POST(request: Request) {
     } catch {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
     }
-
-    const filePath = path.join(workspacePath, filename);
     const dirPath = isDir ? filePath : path.dirname(filePath);
 
     // Create parent directories if needed
@@ -143,13 +142,13 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Missing workspaceId or filename' }, { status: 400 });
   }
 
-  // Security check to prevent path traversal
-  if (filename.includes('..')) {
-    return NextResponse.json({ error: 'Invalid filename' }, { status: 400 });
-  }
+  const workspacePath = path.resolve(process.cwd(), 'workspaces', workspaceId);
+  const filePath = path.resolve(workspacePath, filename);
 
-  const workspacePath = path.join(process.cwd(), 'workspaces', workspaceId);
-  const filePath = path.join(workspacePath, filename);
+  // Security check to prevent path traversal
+  if (!filePath.startsWith(workspacePath)) {
+    return NextResponse.json({ error: 'Invalid file path: path traversal detected' }, { status: 403 });
+  }
 
   try {
     const stat = await fs.stat(filePath);

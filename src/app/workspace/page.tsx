@@ -8,13 +8,14 @@ import {
   Folder, FileCode, FileJson, FileType2, Terminal as TerminalIcon, 
   Play, Share, Settings, Code2, MessageSquare, AlertCircle,
   FilePlus, FolderPlus, RefreshCw, ChevronsDown, ChevronRight, ChevronDown,
-  Plus, Trash, SplitSquareHorizontal, ChevronDown as ChevronDownIcon
+  Plus, Trash, SplitSquareHorizontal, ChevronDown as ChevronDownIcon, GitBranch, Files
 } from 'lucide-react';
 
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { io, Socket } from 'socket.io-client';
 import '@xterm/xterm/css/xterm.css';
+import GitPanel from './GitPanel';
 
 const FileTreeNode = ({ node, level, expandedFolders, setExpandedFolders, activeFile, openFile }: any) => {
   const isExpanded = expandedFolders[node.path];
@@ -100,6 +101,7 @@ export default function Workspace() {
   const [isSaving, setIsSaving] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState('terminal');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [activeSidebar, setActiveSidebar] = useState<'explorer' | 'git'>('explorer');
 
   type TerminalState = { id: string, title: string, shellType: string };
   const [terminals, setTerminals] = useState<TerminalState[]>([{ id: 'term-1', title: 'powershell', shellType: 'powershell' }]);
@@ -107,6 +109,7 @@ export default function Workspace() {
   
   const socketRef = useRef<Socket | null>(null);
   const xtermInstances = useRef<Record<string, { term: XTerm, fitAddon: FitAddon, container: HTMLDivElement }>>({});
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const openFile = async (path: string, node: any) => {
     if (files[path]) {
@@ -162,8 +165,9 @@ export default function Workspace() {
     return 'plaintext';
   };
 
-  const handleSave = async () => {
-    if (!activeFile || !files[activeFile]) return;
+  const handleSave = async (specificFile?: string, specificContent?: string) => {
+    const fileToSave = specificFile || activeFile;
+    if (!fileToSave || !files[fileToSave]) return;
     
     setIsSaving(true);
     try {
@@ -172,12 +176,12 @@ export default function Workspace() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId,
-          filename: activeFile,
-          content: files[activeFile].content
+          filename: fileToSave,
+          content: specificContent !== undefined ? specificContent : files[fileToSave].content
         })
       });
-      console.log('Saved', activeFile);
-      setActiveMenu(null); // Close menu if open
+      console.log('Saved', fileToSave);
+      if (!specificFile) setActiveMenu(null); // Close menu if open manually
     } catch (err) {
       console.error('Save failed:', err);
     } finally {
@@ -255,6 +259,31 @@ export default function Workspace() {
     } catch (err) {
       console.error('Delete failed:', err);
       alert('Failed to delete file');
+    }
+  };
+
+  const handleGitPush = async () => {
+    const message = prompt('Enter commit message:');
+    if (message === null) return;
+    
+    try {
+      setIsSaving(true); // Reusing isSaving to show network activity
+      const res = await fetch('/api/git/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, message })
+      });
+      const data = await res.json();
+      if (data.error) {
+        alert('Git push failed: ' + data.error);
+      } else {
+        alert('Successfully pushed to GitHub!\n' + (data.message || ''));
+      }
+    } catch (err: any) {
+      alert('Git push failed: ' + err.message);
+    } finally {
+      setIsSaving(false);
+      setActiveMenu(null);
     }
   };
 
@@ -381,6 +410,14 @@ export default function Workspace() {
         ...prev,
         [activeFile]: { ...prev[activeFile], content: value }
       }));
+
+      // Debounced Autosave
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        handleSave(activeFile, value);
+      }, 1500); // 1.5 second debounce
     }
   };
 
@@ -445,7 +482,8 @@ export default function Workspace() {
                 {activeMenu === 'file' && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '6px', minWidth: '150px', zIndex: 10 }}>
                     <div onClick={handleNewFile} style={{ padding: '8px 16px', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.background = 'var(--bg-secondary)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>New File</div>
-                    <div onClick={handleSave} style={{ padding: '8px 16px', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.background = 'var(--bg-secondary)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>Save</div>
+                    <div onClick={() => handleSave()} style={{ padding: '8px 16px', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.background = 'var(--bg-secondary)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>Save</div>
+                    <a href={`/api/workspace/export?id=${encodeURIComponent(workspaceId)}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block', padding: '8px 16px', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.background = 'var(--bg-secondary)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>Download Workspace (ZIP)</a>
                     <div onClick={handleDeleteFile} style={{ padding: '8px 16px', cursor: 'pointer', color: 'var(--accent-orange)' }} onMouseOver={e => {e.currentTarget.style.background = 'var(--bg-secondary)'; e.currentTarget.style.color = 'var(--accent-orange)';}} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>Delete File</div>
                   </div>
                 )}
@@ -471,10 +509,10 @@ export default function Workspace() {
               </div>
 
               <div style={{ position: 'relative' }}>
-                <span onClick={(e) => handleMenuClick(e, 'terminal')} style={{ cursor: 'pointer', transition: 'color 0.2s', color: activeMenu === 'terminal' ? '#fff' : 'var(--text-secondary)' }} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => {if(activeMenu !== 'terminal') e.currentTarget.style.color = 'var(--text-secondary)'}}>Terminal</span>
-                {activeMenu === 'terminal' && (
+                <span onClick={(e) => handleMenuClick(e, 'git')} style={{ cursor: 'pointer', transition: 'color 0.2s', color: activeMenu === 'git' ? '#fff' : 'var(--text-secondary)' }} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => {if(activeMenu !== 'git') e.currentTarget.style.color = 'var(--text-secondary)'}}>Source Control</span>
+                {activeMenu === 'git' && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '6px', minWidth: '150px', zIndex: 10 }}>
-                    <div style={{ padding: '8px 16px', cursor: 'pointer' }} onClick={() => setActiveBottomTab('terminal')} onMouseOver={e => e.currentTarget.style.background = 'var(--bg-secondary)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>New Terminal</div>
+                    <div onClick={handleGitPush} style={{ padding: '8px 16px', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.background = 'var(--bg-secondary)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>Commit & Push</div>
                   </div>
                 )}
               </div>
@@ -497,41 +535,74 @@ export default function Workspace() {
         </nav>
 
         {/* Main Layout using Resizable Panels */}
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <PanelGroup orientation="horizontal">
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+          {/* Activity Bar (Far Left) */}
+          <div style={{ width: '48px', height: '100%', background: 'var(--bg-secondary)', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '12px', gap: '16px' }}>
+            <div 
+              onClick={() => setActiveSidebar('explorer')}
+              style={{ cursor: 'pointer', opacity: activeSidebar === 'explorer' ? 1 : 0.5, borderLeft: activeSidebar === 'explorer' ? '2px solid var(--accent-orange)' : '2px solid transparent', padding: '8px', transition: 'all 0.2s' }}
+              title="Explorer"
+            >
+              <Files size={24} />
+            </div>
+            <div 
+              onClick={() => setActiveSidebar('git')}
+              style={{ cursor: 'pointer', opacity: activeSidebar === 'git' ? 1 : 0.5, borderLeft: activeSidebar === 'git' ? '2px solid var(--accent-orange)' : '2px solid transparent', padding: '8px', transition: 'all 0.2s' }}
+              title="Source Control"
+            >
+              <GitBranch size={24} />
+            </div>
+          </div>
+
+          <PanelGroup orientation="horizontal" style={{ flex: 1 }}>
             
-            {/* Sidebar (File Tree) */}
-            <Panel defaultSize={15} minSize={10} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-tertiary)' }}>
-              <div style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Folder size={14} /> EXPLORER
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <FilePlus size={14} style={{ cursor: 'pointer' }} onClick={handleNewFile} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
-                  <FolderPlus size={14} style={{ cursor: 'pointer' }} onClick={handleNewFolder} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
-                  <RefreshCw size={14} style={{ cursor: 'pointer' }} onClick={fetchWorkspace} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
-                  <ChevronsDown size={14} style={{ cursor: 'pointer' }} onClick={() => setExpandedFolders({})} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
-                </div>
-              </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-                {Object.keys(fileTree).length > 0 ? (
-                  Object.values(fileTree).map((node: any) => (
-                    <FileTreeNode 
-                      key={node.path} 
-                      node={node} 
-                      level={0} 
-                      expandedFolders={expandedFolders} 
-                      setExpandedFolders={setExpandedFolders} 
-                      activeFile={activeFile} 
-                      openFile={openFile} 
-                    />
-                  ))
-                ) : (
-                  <div style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center' }}>
-                    Loading workspace...
+            {/* Sidebar (Explorer / Git) */}
+            <Panel defaultSize={20} minSize={15} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-tertiary)' }}>
+              {activeSidebar === 'explorer' ? (
+                <>
+                  <div style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      EXPLORER
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <FilePlus size={14} style={{ cursor: 'pointer' }} onClick={handleNewFile} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
+                      <FolderPlus size={14} style={{ cursor: 'pointer' }} onClick={handleNewFolder} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
+                      <RefreshCw size={14} style={{ cursor: 'pointer' }} onClick={fetchWorkspace} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
+                      <ChevronsDown size={14} style={{ cursor: 'pointer' }} onClick={() => setExpandedFolders({})} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
+                    </div>
                   </div>
-                )}
-              </div>
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+                    {Object.keys(fileTree).length > 0 ? (
+                      Object.values(fileTree).map((node: any) => (
+                        <FileTreeNode 
+                          key={node.path} 
+                          node={node} 
+                          level={0} 
+                          expandedFolders={expandedFolders} 
+                          setExpandedFolders={setExpandedFolders} 
+                          activeFile={activeFile} 
+                          openFile={openFile} 
+                        />
+                      ))
+                    ) : (
+                      <div style={{ padding: '16px', color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center' }}>
+                        Loading workspace...
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      SOURCE CONTROL
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, overflowY: 'auto' }}>
+                    <GitPanel workspaceId={workspaceId} />
+                  </div>
+                </>
+              )}
             </Panel>
 
             <PanelResizeHandle className="resize-handle" style={{ width: '1px', cursor: 'col-resize' }} />
@@ -715,25 +786,33 @@ export default function Workspace() {
         </div>
 
         {/* Status Bar */}
-        <footer style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '24px', padding: '0 16px', background: 'var(--bg-tertiary)', borderTop: '1px solid var(--border-color)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>main*</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-green)' }}></div> 
-              Local Exec (Phase 6)
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>Ln 1, Col 1</span>
-            <span style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>UTF-8</span>
-            <span style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>{files[activeFile]?.language === 'typescript' ? 'TypeScript' : (files[activeFile]?.language || 'Loading...')}</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>
-              <Settings size={12} /> Prettier
-            </span>
-          </div>
-        </footer>
 
-        {/* Command Palette Overlay */}
+          <footer style={{ height: '24px', background: 'var(--accent-orange)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', fontSize: '0.75rem', fontWeight: 600 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <span style={{ cursor: 'pointer', transition: 'color 0.2s', display: 'flex', alignItems: 'center', gap: '6px' }} onMouseOver={e => e.currentTarget.style.color = 'var(--bg-primary)'} onMouseOut={e => e.currentTarget.style.color = '#fff'}>
+                <GitBranch size={12} /> main
+              </span>
+              <span style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--bg-primary)'} onMouseOut={e => e.currentTarget.style.color = '#fff'}>
+                <RefreshCw size={12} style={{ display: 'inline', marginRight: '4px' }} /> 0 ↓ 0 ↑
+              </span>
+              <span style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--bg-primary)'} onMouseOut={e => e.currentTarget.style.color = '#fff'}>
+                <AlertCircle size={12} style={{ display: 'inline', marginRight: '4px' }} /> 0
+              </span>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <span style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--bg-primary)'} onMouseOut={e => e.currentTarget.style.color = '#fff'}>Ln 1, Col 1</span>
+              <span style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--bg-primary)'} onMouseOut={e => e.currentTarget.style.color = '#fff'}>UTF-8</span>
+              <span style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--bg-primary)'} onMouseOut={e => e.currentTarget.style.color = '#fff'}>{activeFile && files[activeFile] ? (files[activeFile].language === 'typescript' ? 'TypeScript' : (files[activeFile].language || 'JSON')) : ''}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--bg-primary)'} onMouseOut={e => e.currentTarget.style.color = '#fff'}>
+                <Settings size={12} /> Prettier
+              </span>
+              {isSaving && (
+                <span style={{ color: 'var(--bg-primary)' }}>Saving...</span>
+              )}
+            </div>
+          </footer>
+
         {showCommandPalette && (
           <div onClick={() => setShowCommandPalette(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', paddingTop: '96px', zIndex: 50 }}>
             <div onClick={e => e.stopPropagation()} style={{ width: '600px', height: '300px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

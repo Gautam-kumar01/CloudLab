@@ -11,13 +11,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Missing workspace id or filename' }, { status: 400 });
   }
 
-  // Security check
-  if (filename.includes('..')) {
-    return NextResponse.json({ error: 'Invalid filename' }, { status: 400 });
-  }
+  const workspacePath = path.resolve(process.cwd(), 'workspaces', workspaceId);
+  const filePath = path.resolve(workspacePath, filename);
 
-  const workspacePath = path.join(process.cwd(), 'workspaces', workspaceId);
-  const filePath = path.join(workspacePath, filename);
+  // Security check to prevent path traversal
+  if (!filePath.startsWith(workspacePath)) {
+    return NextResponse.json({ error: 'Invalid file path: path traversal detected' }, { status: 403 });
+  }
 
   try {
     const content = await fs.readFile(filePath, 'utf-8');
