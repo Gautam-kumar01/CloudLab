@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Minus, RefreshCw, Check, AlertCircle } from 'lucide-react';
+import { Plus, Minus, RefreshCw, Check, AlertCircle, GitBranch } from 'lucide-react';
 
 interface GitPanelProps {
   workspaceId: string;
@@ -41,7 +41,7 @@ export default function GitPanel({ workspaceId }: GitPanelProps) {
       const res = await fetch('/api/git/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId, action, file, message: action === 'commit' ? commitMessage : undefined })
+        body: JSON.stringify({ workspaceId, action, file, message: action === 'commit' ? commitMessage : undefined, branch: file })
       });
       const data = await res.json();
       if (data.error) {
@@ -77,6 +77,35 @@ export default function GitPanel({ workspaceId }: GitPanelProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Branch Controls */}
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-tertiary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+          <GitBranch size={14} /> {currentBranch || 'No Branch'}
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            disabled={isLoading}
+            onClick={() => {
+              const name = prompt('Enter branch name to switch to:');
+              if (name) handleAction('checkout', name);
+            }}
+            style={{ fontSize: '0.75rem', padding: '4px 8px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            Switch
+          </button>
+          <button 
+            disabled={isLoading}
+            onClick={() => {
+              const name = prompt('Enter new branch name:');
+              if (name) handleAction('create-branch', name);
+            }}
+            style={{ fontSize: '0.75rem', padding: '4px 8px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            New
+          </button>
+        </div>
+      </div>
+
       {/* Commit Input Area */}
       <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', borderBottom: '1px solid var(--border-color)' }}>
         <textarea 

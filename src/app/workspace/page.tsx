@@ -16,12 +16,14 @@ import { FitAddon } from '@xterm/addon-fit';
 import { io, Socket } from 'socket.io-client';
 import '@xterm/xterm/css/xterm.css';
 import GitPanel from './GitPanel';
-
-const FileTreeNode = ({ node, level, expandedFolders, setExpandedFolders, activeFile, openFile }: any) => {
+import AiChatPanel from './AiChatPanel';
+const FileTreeNode = ({ node, level, expandedFolders, setExpandedFolders, activeFile, openFile, onContextMenu, selectedNodePath, setSelectedNodePath }: any) => {
   const isExpanded = expandedFolders[node.path];
+  const isSelected = selectedNodePath === node.path;
 
   const toggleFolder = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setSelectedNodePath(node.path);
     setExpandedFolders((prev: any) => ({ ...prev, [node.path]: !prev[node.path] }));
   };
 
@@ -37,6 +39,7 @@ const FileTreeNode = ({ node, level, expandedFolders, setExpandedFolders, active
       <div style={{ userSelect: 'none' }}>
         <div 
           onClick={toggleFolder}
+          onContextMenu={(e) => { setSelectedNodePath(node.path); onContextMenu(e, node); }}
           style={{
             padding: '4px 8px',
             paddingLeft: `${level * 12 + 8}px`,
@@ -45,10 +48,13 @@ const FileTreeNode = ({ node, level, expandedFolders, setExpandedFolders, active
             alignItems: 'center',
             gap: '6px',
             color: 'var(--text-secondary)',
-            fontSize: '0.85rem'
+            fontSize: '0.85rem',
+            background: isSelected ? 'rgba(255, 165, 0, 0.1)' : 'transparent',
+            outline: isSelected ? '1px solid var(--accent-orange)' : 'none',
+            outlineOffset: '-1px'
           }}
           onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'}
-          onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+          onMouseOut={e => { if (!isSelected) e.currentTarget.style.color = 'var(--text-secondary)' }}
         >
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           <Folder size={14} color="#dcb67a" fill="#dcb67a" />
@@ -57,7 +63,7 @@ const FileTreeNode = ({ node, level, expandedFolders, setExpandedFolders, active
         {isExpanded && node.children && (
           <div>
             {Object.values(node.children).map((child: any) => (
-              <FileTreeNode key={child.path} node={child} level={level + 1} expandedFolders={expandedFolders} setExpandedFolders={setExpandedFolders} activeFile={activeFile} openFile={openFile} />
+              <FileTreeNode key={child.path} node={child} level={level + 1} expandedFolders={expandedFolders} setExpandedFolders={setExpandedFolders} activeFile={activeFile} openFile={openFile} onContextMenu={onContextMenu} selectedNodePath={selectedNodePath} setSelectedNodePath={setSelectedNodePath} />
             ))}
           </div>
         )}
@@ -67,7 +73,8 @@ const FileTreeNode = ({ node, level, expandedFolders, setExpandedFolders, active
 
   return (
     <div 
-      onClick={() => openFile(node.path, node)}
+      onClick={() => { setSelectedNodePath(node.path); openFile(node.path, node); }}
+      onContextMenu={(e) => { setSelectedNodePath(node.path); onContextMenu(e, node); }}
       style={{
         padding: '4px 8px',
         paddingLeft: `${level * 12 + 8 + 20}px`,
@@ -76,11 +83,13 @@ const FileTreeNode = ({ node, level, expandedFolders, setExpandedFolders, active
         alignItems: 'center',
         gap: '6px',
         color: activeFile === node.path ? 'var(--text-primary)' : 'var(--text-secondary)',
-        background: activeFile === node.path ? 'var(--bg-secondary)' : 'transparent',
+        background: activeFile === node.path ? 'var(--bg-secondary)' : (isSelected ? 'rgba(255, 165, 0, 0.1)' : 'transparent'),
+        outline: isSelected ? '1px solid var(--accent-orange)' : 'none',
+        outlineOffset: '-1px',
         fontSize: '0.85rem'
       }}
-      onMouseOver={e => { if (activeFile !== node.path) { e.currentTarget.style.background = 'var(--bg-secondary)'; e.currentTarget.style.color = 'var(--text-primary)'; } }}
-      onMouseOut={e => { if (activeFile !== node.path) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; } }}
+      onMouseOver={e => { if (activeFile !== node.path && !isSelected) { e.currentTarget.style.background = 'var(--bg-secondary)'; e.currentTarget.style.color = 'var(--text-primary)'; } }}
+      onMouseOut={e => { if (activeFile !== node.path && !isSelected) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; } }}
     >
       {getFileIcon(node.name)}
       {node.name}
@@ -96,12 +105,49 @@ export default function Workspace() {
   const [fileTree, setFileTree] = useState<Record<string, any>>({});
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [files, setFiles] = useState<Record<string, { name: string, language: string, content: string }>>({});
+  const [selectedNodePath, setSelectedNodePath] = useState<string | null>(null);
   const [activeFile, setActiveFile] = useState('');
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState('terminal');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [activeSidebar, setActiveSidebar] = useState<'explorer' | 'git'>('explorer');
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, path: string, type: 'file' | 'directory', isRoot?: boolean } | null>(null);
+
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
+
+  const handleContextMenu = (e: React.MouseEvent, node?: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (node) {
+      setContextMenu({ x: e.clientX, y: e.clientY, path: node.path, type: node.type });
+    } else {
+      setContextMenu({ x: e.clientX, y: e.clientY, path: '', type: 'directory', isRoot: true });
+    }
+  };
+
+  const resolveTargetFolder = (): string => {
+    if (!selectedNodePath) return '';
+    const findNode = (tree: any, path: string): any => {
+      for (const key in tree) {
+        if (tree[key].path === path) return tree[key];
+        if (tree[key].children) {
+          const found = findNode(tree[key].children, path);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    const node = findNode(fileTree, selectedNodePath);
+    if (!node) return '';
+    if (node.type === 'directory') return node.path;
+    const lastSlash = node.path.lastIndexOf('/');
+    return lastSlash >= 0 ? node.path.substring(0, lastSlash) : '';
+  };
 
   type TerminalState = { id: string, title: string, shellType: string };
   const [terminals, setTerminals] = useState<TerminalState[]>([{ id: 'term-1', title: 'powershell', shellType: 'powershell' }]);
@@ -189,17 +235,18 @@ export default function Workspace() {
     }
   };
 
-  const handleNewFile = async () => {
-    const filename = prompt('Enter new filename (e.g., component.tsx or folder/file.ts):');
+  const handleNewFile = async (basePath: string = '') => {
+    const filename = prompt(`Enter new filename (e.g., component.tsx) ${basePath ? 'inside ' + basePath : 'in root'}:`);
     if (!filename) return;
     
+    const fullPath = basePath ? `${basePath}/${filename}` : filename;
     try {
       await fetch('/api/workspace/files', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId,
-          filename,
+          filename: fullPath,
           content: '',
           isDir: false
         })
@@ -211,16 +258,18 @@ export default function Workspace() {
     }
   };
 
-  const handleNewFolder = async () => {
-    const foldername = prompt('Enter new folder name:');
+  const handleNewFolder = async (basePath: string = '') => {
+    const foldername = prompt(`Enter new folder name ${basePath ? 'inside ' + basePath : 'in root'}:`);
     if (!foldername) return;
+    
+    const fullPath = basePath ? `${basePath}/${foldername}/` : `${foldername}/`;
     try {
       await fetch('/api/workspace/files', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId,
-          filename: foldername + '/',
+          filename: fullPath,
           content: '',
           isDir: true
         })
@@ -231,23 +280,24 @@ export default function Workspace() {
     }
   };
 
-  const handleDeleteFile = async () => {
-    if (!activeFile) return;
-    if (!confirm(`Are you sure you want to delete ${activeFile}?`)) return;
+  const handleDeleteFile = async (targetPath?: string) => {
+    const fileToDelete = targetPath || activeFile;
+    if (!fileToDelete) return;
+    if (!confirm(`Are you sure you want to delete ${fileToDelete}?`)) return;
 
     try {
-      await fetch(`/api/workspace/files?id=${encodeURIComponent(workspaceId)}&filename=${encodeURIComponent(activeFile)}`, {
+      await fetch(`/api/workspace/files?id=${encodeURIComponent(workspaceId)}&filename=${encodeURIComponent(fileToDelete)}`, {
         method: 'DELETE'
       });
       
       setFiles(prev => {
         const newFiles = { ...prev };
-        delete newFiles[activeFile];
+        delete newFiles[fileToDelete];
         return newFiles;
       });
       
-      // Select another open file
-      const remainingFiles = Object.keys(files).filter(f => f !== activeFile);
+      // Select another open file if the active one was deleted
+      const remainingFiles = Object.keys(files).filter(f => f !== fileToDelete);
       if (remainingFiles.length > 0) {
         setActiveFile(remainingFiles[0]);
       } else {
@@ -259,6 +309,40 @@ export default function Workspace() {
     } catch (err) {
       console.error('Delete failed:', err);
       alert('Failed to delete file');
+    }
+  };
+
+  const handleRenameFile = async (oldPath: string) => {
+    if (!oldPath) return;
+    const nameOnly = oldPath.split('/').pop() || oldPath;
+    const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/'));
+    
+    const newName = prompt(`Enter new name for ${nameOnly}:`, nameOnly);
+    if (!newName || newName === nameOnly) return;
+    
+    const newPath = parentPath ? `${parentPath}/${newName}` : newName;
+    
+    try {
+      await fetch('/api/workspace/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, oldPath, newPath })
+      });
+      
+      // Update local state if it was open
+      if (files[oldPath]) {
+        setFiles(prev => {
+          const newFiles = { ...prev };
+          newFiles[newPath] = { ...newFiles[oldPath], name: newName };
+          delete newFiles[oldPath];
+          return newFiles;
+        });
+        if (activeFile === oldPath) setActiveFile(newPath);
+      }
+      
+      await fetchWorkspace();
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -441,6 +525,46 @@ export default function Workspace() {
     return <FileCode size={14} color="#888" />;
   };
 
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    editor.addAction({
+      id: 'ai-explain-code',
+      label: 'Explain Code (CloudLab AI)',
+      contextMenuGroupId: 'navigation',
+      contextMenuOrder: 1.5,
+      run: function (ed: any) {
+        const selection = ed.getSelection();
+        const text = ed.getModel().getValueInRange(selection);
+        if (text) {
+          const event = new CustomEvent('ai-action', {
+            detail: { action: 'explain', text, context: activeFile }
+          });
+          window.dispatchEvent(event);
+        } else {
+          alert('Please select some code to explain.');
+        }
+      }
+    });
+
+    editor.addAction({
+      id: 'ai-fix-error',
+      label: 'Fix Error (CloudLab AI)',
+      contextMenuGroupId: 'navigation',
+      contextMenuOrder: 1.6,
+      run: function (ed: any) {
+        const selection = ed.getSelection();
+        const text = ed.getModel().getValueInRange(selection);
+        if (text) {
+          const event = new CustomEvent('ai-action', {
+            detail: { action: 'fix', text, context: activeFile }
+          });
+          window.dispatchEvent(event);
+        } else {
+          alert('Please select some code to fix.');
+        }
+      }
+    });
+  };
+
   return (
     <>
       {/* Mobile Warning Overlay */}
@@ -481,10 +605,10 @@ export default function Workspace() {
                 <span onClick={(e) => handleMenuClick(e, 'file')} style={{ cursor: 'pointer', transition: 'color 0.2s', color: activeMenu === 'file' ? '#fff' : 'var(--text-secondary)' }} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => {if(activeMenu !== 'file') e.currentTarget.style.color = 'var(--text-secondary)'}}>File</span>
                 {activeMenu === 'file' && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '8px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '6px', minWidth: '150px', zIndex: 10 }}>
-                    <div onClick={handleNewFile} style={{ padding: '8px 16px', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.background = 'var(--bg-secondary)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>New File</div>
+                    <div onClick={() => handleNewFile()} style={{ padding: '8px 16px', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.background = 'var(--bg-secondary)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>New File</div>
                     <div onClick={() => handleSave()} style={{ padding: '8px 16px', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.background = 'var(--bg-secondary)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>Save</div>
                     <a href={`/api/workspace/export?id=${encodeURIComponent(workspaceId)}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block', padding: '8px 16px', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.background = 'var(--bg-secondary)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>Download Workspace (ZIP)</a>
-                    <div onClick={handleDeleteFile} style={{ padding: '8px 16px', cursor: 'pointer', color: 'var(--accent-orange)' }} onMouseOver={e => {e.currentTarget.style.background = 'var(--bg-secondary)'; e.currentTarget.style.color = 'var(--accent-orange)';}} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>Delete File</div>
+                    <div onClick={() => handleDeleteFile()} style={{ padding: '8px 16px', cursor: 'pointer', color: 'var(--accent-orange)' }} onMouseOver={e => {e.currentTarget.style.background = 'var(--bg-secondary)'; e.currentTarget.style.color = 'var(--accent-orange)';}} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>Delete File</div>
                   </div>
                 )}
               </div>
@@ -565,13 +689,17 @@ export default function Workspace() {
                       EXPLORER
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <FilePlus size={14} style={{ cursor: 'pointer' }} onClick={handleNewFile} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
-                      <FolderPlus size={14} style={{ cursor: 'pointer' }} onClick={handleNewFolder} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
+                      <FilePlus size={14} style={{ cursor: 'pointer' }} onClick={() => handleNewFile(resolveTargetFolder())} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
+                      <FolderPlus size={14} style={{ cursor: 'pointer' }} onClick={() => handleNewFolder(resolveTargetFolder())} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
                       <RefreshCw size={14} style={{ cursor: 'pointer' }} onClick={fetchWorkspace} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
                       <ChevronsDown size={14} style={{ cursor: 'pointer' }} onClick={() => setExpandedFolders({})} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
                     </div>
                   </div>
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+                  <div 
+                    style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}
+                    onClick={(e) => { if (e.target === e.currentTarget) setSelectedNodePath(null); }}
+                    onContextMenu={(e) => handleContextMenu(e)}
+                  >
                     {Object.keys(fileTree).length > 0 ? (
                       Object.values(fileTree).map((node: any) => (
                         <FileTreeNode 
@@ -581,7 +709,10 @@ export default function Workspace() {
                           expandedFolders={expandedFolders} 
                           setExpandedFolders={setExpandedFolders} 
                           activeFile={activeFile} 
-                          openFile={openFile} 
+                          openFile={openFile}
+                          onContextMenu={handleContextMenu}
+                          selectedNodePath={selectedNodePath}
+                          setSelectedNodePath={setSelectedNodePath}
                         />
                       ))
                     ) : (
@@ -650,6 +781,7 @@ export default function Workspace() {
                         theme="vs-dark"
                         value={files[activeFile].content}
                         onChange={handleEditorChange}
+                        onMount={handleEditorDidMount}
                         options={{
                           minimap: { enabled: false },
                           fontSize: 14,
@@ -761,25 +893,7 @@ export default function Workspace() {
 
             {/* Right Panel (AI/Chat) */}
             <Panel defaultSize={20} minSize={15} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-tertiary)' }}>
-              <div style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 600, borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MessageSquare size={16} color="var(--accent-purple)" />
-                AI Assistant
-              </div>
-              <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
-                  <strong style={{ color: 'var(--accent-purple)', display: 'block', marginBottom: '4px' }}>CloudLab AI</strong>
-                  Welcome to Phase 6! The terminal below is now a fully functioning shell connected to your local environment. Try running `node index.ts` or click the Run button above!
-                </div>
-              </div>
-              <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)' }}>
-                <input 
-                  type="text" 
-                  placeholder="Ask AI..." 
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.85rem', transition: 'border-color 0.2s' }}
-                  onFocus={e => e.currentTarget.style.borderColor = 'var(--accent-purple)'}
-                  onBlur={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
-                />
-              </div>
+              <AiChatPanel activeFile={activeFile} fileContent={activeFile && files[activeFile] ? files[activeFile].content : ''} />
             </Panel>
 
           </PanelGroup>
@@ -812,6 +926,68 @@ export default function Workspace() {
               )}
             </div>
           </footer>
+
+        {contextMenu && (
+          <div 
+            style={{ 
+              position: 'fixed', 
+              top: contextMenu.y, 
+              left: contextMenu.x, 
+              background: 'var(--bg-secondary)', 
+              border: '1px solid var(--border-color)', 
+              borderRadius: '6px', 
+              boxShadow: '0 4px 12px rgba(0,0,0,0.5)', 
+              zIndex: 100,
+              padding: '4px 0',
+              minWidth: '160px',
+              color: 'var(--text-primary)',
+              fontSize: '0.85rem'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div 
+              className="context-menu-item"
+              style={{ padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+              onClick={() => { setContextMenu(null); handleNewFile(contextMenu.type === 'directory' ? contextMenu.path : contextMenu.path.substring(0, contextMenu.path.lastIndexOf('/'))); }}
+              onMouseOver={e => e.currentTarget.style.background = 'var(--accent-purple)'}
+              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <FilePlus size={14} /> New File
+            </div>
+            <div 
+              className="context-menu-item"
+              style={{ padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+              onClick={() => { setContextMenu(null); handleNewFolder(contextMenu.type === 'directory' ? contextMenu.path : contextMenu.path.substring(0, contextMenu.path.lastIndexOf('/'))); }}
+              onMouseOver={e => e.currentTarget.style.background = 'var(--accent-purple)'}
+              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <FolderPlus size={14} /> New Folder
+            </div>
+            {!contextMenu.isRoot && (
+              <>
+                <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
+                <div 
+                  className="context-menu-item"
+                  style={{ padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                  onClick={() => { setContextMenu(null); handleRenameFile(contextMenu.path); }}
+                  onMouseOver={e => e.currentTarget.style.background = 'var(--accent-purple)'}
+                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <FileType2 size={14} /> Rename
+                </div>
+                <div 
+                  className="context-menu-item"
+                  style={{ padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#ff5f56' }}
+                  onClick={() => { setContextMenu(null); handleDeleteFile(contextMenu.path); }}
+                  onMouseOver={e => e.currentTarget.style.background = '#ff5f5633'}
+                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <Trash size={14} /> Delete
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {showCommandPalette && (
           <div onClick={() => setShowCommandPalette(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', paddingTop: '96px', zIndex: 50 }}>
