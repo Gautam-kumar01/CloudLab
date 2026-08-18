@@ -1,0 +1,24 @@
+diff --git a/node_modules/y-monaco/dist/y-monaco.cjs b/node_modules/y-monaco/dist/y-monaco.cjs
+index be48d25..05008cd 100644
+--- a/node_modules/y-monaco/dist/y-monaco.cjs
++++ b/node_modules/y-monaco/dist/y-monaco.cjs
+@@ -3,7 +3,7 @@
+ Object.defineProperty(exports, '__esModule', { value: true });
+ 
+ var Y = require('yjs');
+-var monaco = require('monaco-editor/esm/vs/editor/editor.api.js');
++var monaco = require('monaco-editor');
+ var error = require('lib0/error');
+ var mutex = require('lib0/mutex');
+ require('y-protocols/awareness');
+diff --git a/node_modules/y-monaco/src/y-monaco.js b/node_modules/y-monaco/src/y-monaco.js
+index bed9096..ebf550b 100644
+--- a/node_modules/y-monaco/src/y-monaco.js
++++ b/node_modules/y-monaco/src/y-monaco.js
+@@ -1,5 +1,5 @@
+ import * as Y from 'yjs'
+-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js'
++import * as monaco from 'monaco-editor'
+ import * as error from 'lib0/error'
+ import { createMutex } from 'lib0/mutex'
+ import { Awareness } from 'y-protocols/awareness' // eslint-disable-line

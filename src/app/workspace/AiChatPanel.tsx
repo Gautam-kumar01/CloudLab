@@ -7,14 +7,17 @@ import ReactMarkdown from 'react-markdown';
 
 export default function AiChatPanel({ 
   activeFile, 
-  fileContent 
+  fileContent,
+  workspaceId
 }: { 
   activeFile: string;
   fileContent: string;
+  workspaceId: string;
 }) {
   const [input, setInput] = useState('');
-  const { messages, isLoading, stop, setMessages, append } = useChat({
+  const { messages, isLoading, stop, setMessages, append, addToolResult } = useChat({
     api: '/api/chat',
+    body: { workspaceId },
     onError: (error) => {
       console.error('Chat error:', error);
     }
@@ -119,7 +122,7 @@ export default function AiChatPanel({
                     },
                     pre({node, children, ...props}) {
                       return (
-                        <pre style={{ background: '#000', padding: '12px', borderRadius: '6px', overflowX: 'auto', border: '1px solid var(--border-color)' }} {...props}>
+                        <pre style={{ background: '#000', padding: '12px', borderRadius: '6px', overflowX: 'auto', border: '1px solid var(--border-color)', margin: '8px 0' }} {...props}>
                           {children}
                         </pre>
                       )
@@ -130,6 +133,70 @@ export default function AiChatPanel({
                 </ReactMarkdown>
               )}
             </div>
+
+            {m.toolInvocations && m.toolInvocations.map(toolInvocation => {
+              const toolCallId = toolInvocation.toolCallId;
+              
+              if (toolInvocation.toolName === 'readFile' || toolInvocation.toolName === 'listDirectory') {
+                return (
+                  <div key={toolCallId} style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '4px 8px', background: 'var(--bg-primary)', borderRadius: '4px', border: '1px solid var(--border-color)', width: 'fit-content' }}>
+                    Agent {toolInvocation.toolName === 'readFile' ? 'read file' : 'listed directory'}: <code>{toolInvocation.args.path}</code>
+                  </div>
+                );
+              }
+
+              if (toolInvocation.toolName === 'writeFile' || toolInvocation.toolName === 'runCommand') {
+                const isWriting = toolInvocation.toolName === 'writeFile';
+                return (
+                  <div key={toolCallId} style={{ 
+                    background: 'var(--bg-primary)', 
+                    border: '1px solid var(--accent-orange)', 
+                    borderRadius: '8px',
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    marginTop: '8px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-orange)', fontWeight: 600, fontSize: '0.85rem' }}>
+                      ⚠ Agent wants to {isWriting ? 'modify a file' : 'run a command'}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', background: '#000', padding: '8px', borderRadius: '4px', overflowX: 'auto' }}>
+                      {isWriting ? (
+                        <>
+                          <div style={{ color: 'var(--text-primary)', marginBottom: '4px' }}>File: {toolInvocation.args.path}</div>
+                          <pre style={{ margin: 0 }}>{toolInvocation.args.content}</pre>
+                        </>
+                      ) : (
+                        <div style={{ color: 'var(--text-primary)' }}>{toolInvocation.args.command}</div>
+                      )}
+                    </div>
+                    
+                    {'result' in toolInvocation ? (
+                      <div style={{ fontSize: '0.8rem', color: toolInvocation.result.includes('Rejected') ? 'var(--accent-orange)' : 'var(--text-secondary)' }}>
+                        Status: {toolInvocation.result.substring(0, 100)}{toolInvocation.result.length > 100 ? '...' : ''}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                        <button 
+                          onClick={() => addToolResult({ toolCallId, result: 'User rejected the request.' })}
+                          style={{ flex: 1, padding: '6px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                        >
+                          Reject
+                        </button>
+                        <button 
+                          onClick={() => addToolResult({ toolCallId, result: 'APPROVED' })}
+                          style={{ flex: 1, padding: '6px', background: 'var(--accent-orange)', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                        >
+                          Approve
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })}
           </div>
         ))}
         

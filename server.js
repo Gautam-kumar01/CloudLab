@@ -4,6 +4,10 @@ const next = require('next');
 const { Server } = require('socket.io');
 const { spawn } = require('child_process');
 const os = require('os');
+const ws = require('ws');
+const { setupWSConnection, docs } = require('y-websocket/bin/utils');
+const fs = require('fs');
+const path = require('path');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -25,6 +29,97 @@ app.prepare().then(() => {
 
   const io = new Server(server, {
     cors: { origin: "*" }
+  });
+
+  const wss = new ws.Server({ noServer: true });
+
+  server.on('upgrade', async (request, socket, head) => {
+    const parsedUrl = parse(request.url, true);
+    
+    if (parsedUrl.pathname && parsedUrl.pathname.startsWith('/collaboration')) {
+      const workspaceId = parsedUrl.query.workspaceId;
+      const file = parsedUrl.query.file;
+      
+      if (!workspaceId || !file) {
+        socket.destroy();
+        return;
+      }
+
+      // Authentication check via internal proxy
+      try {
+        const response = await fetch(`http://localhost:${port}/api/auth/session`, {
+          headers: { 
+            cookie: request.headers.cookie || '',
+            host: request.headers.host || `localhost:${port}`
+          }
+        });
+        const session = await response.json();
+        if (!session || !session.user) {
+          console.log('Unauthorized WS connection attempt');
+          socket.destroy();
+          return;
+        }
+
+        const accessRes = await fetch(`http://localhost:${port}/api/workspace/access?workspaceId=${workspaceId}`, {
+          headers: { 
+            cookie: request.headers.cookie || '',
+            host: request.headers.host || `localhost:${port}`
+          }
+        });
+        const access = await accessRes.json();
+        
+        if (!access.success) {
+          console.log(`User ${session.user.id} denied access to workspace ${workspaceId}`);
+          socket.destroy();
+          return;
+        }
+
+        // Room name includes workspace and file
+        const docName = `workspace/${workspaceId}/file/${file}`;
+        
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          setupWSConnection(ws, request, { docName });
+          
+          // Persistence Logic
+          const doc = docs.get(docName);
+          if (doc && !doc.__hasSaveHook) {
+            doc.__hasSaveHook = true;
+            
+            // Load initial content if it exists
+            const workspacePath = path.join(process.cwd(), 'workspaces', workspaceId);
+            const filePath = path.join(workspacePath, file);
+            
+            if (fs.existsSync(filePath)) {
+              const content = fs.readFileSync(filePath, 'utf-8');
+              const ytext = doc.getText('monaco');
+              if (ytext.length === 0) {
+                ytext.insert(0, content);
+              }
+            }
+
+            // Save on change
+            let saveTimeout = null;
+            doc.on('update', () => {
+              if (saveTimeout) clearTimeout(saveTimeout);
+              saveTimeout = setTimeout(() => {
+                const ytext = doc.getText('monaco');
+                const content = ytext.toString();
+                
+                // Ensure directory exists
+                const dirPath = path.dirname(filePath);
+                fs.mkdirSync(dirPath, { recursive: true });
+                fs.writeFileSync(filePath, content, 'utf-8');
+              }, 2000); // 2 second debounce
+            });
+          }
+        });
+      } catch (err) {
+        console.error('WS auth error:', err);
+        socket.destroy();
+      }
+    } else {
+      // Let Next.js or Socket.io handle other upgrades (Socket.io handles its own)
+    }
   });
 
   io.on('connection', (socket) => {

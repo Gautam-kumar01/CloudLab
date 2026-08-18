@@ -15,6 +15,8 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { io, Socket } from 'socket.io-client';
 import '@xterm/xterm/css/xterm.css';
+import * as Y from 'yjs';
+import { WebsocketProvider } from 'y-websocket';
 import GitPanel from './GitPanel';
 import AiChatPanel from './AiChatPanel';
 const FileTreeNode = ({ node, level, expandedFolders, setExpandedFolders, activeFile, openFile, onContextMenu, selectedNodePath, setSelectedNodePath }: any) => {
@@ -113,6 +115,18 @@ export default function Workspace() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [activeSidebar, setActiveSidebar] = useState<'explorer' | 'git'>('explorer');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, path: string, type: 'file' | 'directory', isRoot?: boolean } | null>(null);
+
+  // Yjs Refs
+  const ydocRef = useRef<Y.Doc | null>(null);
+  const providerRef = useRef<WebsocketProvider | null>(null);
+  const bindingRef = useRef<any | null>(null);
+  const editorRef = useRef<any>(null);
+  const [collaborators, setCollaborators] = useState<any[]>([]);
+  const [sessionUser, setSessionUser] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/session').then(r => r.json()).then(s => setSessionUser(s?.user));
+  }, []);
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -495,13 +509,8 @@ export default function Workspace() {
         [activeFile]: { ...prev[activeFile], content: value }
       }));
 
-      // Debounced Autosave
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
-      }
-      autoSaveTimeoutRef.current = setTimeout(() => {
-        handleSave(activeFile, value);
-      }, 1500); // 1.5 second debounce
+      // In Yjs mode, we don't save to the backend manually using POST /api/workspace/files on every change
+      // The server will handle saving directly from the Yjs document state.
     }
   };
 
@@ -525,7 +534,44 @@ export default function Workspace() {
     return <FileCode size={14} color="#888" />;
   };
 
-  const handleEditorDidMount = (editor: any, monaco: any) => {
+  const handleEditorDidMount = async (editor: any, monaco: any) => {
+    editorRef.current = editor;
+
+    // Dynamically import y-monaco only on the client side
+    const { MonacoBinding } = await import('y-monaco');
+
+    // Cleanup previous Yjs state if any
+    if (bindingRef.current) { bindingRef.current.destroy(); bindingRef.current = null; }
+    if (providerRef.current) { providerRef.current.destroy(); providerRef.current = null; }
+    if (ydocRef.current) { ydocRef.current.destroy(); ydocRef.current = null; }
+
+    if (activeFile) {
+      const ydoc = new Y.Doc();
+      ydocRef.current = ydoc;
+
+      const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/collaboration`;
+      
+      const provider = new WebsocketProvider(wsUrl, `workspace/${workspaceId}/file/${encodeURIComponent(activeFile)}`, ydoc, { 
+        connect: true,
+        params: { workspaceId, file: activeFile }
+      });
+      providerRef.current = provider;
+
+      provider.awareness.setLocalStateField('user', {
+        name: sessionUser?.name || 'Anonymous',
+        color: '#' + Math.floor(Math.random()*16777215).toString(16)
+      });
+
+      provider.awareness.on('change', () => {
+        const states = Array.from(provider.awareness.getStates().values());
+        setCollaborators(states.filter((state: any) => state.user));
+      });
+
+      const ytext = ydoc.getText('monaco');
+      const binding = new MonacoBinding(ytext, editor.getModel(), new Set([editor]), provider.awareness);
+      bindingRef.current = binding;
+    }
+
     editor.addAction({
       id: 'ai-explain-code',
       label: 'Explain Code (CloudLab AI)',
@@ -564,6 +610,13 @@ export default function Workspace() {
       }
     });
   };
+
+  useEffect(() => {
+    // When activeFile changes, we re-trigger handleEditorDidMount manually if the editor is already mounted
+    if (editorRef.current && activeFile) {
+      handleEditorDidMount(editorRef.current, null);
+    }
+  }, [activeFile, sessionUser]);
 
   return (
     <>
@@ -645,10 +698,26 @@ export default function Workspace() {
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-            react-ecommerce
+            {workspaceId}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Collaborators UI */}
+            {collaborators.map((c, i) => (
+              <div 
+                key={i} 
+                title={c.user.name} 
+                style={{ 
+                  width: '28px', height: '28px', borderRadius: '50%', 
+                  backgroundColor: c.user.color, display: 'flex', alignItems: 'center', 
+                  justifyContent: 'center', color: '#fff', fontSize: '12px', fontWeight: 'bold',
+                  boxShadow: '0 0 0 2px var(--bg-secondary)'
+                }}
+              >
+                {c.user.name.charAt(0).toUpperCase()}
+              </div>
+            ))}
+            
             <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--border-color)'} onMouseOut={e => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}>
               <Share size={14} /> Share
             </button>
@@ -776,11 +845,11 @@ export default function Workspace() {
                   <div style={{ flex: 1, position: 'relative' }}>
                     {activeFile && files[activeFile] ? (
                       <Editor
+                        path={activeFile}
                         height="100%"
                         language={files[activeFile].language}
                         theme="vs-dark"
-                        value={files[activeFile].content}
-                        onChange={handleEditorChange}
+                        defaultValue={files[activeFile].content}
                         onMount={handleEditorDidMount}
                         options={{
                           minimap: { enabled: false },
@@ -893,7 +962,7 @@ export default function Workspace() {
 
             {/* Right Panel (AI/Chat) */}
             <Panel defaultSize={20} minSize={15} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-tertiary)' }}>
-              <AiChatPanel activeFile={activeFile} fileContent={activeFile && files[activeFile] ? files[activeFile].content : ''} />
+              <AiChatPanel activeFile={activeFile} fileContent={activeFile && files[activeFile] ? files[activeFile].content : ''} workspaceId={workspaceId} />
             </Panel>
 
           </PanelGroup>
