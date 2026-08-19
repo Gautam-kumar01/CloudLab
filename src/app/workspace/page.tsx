@@ -8,7 +8,7 @@ import {
   Folder, FileCode, FileJson, FileType2, Terminal as TerminalIcon, 
   Play, Share, Settings, Code2, MessageSquare, AlertCircle,
   FilePlus, FolderPlus, RefreshCw, ChevronsDown, ChevronRight, ChevronDown,
-  Plus, Trash, SplitSquareHorizontal, ChevronDown as ChevronDownIcon, GitBranch, Files
+  Plus, Trash, SplitSquareHorizontal, ChevronDown as ChevronDownIcon, GitBranch, Files, Globe, Rocket
 } from 'lucide-react';
 
 import { Terminal as XTerm } from '@xterm/xterm';
@@ -19,6 +19,8 @@ import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import GitPanel from './GitPanel';
 import AiChatPanel from './AiChatPanel';
+import PreviewPanel from './PreviewPanel';
+import DeploymentPanel from './DeploymentPanel';
 const FileTreeNode = ({ node, level, expandedFolders, setExpandedFolders, activeFile, openFile, onContextMenu, selectedNodePath, setSelectedNodePath }: any) => {
   const isExpanded = expandedFolders[node.path];
   const isSelected = selectedNodePath === node.path;
@@ -113,8 +115,9 @@ export default function Workspace() {
   const [isSaving, setIsSaving] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState('terminal');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [activeSidebar, setActiveSidebar] = useState<'explorer' | 'git'>('explorer');
+  const [activeSidebar, setActiveSidebar] = useState<'explorer' | 'git' | 'deploy'>('explorer');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, path: string, type: 'file' | 'directory', isRoot?: boolean } | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Yjs Refs
   const ydocRef = useRef<Y.Doc | null>(null);
@@ -718,8 +721,21 @@ export default function Workspace() {
               </div>
             ))}
             
-            <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--border-color)'} onMouseOut={e => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}>
+            <button 
+              onClick={() => { navigator.clipboard.writeText(window.location.href); alert('Workspace URL copied to clipboard! Share it with collaborators.'); }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', transition: 'background-color 0.2s', cursor: 'pointer' }} 
+              onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--border-color)'} 
+              onMouseOut={e => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
+            >
               <Share size={14} /> Share
+            </button>
+            <button 
+              onClick={() => setShowPreview(!showPreview)} 
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: showPreview ? 'var(--bg-secondary)' : 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', transition: 'background-color 0.2s', cursor: 'pointer' }} 
+              onMouseOver={e => e.currentTarget.style.backgroundColor = 'var(--border-color)'} 
+              onMouseOut={e => e.currentTarget.style.backgroundColor = showPreview ? 'var(--bg-secondary)' : 'var(--bg-tertiary)'}
+            >
+              <Globe size={14} /> Preview
             </button>
             <button onClick={handleRunCommand} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'var(--accent-green)', color: '#000', borderRadius: '6px', border: 'none', fontWeight: 600, transition: 'opacity 0.2s', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.opacity = '0.9'} onMouseOut={e => e.currentTarget.style.opacity = '1'}>
               <Play size={14} fill="currentColor" /> Run
@@ -731,27 +747,16 @@ export default function Workspace() {
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
           {/* Activity Bar (Far Left) */}
           <div style={{ width: '48px', height: '100%', background: 'var(--bg-secondary)', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '12px', gap: '16px' }}>
-            <div 
-              onClick={() => setActiveSidebar('explorer')}
-              style={{ cursor: 'pointer', opacity: activeSidebar === 'explorer' ? 1 : 0.5, borderLeft: activeSidebar === 'explorer' ? '2px solid var(--accent-orange)' : '2px solid transparent', padding: '8px', transition: 'all 0.2s' }}
-              title="Explorer"
-            >
-              <Files size={24} />
-            </div>
-            <div 
-              onClick={() => setActiveSidebar('git')}
-              style={{ cursor: 'pointer', opacity: activeSidebar === 'git' ? 1 : 0.5, borderLeft: activeSidebar === 'git' ? '2px solid var(--accent-orange)' : '2px solid transparent', padding: '8px', transition: 'all 0.2s' }}
-              title="Source Control"
-            >
-              <GitBranch size={24} />
-            </div>
+            <Files size={24} style={{ cursor: 'pointer', color: activeSidebar === 'explorer' ? 'var(--text-primary)' : 'var(--text-secondary)' }} onClick={() => setActiveSidebar('explorer')} />
+            <GitBranch size={24} style={{ cursor: 'pointer', color: activeSidebar === 'git' ? 'var(--text-primary)' : 'var(--text-secondary)' }} onClick={() => setActiveSidebar('git')} />
+            <Rocket size={24} style={{ cursor: 'pointer', color: activeSidebar === 'deploy' ? 'var(--text-primary)' : 'var(--text-secondary)' }} onClick={() => setActiveSidebar('deploy')} />
           </div>
 
           <PanelGroup orientation="horizontal" style={{ flex: 1 }}>
             
-            {/* Sidebar (Explorer / Git) */}
+            {/* Sidebar (Explorer / Git / Deploy) */}
             <Panel defaultSize={20} minSize={15} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-tertiary)' }}>
-              {activeSidebar === 'explorer' ? (
+              {activeSidebar === 'explorer' && (
                 <>
                   <div style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -791,7 +796,9 @@ export default function Workspace() {
                     )}
                   </div>
                 </>
-              ) : (
+              )}
+
+              {activeSidebar === 'git' && (
                 <>
                   <div style={{ padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -803,6 +810,12 @@ export default function Workspace() {
                   </div>
                 </>
               )}
+
+              {activeSidebar === 'deploy' && (
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  <DeploymentPanel workspaceId={workspaceId} />
+                </div>
+              )}
             </Panel>
 
             <PanelResizeHandle className="resize-handle" style={{ width: '1px', cursor: 'col-resize' }} />
@@ -811,9 +824,11 @@ export default function Workspace() {
             <Panel defaultSize={65} minSize={30} style={{ display: 'flex', flexDirection: 'column' }}>
               <PanelGroup orientation="vertical">
                 
-                {/* Editor Panel */}
+                {/* Editor (and Preview) Area */}
                 <Panel defaultSize={70} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
-                  {/* Editor Tabs */}
+                  <PanelGroup orientation="horizontal">
+                    <Panel defaultSize={showPreview ? 50 : 100} style={{ display: 'flex', flexDirection: 'column' }}>
+                      {/* Editor Tabs */}
                   <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', overflowX: 'auto' }}>
                     {Object.keys(files).map(filename => (
                       <div 
@@ -870,6 +885,17 @@ export default function Workspace() {
                     )}
                   </div>
                 </Panel>
+
+                {showPreview && (
+                  <>
+                    <PanelResizeHandle className="resize-handle" style={{ width: '1px', cursor: 'col-resize' }} />
+                    <Panel defaultSize={50} minSize={20}>
+                      <PreviewPanel workspaceId={workspaceId} onClose={() => setShowPreview(false)} />
+                    </Panel>
+                  </>
+                )}
+                </PanelGroup>
+              </Panel>
 
                 <PanelResizeHandle className="resize-handle" style={{ height: '1px', cursor: 'row-resize' }} />
 

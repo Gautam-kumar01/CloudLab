@@ -8,13 +8,7 @@ const nextConfig: NextConfig = {
     };
     return config;
   },
-  experimental: {
-    turbo: {
-      resolveAlias: {
-        'monaco-editor/esm/vs/editor/editor.api.js': 'monaco-editor'
-      }
-    }
-  }
+
 };
 
 export default nextConfig;
