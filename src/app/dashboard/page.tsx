@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { auth, signOut } from '@/auth';
 import RepoCard from './RepoCard';
 import ImportButton from './ImportButton';
+import NewProjectButton from './NewProjectButton';
 
 export default async function Dashboard() {
   const session = await auth();
@@ -75,7 +76,10 @@ export default async function Dashboard() {
         
         <div className="flex justify-between items-center" style={{ marginBottom: '32px' }}>
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Your GitHub Repositories</h1>
-          <ImportButton />
+          <div className="flex gap-4">
+            <ImportButton />
+            <NewProjectButton />
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '24px' }}>

@@ -123,7 +123,26 @@ export async function POST(request: Request) {
     await fs.mkdir(dirPath, { recursive: true });
 
     if (!isDir) {
-      await fs.writeFile(filePath, content || '', 'utf-8');
+      const { checkQuota } = await import('@/lib/storage');
+      const contentBuffer = Buffer.from(content || '', 'utf-8');
+      
+      let existingSize = 0;
+      try {
+        const stat = await fs.stat(filePath);
+        existingSize = stat.size;
+      } catch (e) {
+        // File doesn't exist yet
+      }
+      
+      const sizeDiff = contentBuffer.byteLength - existingSize;
+      if (sizeDiff > 0) {
+        const quota = await checkQuota(workspacePath, sizeDiff);
+        if (!quota.ok) {
+          return NextResponse.json({ error: 'Storage quota exceeded (500 MB limit)' }, { status: 403 });
+        }
+      }
+
+      await fs.writeFile(filePath, contentBuffer);
     }
 
     return NextResponse.json({ success: true });

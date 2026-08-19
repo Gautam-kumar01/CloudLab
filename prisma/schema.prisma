@@ -69,6 +69,7 @@ model Project {
   owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  isTemplate    Boolean  @default(false)
   
   // Relationships
   members       WorkspaceMember[]

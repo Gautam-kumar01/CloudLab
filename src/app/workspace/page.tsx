@@ -8,7 +8,7 @@ import {
   Folder, FileCode, FileJson, FileType2, Terminal as TerminalIcon, 
   Play, Share, Settings, Code2, MessageSquare, AlertCircle,
   FilePlus, FolderPlus, RefreshCw, ChevronsDown, ChevronRight, ChevronDown,
-  Plus, Trash, SplitSquareHorizontal, ChevronDown as ChevronDownIcon, GitBranch, Files, Globe, Rocket
+  Plus, Trash, SplitSquareHorizontal, ChevronDown as ChevronDownIcon, GitBranch, Files, Globe, Rocket, Upload, Download
 } from 'lucide-react';
 
 import { Terminal as XTerm } from '@xterm/xterm';
@@ -118,6 +118,9 @@ export default function Workspace() {
   const [activeSidebar, setActiveSidebar] = useState<'explorer' | 'git' | 'deploy'>('explorer');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, path: string, type: 'file' | 'directory', isRoot?: boolean } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [storageUsage, setStorageUsage] = useState({ usedBytes: 0, quotaBytes: 500 * 1024 * 1024 });
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadTargetFolder, setUploadTargetFolder] = useState<string>('');
 
   // Yjs Refs
   const ydocRef = useRef<Y.Doc | null>(null);
@@ -179,6 +182,14 @@ export default function Workspace() {
       setActiveFile(path);
       return;
     }
+    
+    // Immediately open tab with loading state
+    setFiles(prev => ({
+      ...prev,
+      [path]: { name: node.name, language: node.language, content: '// Loading...' }
+    }));
+    setActiveFile(path);
+
     try {
       const res = await fetch(`/api/workspace/file?id=${encodeURIComponent(workspaceId)}&filename=${encodeURIComponent(path)}`);
       const data = await res.json();
@@ -187,10 +198,13 @@ export default function Workspace() {
           ...prev,
           [path]: { name: node.name, language: node.language, content: data.content }
         }));
-        setActiveFile(path);
       }
     } catch (e) {
       console.error(e);
+      setFiles(prev => ({
+        ...prev,
+        [path]: { name: node.name, language: node.language, content: '// Failed to load file' }
+      }));
     }
   };
 
@@ -206,6 +220,12 @@ export default function Workspace() {
           const firstKey = Object.keys(data).find(k => data[k].type === 'file');
           if (firstKey) openFile(firstKey, data[firstKey]);
         }
+      }
+      
+      const storageRes = await fetch(`/api/workspace/storage?id=${encodeURIComponent(workspaceId)}`);
+      const storageData = await storageRes.json();
+      if (!storageData.error) {
+        setStorageUsage({ usedBytes: storageData.usedBytes, quotaBytes: storageData.quotaBytes });
       }
     } catch (err) {
       console.error('Error fetching files:', err);
@@ -360,6 +380,54 @@ export default function Workspace() {
       await fetchWorkspace();
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleDownloadFile = (targetPath: string) => {
+    if (!targetPath) return;
+    window.location.href = `/api/workspace/download?id=${encodeURIComponent(workspaceId)}&filename=${encodeURIComponent(targetPath)}`;
+    setContextMenu(null);
+  };
+
+  const handleUploadFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size + storageUsage.usedBytes > storageUsage.quotaBytes) {
+      alert(`Upload failed: This file exceeds your workspace storage quota.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    fetch(`/api/workspace/upload?id=${encodeURIComponent(workspaceId)}&path=${encodeURIComponent(uploadTargetFolder)}`, {
+      method: 'POST',
+      body: formData,
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          alert('Upload failed: ' + data.error);
+        } else {
+          fetchWorkspace();
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Upload failed');
+      })
+      .finally(() => {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      });
+  };
+
+  const handleUploadTrigger = (targetPath: string) => {
+    setUploadTargetFolder(targetPath);
+    setContextMenu(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
@@ -763,10 +831,11 @@ export default function Workspace() {
                       EXPLORER
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <FilePlus size={14} style={{ cursor: 'pointer' }} onClick={() => handleNewFile(resolveTargetFolder())} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
-                      <FolderPlus size={14} style={{ cursor: 'pointer' }} onClick={() => handleNewFolder(resolveTargetFolder())} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
-                      <RefreshCw size={14} style={{ cursor: 'pointer' }} onClick={fetchWorkspace} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
-                      <ChevronsDown size={14} style={{ cursor: 'pointer' }} onClick={() => setExpandedFolders({})} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} />
+                      <span title="New File" style={{ display: 'flex' }}><FilePlus size={14} style={{ cursor: 'pointer' }} onClick={() => handleNewFile(resolveTargetFolder())} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} /></span>
+                      <span title="New Folder" style={{ display: 'flex' }}><FolderPlus size={14} style={{ cursor: 'pointer' }} onClick={() => handleNewFolder(resolveTargetFolder())} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} /></span>
+                      <span title="Upload File" style={{ display: 'flex' }}><Upload size={14} style={{ cursor: 'pointer' }} onClick={() => handleUploadTrigger(resolveTargetFolder())} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} /></span>
+                      <span title="Refresh" style={{ display: 'flex' }}><RefreshCw size={14} style={{ cursor: 'pointer' }} onClick={fetchWorkspace} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} /></span>
+                      <span title="Collapse Folders" style={{ display: 'flex' }}><ChevronsDown size={14} style={{ cursor: 'pointer' }} onClick={() => setExpandedFolders({})} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'} /></span>
                     </div>
                   </div>
                   <div 
@@ -1007,6 +1076,9 @@ export default function Workspace() {
               <span style={{ cursor: 'pointer', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--bg-primary)'} onMouseOut={e => e.currentTarget.style.color = '#fff'}>
                 <AlertCircle size={12} style={{ display: 'inline', marginRight: '4px' }} /> 0
               </span>
+              <span style={{ cursor: 'pointer', transition: 'color 0.2s', display: 'flex', alignItems: 'center', gap: '4px' }} onMouseOver={e => e.currentTarget.style.color = 'var(--bg-primary)'} onMouseOut={e => e.currentTarget.style.color = '#fff'}>
+                💾 {(storageUsage.usedBytes / 1024 / 1024).toFixed(1)} MB / {(storageUsage.quotaBytes / 1024 / 1024).toFixed(0)} MB
+              </span>
             </div>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -1081,8 +1153,35 @@ export default function Workspace() {
                 </div>
               </>
             )}
+            <div 
+              className="context-menu-item"
+              style={{ padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+              onClick={() => handleUploadTrigger(contextMenu.type === 'directory' ? contextMenu.path : contextMenu.path.substring(0, contextMenu.path.lastIndexOf('/')))}
+              onMouseOver={e => e.currentTarget.style.background = 'var(--accent-purple)'}
+              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <Upload size={14} /> Upload File
+            </div>
+            {contextMenu.type === 'file' && (
+              <div 
+                className="context-menu-item"
+                style={{ padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                onClick={() => handleDownloadFile(contextMenu.path)}
+                onMouseOver={e => e.currentTarget.style.background = 'var(--accent-purple)'}
+                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <Download size={14} /> Download File
+              </div>
+            )}
           </div>
         )}
+
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          style={{ display: 'none' }} 
+          onChange={handleUploadFileSelect} 
+        />
 
         {showCommandPalette && (
           <div onClick={() => setShowCommandPalette(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', paddingTop: '96px', zIndex: 50 }}>
