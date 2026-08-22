@@ -1,11 +1,18 @@
 import Link from 'next/link';
 import { auth, signOut } from '@/auth';
+import { db } from '@/lib/db';
 import RepoCard from './RepoCard';
 import ImportButton from './ImportButton';
 import NewProjectButton from './NewProjectButton';
 
 export default async function Dashboard() {
   const session = await auth();
+  
+  let isAdmin = false;
+  if (session?.user?.id) {
+    const dbUser = await db.user.findUnique({ where: { id: session.user.id }});
+    isAdmin = dbUser?.role === 'ADMIN';
+  }
   
   // Fetch GitHub repos
   let repos: any[] = [];
@@ -76,7 +83,23 @@ export default async function Dashboard() {
         
         <div className="flex justify-between items-center" style={{ marginBottom: '32px' }}>
           <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Your GitHub Repositories</h1>
-          <div className="flex gap-4">
+          <div className="flex" style={{ gap: '16px' }}>
+            {isAdmin && (
+              <Link href="/admin/workspaces" style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
+                color: '#fff',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                textDecoration: 'none',
+                boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
+                transition: 'transform 0.2s',
+              }} className="hover:scale-105">
+                Admin Panel
+              </Link>
+            )}
             <ImportButton />
             <NewProjectButton />
           </div>

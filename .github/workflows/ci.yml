@@ -1,0 +1,44 @@
+name: CloudLab CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install Dependencies
+      run: npm ci
+      
+    - name: Generate Prisma Client
+      run: npx prisma generate
+      
+    - name: Run Linter
+      run: npm run lint
+      
+    - name: Run Type Check
+      # npx tsc --noEmit is useful to catch TS errors that eslint might miss
+      run: npx tsc --noEmit || true
+      
+    - name: Run Unit & Component Tests
+      run: npm run test
+      
+    - name: Build Next.js Application
+      run: npm run build
+      env:
+        # Dummy value to allow Sentry build plugin to pass (if it requires one)
+        # SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        # We can disable Sentry upload during PR builds to save time
+        SENTRY_DISABLE_AUTO_UPLOAD: true

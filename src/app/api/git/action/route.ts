@@ -1,4 +1,7 @@
-import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { canAccessWorkspace } from '@/lib/workspace-auth';
+import { apiResponse, apiError, apiValidationError } from '@/lib/api-utils';
+import { GitActionSchema } from '@/lib/validations/api';
 import { exec } from 'child_process';
 import util from 'util';
 import path from 'path';
@@ -8,10 +11,21 @@ const execPromise = util.promisify(exec);
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { workspaceId, action, file, message, branch } = body;
+    const parseResult = GitActionSchema.safeParse(body);
 
-    if (!workspaceId || !action) {
-      return NextResponse.json({ error: 'Missing workspaceId or action' }, { status: 400 });
+    if (!parseResult.success) {
+      return apiValidationError(parseResult.error);
+    }
+
+    const { workspaceId, action, file, message, branch } = parseResult.data;
+
+    const session = await auth();
+    if (!session?.user?.id) {
+      return apiError('Unauthorized', 401);
+    }
+    const hasAccess = await canAccessWorkspace(session.user.id, workspaceId);
+    if (!hasAccess) {
+      return apiError('Forbidden', 403);
     }
 
     const workspacePath = path.resolve(process.cwd(), 'workspaces', workspaceId);
@@ -31,7 +45,7 @@ export async function POST(request: Request) {
         command = `git reset HEAD ${safeFile || ''}`;
         break;
       case 'commit':
-        if (!message) return NextResponse.json({ error: 'Missing commit message' }, { status: 400 });
+        if (!message) return apiError('Missing commit message', 400);
         const safeMsg = message.replace(/"/g, '\\"');
         command = `git commit -m "${safeMsg}"`;
         break;
@@ -39,23 +53,26 @@ export async function POST(request: Request) {
         command = 'git pull origin HEAD && git push origin HEAD';
         break;
       case 'checkout':
-        if (!branch) return NextResponse.json({ error: 'Missing branch name' }, { status: 400 });
+        if (!branch) return apiError('Missing branch name', 400);
         const safeBranch = branch.replace(/[^a-zA-Z0-9_\-\/]/g, '');
         command = `git checkout ${safeBranch}`;
         break;
       case 'create-branch':
-        if (!branch) return NextResponse.json({ error: 'Missing branch name' }, { status: 400 });
+        if (!branch) return apiError('Missing branch name', 400);
         const safeNewBranch = branch.replace(/[^a-zA-Z0-9_\-\/]/g, '');
         command = `git checkout -b ${safeNewBranch}`;
         break;
+      case 'pull':
+        command = `git pull`;
+        break;
       default:
-        return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+        return apiError('Unknown action', 400);
     }
 
     const { stdout, stderr } = await execPromise(command, { cwd: workspacePath });
-    return NextResponse.json({ success: true, stdout, stderr });
+    return apiResponse({ success: true, stdout, stderr });
   } catch (error: any) {
     console.error(`Git action failed:`, error);
-    return NextResponse.json({ error: error.message || String(error) }, { status: 500 });
+    return apiError('Git operation failed', 500, error.message);
   }
 }

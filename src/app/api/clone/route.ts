@@ -3,17 +3,39 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
+import { db } from '@/lib/db';
+import { auth } from '@/auth';
 
 const execAsync = promisify(exec);
 
 export async function POST(req: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { cloneUrl, name } = await req.json();
     if (!cloneUrl || !name) {
       return NextResponse.json({ error: 'Missing cloneUrl or name' }, { status: 400 });
     }
 
     const workspacePath = path.join(process.cwd(), 'workspaces', name);
+
+    // Check if project exists in database
+    const existingProject = await db.project.findFirst({
+      where: { name: name, ownerId: session.user.id },
+    });
+
+    if (!existingProject) {
+      await db.project.create({
+        data: {
+          name: name,
+          description: `Cloned from ${cloneUrl}`,
+          ownerId: session.user.id,
+        },
+      });
+    }
 
     // Check if it already exists
     try {

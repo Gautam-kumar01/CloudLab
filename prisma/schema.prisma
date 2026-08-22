@@ -7,6 +7,16 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ProjectStatus {
+  ACTIVE
+  DISABLED
+}
+
 // NextAuth Required Models
 model User {
   id            String    @id @default(cuid())
@@ -14,6 +24,7 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
+  role          Role      @default(USER)
   accounts      Account[]
   sessions      Session[]
   
@@ -70,6 +81,7 @@ model Project {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   isTemplate    Boolean  @default(false)
+  status        ProjectStatus @default(ACTIVE)
   
   // Relationships
   members       WorkspaceMember[]

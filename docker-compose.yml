@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: cloudlab-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: cloudlab
+      POSTGRES_PASSWORD: cloudlab_password
+      POSTGRES_DB: cloudlab_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudlab -d cloudlab_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.platform
+    container_name: cloudlab-web
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://cloudlab:cloudlab_password@postgres:5432/cloudlab_dev
+      - NODE_ENV=production
+      # Add other necessary env vars here (e.g. NEXTAUTH_URL, GITHUB_ID, etc.)
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["node", "server.js"]
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.platform
+    container_name: cloudlab-worker
+    environment:
+      - DATABASE_URL=postgresql://cloudlab:cloudlab_password@postgres:5432/cloudlab_dev
+      - NODE_ENV=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Using npx tsx since the worker is in TS, or node if worker is JS
+    command: ["npx", "tsx", "worker.ts"]
+
+volumes:
+  postgres_data:

@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { canAccessWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
+
 import { getDirectorySize, WORKSPACE_QUOTA_BYTES } from '@/lib/storage';
 import path from 'path';
 import { promises as fs } from 'fs';
@@ -11,7 +14,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Missing workspace id' }, { status: 400 });
   }
 
-  const workspacePath = path.resolve(process.cwd(), 'workspaces', workspaceId);
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const project = await getWorkspaceProject(session.user.id, workspaceId);
+  if (!project) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const workspacePath = path.resolve(process.cwd(), 'workspaces', project.name);
 
   try {
     await fs.access(workspacePath);
@@ -23,6 +35,6 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     usedBytes,
-    quotaBytes: WORKSPACE_QUOTA_BYTES
+    quotaBytes: WORKSPACE_QUOTA_BYTES,
   });
 }

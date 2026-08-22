@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { canAccessWorkspace } from '@/lib/workspace-auth';
 import { db } from '@/lib/db';
+import { apiResponse, apiError } from '@/lib/api-utils';
 import fs from 'fs';
 import path from 'path';
 
@@ -9,12 +11,12 @@ export async function GET(request: Request) {
   const workspaceId = searchParams.get('workspaceId');
 
   if (!workspaceId) {
-    return NextResponse.json({ error: 'Missing workspaceId' }, { status: 400 });
+    return apiError('Missing workspaceId', 400);
   }
 
   const session = await auth();
   if (!session || !session.user || !session.user.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return apiError('Unauthorized', 401);
   }
 
   const userId = session.user.id;
@@ -23,15 +25,12 @@ export async function GET(request: Request) {
     // 1. Check if the workspace (project) exists
     console.log(`[AccessCheck] Checking workspace: ${workspaceId} for user ${userId}`);
     const project = await db.project.findFirst({
-      where: { 
-        OR: [
-          { id: workspaceId },
-          { name: workspaceId }
-        ]
+      where: {
+        OR: [{ id: workspaceId }, { name: workspaceId }],
       },
       include: {
-        members: true
-      }
+        members: true,
+      },
     });
 
     if (!project) {
@@ -39,26 +38,42 @@ export async function GET(request: Request) {
       console.log(`[AccessCheck] Project not found in DB. Checking local path: ${workspacePath}`);
       if (fs.existsSync(workspacePath)) {
         console.log(`[AccessCheck] Local path exists. Granting OWNER access.`);
-        return NextResponse.json({ success: true, role: 'OWNER', user: session.user });
+        // For local fallback, we assume the name is the ID provided
+        return apiResponse({
+          success: true,
+          role: 'OWNER',
+          user: session.user,
+          projectName: workspaceId,
+        });
       }
       console.log(`[AccessCheck] Local path does NOT exist.`);
-      return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
+      return apiError('Workspace not found', 404);
     }
 
     // 2. Check if the user is the owner
     if (project.ownerId === userId) {
-      return NextResponse.json({ success: true, role: 'OWNER', user: session.user });
+      return apiResponse({
+        success: true,
+        role: 'OWNER',
+        user: session.user,
+        projectName: project.name,
+      });
     }
 
     // 3. Check if the user is a member
-    const member = project.members.find(m => m.userId === userId);
+    const member = project.members.find((m) => m.userId === userId);
     if (member) {
-      return NextResponse.json({ success: true, role: member.role, user: session.user });
+      return apiResponse({
+        success: true,
+        role: member.role,
+        user: session.user,
+        projectName: project.name,
+      });
     }
 
-    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    return apiError('Access denied', 403);
   } catch (error: any) {
     console.error('Workspace access check error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return apiError('Internal Server Error', 500, error.message);
   }
 }

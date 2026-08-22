@@ -1,4 +1,8 @@
-import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { canAccessWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
+import { apiResponse, apiError, apiValidationError } from '@/lib/api-utils';
+import { FileWriteSchema } from '@/lib/validations/api';
+
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -14,10 +18,14 @@ function getLanguageFromFilename(filename: string) {
 }
 
 const initialFiles = {
-  'index.ts': "console.log('Hello from CloudLab Local!');\n\n// Try running 'node index.ts' in the terminal below!",
-  'App.tsx': "import React from 'react';\n\nexport default function App() {\n  return (\n    <div>\n      <h1>Hello CloudLab 🚀</h1>\n    </div>\n  );\n}",
-  'styles.css': "body {\n  margin: 0;\n  padding: 0;\n  background: #0d1117;\n  color: #c9d1d9;\n  font-family: sans-serif;\n}",
-  'package.json': "{\n  \"name\": \"cloudlab-demo\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n    \"react\": \"^18.2.0\"\n  }\n}"
+  'index.ts':
+    "console.log('Hello from CloudLab Local!');\n\n// Try running 'node index.ts' in the terminal below!",
+  'App.tsx':
+    "import React from 'react';\n\nexport default function App() {\n  return (\n    <div>\n      <h1>Hello CloudLab 🚀</h1>\n    </div>\n  );\n}",
+  'styles.css':
+    'body {\n  margin: 0;\n  padding: 0;\n  background: #0d1117;\n  color: #c9d1d9;\n  font-family: sans-serif;\n}',
+  'package.json':
+    '{\n  "name": "cloudlab-demo",\n  "version": "1.0.0",\n  "dependencies": {\n    "react": "^18.2.0"\n  }\n}',
 };
 
 export async function GET(request: Request) {
@@ -25,10 +33,19 @@ export async function GET(request: Request) {
   const workspaceId = searchParams.get('id');
 
   if (!workspaceId) {
-    return NextResponse.json({ error: 'Missing workspace id' }, { status: 400 });
+    return apiError('Missing workspace id', 400);
   }
 
-  const workspacePath = path.join(process.cwd(), 'workspaces', workspaceId);
+  const session = await auth();
+  if (!session?.user?.id) {
+    return apiError('Unauthorized', 401);
+  }
+  const project = await getWorkspaceProject(session.user.id, workspaceId);
+  if (!project) {
+    return apiError('Forbidden', 403);
+  }
+
+  const workspacePath = path.join(process.cwd(), 'workspaces', project.name);
 
   try {
     // Check if workspace exists, if not, create it and populate with initial files
@@ -52,7 +69,7 @@ export async function GET(request: Request) {
     const buildTree = async (dirPath: string, relativePath: string = ''): Promise<any> => {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
       const tree: Record<string, any> = {};
-      
+
       // Sort directories first, then files
       const sortedEntries = entries.sort((a, b) => {
         if (a.isDirectory() && !b.isDirectory()) return -1;
@@ -61,17 +78,18 @@ export async function GET(request: Request) {
       });
 
       for (const entry of sortedEntries) {
-        if (entry.name === '.git' || entry.name === 'node_modules' || entry.name === '__pycache__') continue; // Skip large/hidden dirs
-        
+        if (entry.name === '.git' || entry.name === 'node_modules' || entry.name === '__pycache__')
+          continue; // Skip large/hidden dirs
+
         const fullPath = path.join(dirPath, entry.name);
         const itemRelPath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
-        
+
         if (entry.isDirectory()) {
           tree[entry.name] = {
             type: 'directory',
             name: entry.name,
             path: itemRelPath,
-            children: await buildTree(fullPath, itemRelPath)
+            children: await buildTree(fullPath, itemRelPath),
           };
         } else {
           tree[entry.name] = {
@@ -79,7 +97,7 @@ export async function GET(request: Request) {
             name: entry.name,
             path: itemRelPath,
             language: getLanguageFromFilename(entry.name),
-            content: null // Content is now lazy-loaded
+            content: null, // Content is now lazy-loaded
           };
         }
       }
@@ -88,34 +106,51 @@ export async function GET(request: Request) {
 
     const result = await buildTree(workspacePath);
 
-    return NextResponse.json(result);
+    return apiResponse(result);
   } catch (error: any) {
     console.error('Error reading workspace files:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return apiError('Failed to read workspace files', 500, error.message);
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const { workspaceId, filename, content, isDir } = await request.json();
+    const body = await request.json();
+    const parseResult = FileWriteSchema.safeParse(body);
 
-    if (!workspaceId || !filename) {
-      return NextResponse.json({ error: 'Missing workspaceId or filename' }, { status: 400 });
+    if (!parseResult.success) {
+      return apiValidationError(parseResult.error);
     }
 
-    const workspacePath = path.resolve(process.cwd(), 'workspaces', workspaceId);
+    const { workspaceId, filename, content, isDir } = parseResult.data;
+
+    const session = await auth();
+    if (!session?.user?.id) {
+      return apiError('Unauthorized', 401);
+    }
+    const project = await getWorkspaceProject(session.user.id, workspaceId);
+    if (!project) {
+      return apiError('Forbidden', 403);
+    }
+
+    // Strict Path Traversal Guard
+    if (filename.includes('../') || filename.includes('..\\')) {
+      return apiError('Invalid file path: path traversal detected', 403);
+    }
+
+    const workspacePath = path.resolve(process.cwd(), 'workspaces', project.name);
     const filePath = path.resolve(workspacePath, filename);
 
     // Security check to prevent path traversal
     if (!filePath.startsWith(workspacePath)) {
-      return NextResponse.json({ error: 'Invalid file path: path traversal detected' }, { status: 403 });
+      return apiError('Invalid file path: path traversal detected', 403);
     }
-    
+
     // Ensure workspace exists
     try {
       await fs.access(workspacePath);
     } catch {
-      return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
+      return apiError('Workspace not found', 404);
     }
     const dirPath = isDir ? filePath : path.dirname(filePath);
 
@@ -125,7 +160,7 @@ export async function POST(request: Request) {
     if (!isDir) {
       const { checkQuota } = await import('@/lib/storage');
       const contentBuffer = Buffer.from(content || '', 'utf-8');
-      
+
       let existingSize = 0;
       try {
         const stat = await fs.stat(filePath);
@@ -133,22 +168,22 @@ export async function POST(request: Request) {
       } catch (e) {
         // File doesn't exist yet
       }
-      
+
       const sizeDiff = contentBuffer.byteLength - existingSize;
       if (sizeDiff > 0) {
         const quota = await checkQuota(workspacePath, sizeDiff);
         if (!quota.ok) {
-          return NextResponse.json({ error: 'Storage quota exceeded (500 MB limit)' }, { status: 403 });
+          return apiError('Storage quota exceeded (500 MB limit)', 403);
         }
       }
 
       await fs.writeFile(filePath, contentBuffer);
     }
 
-    return NextResponse.json({ success: true });
+    return apiResponse({ success: true });
   } catch (error: any) {
     console.error('Error saving workspace file:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return apiError('Error saving file', 500, error.message);
   }
 }
 
@@ -158,15 +193,29 @@ export async function DELETE(request: Request) {
   const filename = searchParams.get('filename');
 
   if (!workspaceId || !filename) {
-    return NextResponse.json({ error: 'Missing workspaceId or filename' }, { status: 400 });
+    return apiError('Missing workspaceId or filename', 400);
   }
 
-  const workspacePath = path.resolve(process.cwd(), 'workspaces', workspaceId);
+  const session = await auth();
+  if (!session?.user?.id) {
+    return apiError('Unauthorized', 401);
+  }
+  const project = await getWorkspaceProject(session.user.id, workspaceId);
+  if (!project) {
+    return apiError('Forbidden', 403);
+  }
+
+  // Strict Path Traversal Guard
+  if (filename.includes('../') || filename.includes('..\\')) {
+    return apiError('Invalid file path: path traversal detected', 403);
+  }
+
+  const workspacePath = path.resolve(process.cwd(), 'workspaces', project.name);
   const filePath = path.resolve(workspacePath, filename);
 
   // Security check to prevent path traversal
   if (!filePath.startsWith(workspacePath)) {
-    return NextResponse.json({ error: 'Invalid file path: path traversal detected' }, { status: 403 });
+    return apiError('Invalid file path: path traversal detected', 403);
   }
 
   try {
@@ -176,9 +225,9 @@ export async function DELETE(request: Request) {
     } else {
       await fs.unlink(filePath);
     }
-    return NextResponse.json({ success: true });
+    return apiResponse({ success: true });
   } catch (error: any) {
     console.error('Error deleting workspace file:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return apiError('Error deleting workspace file', 500, error.message);
   }
 }

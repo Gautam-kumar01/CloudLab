@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { canAccessWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
+
 import { promises as fs, createReadStream } from 'fs';
 import path from 'path';
 
@@ -11,7 +14,21 @@ export async function GET(request: Request) {
     return new NextResponse('Missing workspace id or filename', { status: 400 });
   }
 
-  const workspacePath = path.resolve(process.cwd(), 'workspaces', workspaceId);
+  const session = await auth();
+  if (!session?.user?.id) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+  const project = await getWorkspaceProject(session.user.id, workspaceId);
+  if (!project) {
+    return new NextResponse('Forbidden', { status: 403 });
+  }
+
+  // Strict Path Traversal Guard
+  if (filename.includes('../') || filename.includes('..\\')) {
+    return new NextResponse('Invalid file path: path traversal detected', { status: 403 });
+  }
+
+  const workspacePath = path.resolve(process.cwd(), 'workspaces', project.name);
   const filePath = path.resolve(workspacePath, filename);
 
   // Security check to prevent path traversal
@@ -21,13 +38,13 @@ export async function GET(request: Request) {
 
   try {
     const stat = await fs.stat(filePath);
-    
+
     if (stat.isDirectory()) {
       return new NextResponse('Cannot directly download a directory', { status: 400 });
     }
 
     // Use Web Streams API to stream the file instead of Node stream to support Edge/App router better natively
-    // Read the file as a buffer for the MVP as it's safe for 50MB files. 
+    // Read the file as a buffer for the MVP as it's safe for 50MB files.
     // For gigabyte files we would want a proper ReadableStream.
     const fileBuffer = await fs.readFile(filePath);
 
@@ -36,9 +53,8 @@ export async function GET(request: Request) {
         'Content-Disposition': `attachment; filename="${path.basename(filePath)}"`,
         'Content-Type': 'application/octet-stream',
         'Content-Length': stat.size.toString(),
-      }
+      },
     });
-
   } catch (error: any) {
     console.error('Error downloading file:', error);
     return new NextResponse('File not found or unreadable', { status: 404 });

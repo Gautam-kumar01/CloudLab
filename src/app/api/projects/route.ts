@@ -4,23 +4,27 @@ import { db } from '@/lib/db';
 import { builtInTemplates } from '@/lib/templates';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { apiResponse, apiError, apiValidationError } from '@/lib/api-utils';
+import { CreateProjectSchema } from '@/lib/validations/api';
 
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
     if (!session || !session.user || !session.user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return apiError('Unauthorized', 401);
     }
 
     const body = await req.json();
-    const { name, templateId, description } = body;
+    const parseResult = CreateProjectSchema.safeParse(body);
 
-    if (!name) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+    if (!parseResult.success) {
+      return apiValidationError(parseResult.error);
     }
 
+    const { name, template: templateId, description } = parseResult.data;
+
     // Find the template
-    const template = builtInTemplates.find(t => t.id === templateId) || builtInTemplates[0];
+    const template = builtInTemplates.find((t) => t.id === templateId) || builtInTemplates[0];
 
     // Create the project in the database
     const project = await db.project.create({
@@ -28,12 +32,12 @@ export async function POST(req: NextRequest) {
         name,
         description: description || template.description,
         ownerId: session.user.id,
-      }
+      },
     });
 
     // Create workspace directory
     const workspacePath = path.join(process.cwd(), 'workspaces', project.name); // Using project.name instead of ID to match the Dockerfile logic from Phase 14
-    
+
     // Ensure the workspaces directory exists
     await fs.mkdir(path.join(process.cwd(), 'workspaces'), { recursive: true });
 
@@ -51,9 +55,9 @@ export async function POST(req: NextRequest) {
       await fs.writeFile(filePath, content, 'utf-8');
     }
 
-    return NextResponse.json({ project });
+    return apiResponse({ project }, 201);
   } catch (error: any) {
     console.error('Error creating project:', error);
-    return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
+    return apiError('Failed to create project', 500, error.message);
   }
 }
