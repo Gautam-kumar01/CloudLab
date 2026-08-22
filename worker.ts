@@ -7,7 +7,7 @@ async function startWorker() {
   const queue = await getQueue();
 
   // Register worker for basic workspace cleanup
-  await queue.work('workspace-cleanup', async (jobs) => {
+  await queue.work('workspace-cleanup', async (jobs: any[]) => {
     for (const job of jobs) {
       logger.info(
         { jobId: job.id, workspaceId: (job.data as any).workspaceId },
@@ -20,7 +20,7 @@ async function startWorker() {
   });
 
   // Example: queue git operations
-  await queue.work('git-operation', async (jobs) => {
+  await queue.work('git-operation', async (jobs: any[]) => {
     for (const job of jobs) {
       logger.info(
         { jobId: job.id, operation: (job.data as any).operation, repoId: (job.data as any).repoId },

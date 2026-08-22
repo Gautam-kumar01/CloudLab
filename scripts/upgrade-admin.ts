@@ -1,4 +1,4 @@
-import { db } from './src/lib/db.ts';
+import { db } from '../src/lib/db';
 
 async function main() {
   const userId = 'cmsouwgn70000d8dlihcu0qga';

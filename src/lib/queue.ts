@@ -1,4 +1,4 @@
-import { PgBoss } from 'pg-boss';
+import { PgBoss, SendOptions } from 'pg-boss';
 import { logger } from './logger';
 
 function getPostgresUrl(): string {
@@ -38,7 +38,7 @@ function getPostgresUrl(): string {
 
 const boss = new PgBoss(getPostgresUrl());
 
-boss.on('error', (error) => logger.error({ err: error }, 'pg-boss error'));
+boss.on('error', (error: Error) => logger.error({ err: error }, 'pg-boss error'));
 
 let isStarting = false;
 let isReady = false;
@@ -63,7 +63,7 @@ export async function getQueue() {
   return boss;
 }
 
-export async function addJob(name: string, data: any, options?: PgBoss.SendOptions) {
+export async function addJob(name: string, data: any, options?: SendOptions) {
   const queue = await getQueue();
   return queue.send(name, data, options);
 }

@@ -1,6 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
+import fs from 'fs';
 
 const execAsync = promisify(exec);
 
@@ -27,7 +28,6 @@ export class LocalDockerDeployer implements Deployer {
 
     try {
       // 1. Ensure Dockerfile exists, if not create a default Node.js one
-      const fs = require('fs');
       const dockerfilePath = path.join(workspacePath, 'Dockerfile');
       if (!fs.existsSync(dockerfilePath)) {
         // Fallback Dockerfile for Node/React/Vite apps
