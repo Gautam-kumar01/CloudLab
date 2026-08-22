@@ -1,40 +1,65 @@
 # CloudLab
 
-CloudLab is a browser-based cloud development environment combining an online IDE, isolated containers, terminal, GitHub, AI coding assistance, collaboration, and deployment.
+<div align="center">
+  <img src="https://via.placeholder.com/800x400?text=CloudLab+Dashboard" alt="CloudLab Dashboard">
+  
+  **A browser-based cloud development environment combining an online IDE, isolated containers, real-time collaboration, and AI coding assistance.**
+</div>
 
-## Architecture
+---
 
-CloudLab is built using a monorepo approach with a Next.js (App Router) full-stack architecture.
+## 🚀 Features
 
-### Tech Stack
-- **Frontend:** Next.js, React, TypeScript, Vanilla CSS (Design Tokens)
-- **Editor:** Monaco Editor
-- **Terminal:** xterm.js + WebSockets
-- **Backend:** Next.js Route Handlers (API)
-- **Database:** PostgreSQL + Prisma (Future)
-- **Realtime:** WebSockets (Future)
-- **Runtime Environment:** Isolated Docker Containers (Future)
+- **Browser-Based IDE:** Powered by Monaco Editor, providing a VS Code-like experience with syntax highlighting and file management.
+- **Isolated Runtimes:** Every project runs securely inside its own isolated Docker container.
+- **Real-Time Collaboration:** Code with your team simultaneously using Yjs CRDTs.
+- **AI Coding Assistant:** Integrated AI chat and code actions to boost your productivity.
+- **Full Terminal Access:** A fully functional `xterm.js` terminal connected directly to your Docker workspace.
+- **GitHub Integration:** Import repositories, commit, and push directly from the browser.
+- **Admin Console:** Monitor system health, active workspaces, AI usage, and manage users.
 
-### Service Boundaries
-To maintain a modular architecture as we scale, the services are logically bounded:
-1. **Web App (Next.js Frontend):** UI presentation, routing, state management (IDE shell, Dashboard, Auth screens).
-2. **API (Next.js Backend):** User authentication, workspace metadata, billing, settings.
-3. **Realtime Gateway (Future):** WebSocket servers handling live collaboration (Yjs/CRDT) and terminal PTY streams.
-4. **Workspace Manager (Future):** Docker orchestration, starting/stopping isolated containers, monitoring CPU/RAM usage.
-5. **Worker (Future):** Background jobs processing via Redis (Git clones, container cleanup, long-running AI tasks).
+## 🛠️ Tech Stack
 
-### API Versioning Strategy
-All backend API routes follow a strict versioning pattern located at `/api/v1/...` to ensure backward compatibility as the platform evolves.
+- **Frontend:** Next.js (App Router), React, TypeScript, Tailwind CSS
+- **Editor & Terminal:** Monaco Editor, xterm.js
+- **Backend:** Node.js, Express (Unified WebSocket Server)
+- **Realtime:** Socket.io, Yjs, `y-websocket`
+- **Database:** PostgreSQL (Neon), Prisma ORM
+- **Runtime:** Docker Engine
+- **Auth:** NextAuth.js (GitHub OAuth & Email/Password)
 
-Example endpoints:
-- \`/api/v1/auth/*\`
-- \`/api/v1/workspaces/*\`
-- \`/api/v1/users/*\`
+## 📚 Documentation
 
-## Environment Setup
-Copy the \`.env.example\` file to \`.env.development\` to set up your local configuration.
+For a deep dive into CloudLab, refer to our comprehensive documentation:
+
+- [Architecture & Design](docs/ARCHITECTURE.md)
+- [Security Model](docs/SECURITY_MODEL.md)
+- [Local Development Guide](docs/LOCAL_DEVELOPMENT.md)
+- [API Documentation (OpenAPI)](docs/openapi.yaml)
+- [Contributing](docs/CONTRIBUTING.md)
+
+## 💻 Quick Start
+
+To run CloudLab locally, you will need Node.js, Docker, and PostgreSQL. 
+
+Please follow the full [Local Development Guide](docs/LOCAL_DEVELOPMENT.md) for detailed instructions on setting up environment variables, building the base Docker image, and running the unified server.
 
 ```bash
-cp .env.example .env.development
+# Clone the repo
+git clone https://github.com/Gautam-kumar01/CloudLab.git
+cd CloudLab
+
+# Install dependencies
+npm install
+
+# Setup database
+npx prisma generate
+npx prisma db push
+
+# Start the unified server (Next.js + WebSockets)
 npm run dev
 ```
+
+## 🛡️ License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
