@@ -65,6 +65,40 @@ const DockerManager = {
     } catch (error) {
       return 'not_found';
     }
+  },
+
+  /**
+   * Lists all running CloudLab workspace containers.
+   */
+  async listContainers() {
+    try {
+      // Get all containers labeled with cloudlab.workspace=true
+      const { stdout } = await execAsync(`docker ps --filter "label=cloudlab.workspace=true" --format "{{json .}}"`);
+      const lines = stdout.trim().split('\n').filter(Boolean);
+      return lines.map(line => {
+        try {
+          return JSON.parse(line);
+        } catch (e) {
+          return null;
+        }
+      }).filter(Boolean);
+    } catch (error) {
+      console.error('Error listing containers:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Kills any docker container by name or ID (useful for Admin force kill).
+   */
+  async killContainer(containerId) {
+    try {
+      await execAsync(`docker rm -f ${containerId}`);
+      return true;
+    } catch (error) {
+      console.error(`Failed to force kill container ${containerId}:`, error);
+      return false;
+    }
   }
 };
 

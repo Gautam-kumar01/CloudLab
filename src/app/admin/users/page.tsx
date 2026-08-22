@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 export default function AdminUsers() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetch('/api/admin/users')
@@ -34,6 +35,23 @@ export default function AdminUsers() {
           <h1 style={{ fontSize: '2.5rem', fontWeight: 800, margin: 0, letterSpacing: '-0.03em' }}>Users</h1>
           <p style={{ color: 'var(--text-secondary)', marginTop: '8px', fontSize: '1.1rem' }}>Manage platform accounts and roles.</p>
         </div>
+        <div>
+          <input 
+            type="text" 
+            placeholder="Search users..." 
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{
+              padding: '10px 16px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(0,0,0,0.2)',
+              color: 'var(--text-primary)',
+              width: '250px',
+              outline: 'none',
+            }}
+          />
+        </div>
       </div>
       
       {loading ? (
@@ -50,7 +68,10 @@ export default function AdminUsers() {
               </tr>
             </thead>
             <tbody>
-              {users.map(user => (
+              {users.filter(u => 
+                (u.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+                (u.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+              ).map(user => (
                 <tr key={user.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
                   <td style={{ fontWeight: 600, fontSize: '1.05rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
