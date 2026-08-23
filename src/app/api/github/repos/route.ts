@@ -44,3 +44,5 @@ export async function GET() {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
+
+export const revalidate = 300; // Cache for 5 mins

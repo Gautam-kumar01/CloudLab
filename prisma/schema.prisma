@@ -27,27 +27,27 @@ model User {
   role          Role      @default(USER)
   accounts      Account[]
   sessions      Session[]
-  
+
   // CloudLab Specific Relations
-  projects      Project[]
+  projects       Project[]
   workspaceRoles WorkspaceMember[]
-  aiLogs        AiLog[]
-  auditLogs     AuditLog[]
+  aiLogs         AiLog[]
+  auditLogs      AuditLog[]
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -73,52 +73,58 @@ model VerificationToken {
 // CloudLab Models
 
 model Project {
-  id            String   @id @default(cuid())
-  name          String
-  description   String?
-  ownerId       String
-  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  isTemplate    Boolean  @default(false)
-  status        ProjectStatus @default(ACTIVE)
-  
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  ownerId     String
+  owner       User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  isTemplate  Boolean       @default(false)
+  status      ProjectStatus @default(ACTIVE)
+
   // Relationships
-  members       WorkspaceMember[]
-  containers    Container[]
-  deployments   Deployment[]
-  envVars       EnvironmentVariable[]
+  members        WorkspaceMember[]
+  containers     Container[]
+  deployments    Deployment[]
+  envVars        EnvironmentVariable[]
   githubMetadata GitHubMetadata?
+
+  @@index([ownerId])
 }
 
 model WorkspaceMember {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   userId    String
   projectId String
-  role      String   @default("VIEWER") // OWNER, EDITOR, VIEWER
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
+  role      String  @default("VIEWER") // OWNER, EDITOR, VIEWER
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   @@unique([userId, projectId])
+  @@index([userId])
+  @@index([projectId])
 }
 
 model Container {
   id          String   @id @default(cuid())
   projectId   String
-  status      String   // STOPPED, RUNNING, ERROR
-  containerId String?  // Docker container ID
+  status      String // STOPPED, RUNNING, ERROR
+  containerId String? // Docker container ID
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
 }
 
 model GitHubMetadata {
-  id             String   @id @default(cuid())
-  projectId      String   @unique
+  id             String  @id @default(cuid())
+  projectId      String  @unique
   repositoryUrl  String
-  branch         String   @default("main")
+  branch         String  @default("main")
   installationId String?
-  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model AiLog {
@@ -128,15 +134,19 @@ model AiLog {
   tokens    Int      @default(0)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Deployment {
   id        String   @id @default(cuid())
   projectId String
-  status    String   // QUEUED, SUCCESS, FAILED
+  status    String // QUEUED, SUCCESS, FAILED
   url       String?
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+
+  @@index([projectId])
 }
 
 model AuditLog {
@@ -146,6 +156,8 @@ model AuditLog {
   details   String?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model EnvironmentVariable {

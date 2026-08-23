@@ -2,8 +2,13 @@
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
-import Editor from '@monaco-editor/react';
+
+const Editor = dynamic(() => import('@monaco-editor/react'), {
+  ssr: false,
+  loading: () => <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#888' }}>Loading Editor...</div>
+});
 import {
   Folder,
   FileCode,
@@ -34,10 +39,9 @@ import {
   Download,
 } from 'lucide-react';
 
-import { Terminal as XTerm } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
 import { io, Socket } from 'socket.io-client';
 import '@xterm/xterm/css/xterm.css';
+// xterm and fit-addon are dynamically imported inside terminalRef to reduce initial bundle size
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import GitPanel from './GitPanel';
@@ -260,7 +264,7 @@ export default function Workspace() {
 
   const socketRef = useRef<Socket | null>(null);
   const xtermInstances = useRef<
-    Record<string, { term: XTerm; fitAddon: FitAddon; container: HTMLDivElement }>
+    Record<string, { term: any; fitAddon: any; container: HTMLDivElement }>
   >({});
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -632,8 +636,11 @@ export default function Workspace() {
   }, [workspaceId]);
 
   // Terminal DOM attachment via callback ref
-  const terminalRef = (id: string) => (node: HTMLDivElement | null) => {
+  const terminalRef = (id: string) => async (node: HTMLDivElement | null) => {
     if (node && !xtermInstances.current[id]) {
+      const { Terminal: XTerm } = await import('@xterm/xterm');
+      const { FitAddon } = await import('@xterm/addon-fit');
+      
       const term = new XTerm({
         theme: {
           background: '#111111',
