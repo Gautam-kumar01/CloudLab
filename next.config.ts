@@ -27,10 +27,7 @@ export default withSentryConfig(nextConfig, {
   // Upload a larger set of source maps for prettier stack traces (increases build time)
   widenClientFileUpload: true,
 
-  // Automatically annotate React components to show their full name in breadcrumbs and session replay
-  reactComponentAnnotation: {
-    enabled: true,
-  },
+
 
   // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
   // This can increase your server load as well as your hosting bill.
@@ -41,6 +38,4 @@ export default withSentryConfig(nextConfig, {
   sourcemaps: {
     disable: true,
   },
-  // Automatically tree-shake Sentry logger statements to reduce bundle size
-  disableLogger: true,
 });

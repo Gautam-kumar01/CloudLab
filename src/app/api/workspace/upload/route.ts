@@ -6,12 +6,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { checkQuota } from '@/lib/storage';
 
-// Force dynamic route and disable default body parser to handle raw streaming (or large bodies)
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+
 
 export async function POST(request: Request) {
   try {
