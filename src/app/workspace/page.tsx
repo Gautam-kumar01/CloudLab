@@ -1330,55 +1330,60 @@ export default function Workspace() {
                       EXPLORER
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span title="New File" style={{ display: 'flex' }}>
+                      <span title="New File" style={{ display: 'flex' }} role="button" aria-label="New File" tabIndex={0}>
                         <FilePlus
                           size={14}
                           style={{ cursor: 'pointer' }}
                           onClick={() => handleNewFile(resolveTargetFolder())}
+                          onKeyDown={(e) => e.key === 'Enter' && handleNewFile(resolveTargetFolder())}
                           onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
                           onMouseOut={(e) =>
                             (e.currentTarget.style.color = 'var(--text-secondary)')
                           }
                         />
                       </span>
-                      <span title="New Folder" style={{ display: 'flex' }}>
+                      <span title="New Folder" style={{ display: 'flex' }} role="button" aria-label="New Folder" tabIndex={0}>
                         <FolderPlus
                           size={14}
                           style={{ cursor: 'pointer' }}
                           onClick={() => handleNewFolder(resolveTargetFolder())}
+                          onKeyDown={(e) => e.key === 'Enter' && handleNewFolder(resolveTargetFolder())}
                           onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
                           onMouseOut={(e) =>
                             (e.currentTarget.style.color = 'var(--text-secondary)')
                           }
                         />
                       </span>
-                      <span title="Upload File" style={{ display: 'flex' }}>
+                      <span title="Upload File" style={{ display: 'flex' }} role="button" aria-label="Upload File" tabIndex={0}>
                         <Upload
                           size={14}
                           style={{ cursor: 'pointer' }}
                           onClick={() => handleUploadTrigger(resolveTargetFolder())}
+                          onKeyDown={(e) => e.key === 'Enter' && handleUploadTrigger(resolveTargetFolder())}
                           onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
                           onMouseOut={(e) =>
                             (e.currentTarget.style.color = 'var(--text-secondary)')
                           }
                         />
                       </span>
-                      <span title="Refresh" style={{ display: 'flex' }}>
+                      <span title="Refresh" style={{ display: 'flex' }} role="button" aria-label="Refresh Explorer" tabIndex={0}>
                         <RefreshCw
                           size={14}
                           style={{ cursor: 'pointer' }}
                           onClick={fetchWorkspace}
+                          onKeyDown={(e) => e.key === 'Enter' && fetchWorkspace()}
                           onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
                           onMouseOut={(e) =>
                             (e.currentTarget.style.color = 'var(--text-secondary)')
                           }
                         />
                       </span>
-                      <span title="Collapse Folders" style={{ display: 'flex' }}>
+                      <span title="Collapse Folders" style={{ display: 'flex' }} role="button" aria-label="Collapse All Folders" tabIndex={0}>
                         <ChevronsDown
                           size={14}
                           style={{ cursor: 'pointer' }}
                           onClick={() => setExpandedFolders({})}
+                          onKeyDown={(e) => e.key === 'Enter' && setExpandedFolders({})}
                           onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
                           onMouseOut={(e) =>
                             (e.currentTarget.style.color = 'var(--text-secondary)')

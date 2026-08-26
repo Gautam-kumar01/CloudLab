@@ -7,8 +7,29 @@ import path from 'path';
 import { apiResponse, apiError, apiValidationError } from '@/lib/api-utils';
 import { CreateProjectSchema } from '@/lib/validations/api';
 
+// In-memory rate limiting map
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const MAX_REQUESTS = 10; // Max 10 projects per IP
+const WINDOW_MS = 60 * 1000; // Per 1 minute
+
 export async function POST(req: NextRequest) {
   try {
+    // Rate Limiting Logic
+    const ip = req.headers.get('x-forwarded-for') || 'anonymous_ip';
+    const now = Date.now();
+    const record = rateLimitMap.get(ip) || { count: 0, resetTime: now + WINDOW_MS };
+
+    if (now > record.resetTime) {
+      record.count = 0;
+      record.resetTime = now + WINDOW_MS;
+    }
+
+    if (record.count >= MAX_REQUESTS) {
+      return apiError('Rate limit exceeded. Please wait a minute before creating more projects.', 429);
+    }
+
+    record.count += 1;
+    rateLimitMap.set(ip, record);
     const session = await auth();
     if (!session || !session.user || !session.user.id) {
       return apiError('Unauthorized', 401);

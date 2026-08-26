@@ -8,6 +8,11 @@ import { exec } from 'child_process';
 import util from 'util';
 import { logAgentAction } from '@/lib/agent-logger';
 
+// In-memory rate limiting map for the AI endpoint
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const MAX_REQUESTS = 30; // Max 30 requests per IP
+const WINDOW_MS = 60 * 1000; // Per 1 minute
+
 const execPromise = util.promisify(exec);
 export const maxDuration = 30;
 
@@ -26,6 +31,26 @@ function getSafePath(relativePath: string, workspaceId?: string) {
 
 export async function POST(req: Request) {
   try {
+    // Rate Limiting Logic
+    const ip = req.headers.get('x-forwarded-for') || 'anonymous_ip';
+    const now = Date.now();
+    const record = rateLimitMap.get(ip) || { count: 0, resetTime: now + WINDOW_MS };
+
+    if (now > record.resetTime) {
+      record.count = 0;
+      record.resetTime = now + WINDOW_MS;
+    }
+
+    if (record.count >= MAX_REQUESTS) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please wait a minute before trying again.' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    record.count += 1;
+    rateLimitMap.set(ip, record);
+
     const { messages, workspaceId } = await req.json();
 
     const modelsToTry = [];
