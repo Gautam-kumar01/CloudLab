@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { canAccessWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
+import { getWorkspaceProject } from '@/lib/workspace-auth';
 
-import { promises as fs, createReadStream } from 'fs';
+import { promises as fs } from 'fs';
 import path from 'path';
 
 export async function GET(request: Request) {

@@ -1,7 +1,5 @@
-
+import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getQueue } from '@/lib/queue';
-
 export async function GET() {
   const session = await auth();
 
@@ -13,7 +11,7 @@ export async function GET() {
   // if (session.user.role !== 'ADMIN') return ...
 
   try {
-    const queue = await getQueue();
+    // TODO: Add actual job queue processing if needed
     // Mock pg-boss stats for now since getQueueSize isn't available on this type
     const created = 0, active = 0, completed = 0, failed = 0, cancelled = 0;
 
