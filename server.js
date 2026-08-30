@@ -251,7 +251,7 @@ app.prepare().then(() => {
         args = [
           '-NoExit',
           '-Command',
-          `function prompt { return 'cloudlab@${workspaceId || 'local'}:~/workspace$ ' }`,
+          `function prompt { return 'cloudlab@workspace:~/workspace$ ' }`,
         ];
       } else if (shellType === 'cmd') {
         shell = 'cmd.exe';
@@ -262,6 +262,12 @@ app.prepare().then(() => {
       }
 
       try {
+        if (terminals[id]) {
+          try {
+            terminals[id].kill();
+          } catch (e) {}
+        }
+        
         const ptyProcess = pty.spawn(shell, args, {
           name: 'xterm-color',
           cols: 80,
