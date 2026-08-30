@@ -636,31 +636,33 @@ export default function Workspace() {
   }, [workspaceId]);
 
   // Terminal DOM attachment via callback ref
-  const terminalRef = (id: string) => async (node: HTMLDivElement | null) => {
+  const terminalRef = (id: string) => (node: HTMLDivElement | null) => {
     if (node && !xtermInstances.current[id]) {
-      const { Terminal: XTerm } = await import('@xterm/xterm');
-      const { FitAddon } = await import('@xterm/addon-fit');
-      
-      const term = new XTerm({
-        theme: {
-          background: '#111111',
-          foreground: '#e0e0e0',
-          cursor: '#00ff41',
-        },
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: 13,
-        cursorBlink: true,
-      });
-      const fitAddon = new FitAddon();
-      term.loadAddon(fitAddon);
-      term.open(node);
-      fitAddon.fit();
+      (async () => {
+        const { Terminal: XTerm } = await import('@xterm/xterm');
+        const { FitAddon } = await import('@xterm/addon-fit');
+        
+        const term = new XTerm({
+          theme: {
+            background: '#111111',
+            foreground: '#e0e0e0',
+            cursor: '#00ff41',
+          },
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 13,
+          cursorBlink: true,
+        });
+        const fitAddon = new FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(node);
+        fitAddon.fit();
 
-      term.onData((data) => {
-        socketRef.current?.emit('terminal.toTerm', { id, data });
-      });
+        term.onData((data) => {
+          socketRef.current?.emit('terminal.toTerm', { id, data });
+        });
 
-      xtermInstances.current[id] = { term, fitAddon, container: node };
+        xtermInstances.current[id] = { term, fitAddon, container: node };
+      })();
     }
   };
 

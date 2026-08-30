@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 const archiver = require('archiver');
-import { auth } from '@/auth';
+import { db } from '@/lib/db';
 import { canAccessWorkspace } from '@/lib/workspace-auth';
 
 import path from 'path';

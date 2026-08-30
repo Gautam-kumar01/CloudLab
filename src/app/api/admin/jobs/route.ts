@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+
 import { auth } from '@/auth';
 import { getQueue } from '@/lib/queue';
 
-export async function GET(request: Request) {
+export async function GET() {
   const session = await auth();
 
   if (!session || !session.user) {

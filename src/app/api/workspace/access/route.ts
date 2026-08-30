@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
+
 import { auth } from '@/auth';
-import { canAccessWorkspace } from '@/lib/workspace-auth';
+
 import { db } from '@/lib/db';
 import { apiResponse, apiError } from '@/lib/api-utils';
 import fs from 'fs';
