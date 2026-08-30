@@ -42,12 +42,13 @@ cloudlab@workspace:~/project$ npm run dev
       {/* Sticky Glassmorphism Navbar */}
       <nav className="glass sticky top-0 z-50 flex justify-between items-center" style={{ padding: '16px 32px' }}>
         <div className="flex items-center" style={{ gap: '12px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, var(--accent-orange), var(--accent-purple))', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', color: '#fff' }}>CL</div>
-          <span style={{ fontSize: '1.25rem', fontWeight: 700, background: 'linear-gradient(to right, var(--accent-orange), var(--accent-purple))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>CloudLab</span>
+          <img src="/logo.jpg" alt="CloudLab Logo" style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover' }} />
+          <span style={{ fontSize: '1.25rem', fontWeight: 700, background: 'linear-gradient(to right, var(--accent-green), var(--accent-neon))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>CloudLab</span>
         </div>
         <div className="flex items-center" style={{ gap: '24px', fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+          <a href="#about" style={{ transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-primary)'}>About</a>
           <a href="#features" style={{ transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-primary)'}>Features</a>
-          <a href="#pricing" style={{ transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-primary)'}>Pricing</a>
+          <Link href="/dashboard" style={{ transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-primary)'}>Dashboard</Link>
           <Link href="/sign-in" style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontWeight: 600, transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}>Sign In</Link>
           <Link href="/sign-up" style={{ padding: '8px 16px', background: 'var(--accent-green)', color: '#000', borderRadius: '6px', fontWeight: 600, border: 'none', display: 'inline-block', boxShadow: '0 0 15px rgba(0,255,65,0.4)', transition: 'box-shadow 0.2s, transform 0.2s' }} onMouseOver={(e) => { e.currentTarget.style.boxShadow = '0 0 25px rgba(0,255,65,0.6)'; e.currentTarget.style.transform = 'translateY(-2px)'}} onMouseOut={(e) => { e.currentTarget.style.boxShadow = '0 0 15px rgba(0,255,65,0.4)'; e.currentTarget.style.transform = 'translateY(0)'}}>Get Started</Link>
         </div>
@@ -61,7 +62,7 @@ cloudlab@workspace:~/project$ npm run dev
         </h1>
         
         <p style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', maxWidth: '600px', marginBottom: '64px', lineHeight: 1.6 }}>
-          A browser-based cloud development environment combining an online IDE, isolated containers, and AI coding assistance.
+          CloudLab is your complete browser-based cloud development environment. Instantly provision secure Docker containers, write code with an online IDE, and deploy your apps in seconds.
         </p>
 
         {/* 3D Hacker Terminal Preview Window */}
@@ -89,6 +90,27 @@ cloudlab@workspace:~/project$ npm run dev
         </div>
       </main>
 
+      {/* About Section */}
+      <section id="about" style={{ padding: '100px 24px', background: 'rgba(5,5,5,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ maxWidth: '1200px', width: '100%', display: 'flex', gap: '64px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 500px' }}>
+            <h2 style={{ fontSize: '2.5rem', fontWeight: 800, color: '#fff', marginBottom: '24px' }}>The Future of Development is in the Cloud.</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', lineHeight: 1.8, marginBottom: '24px' }}>
+              We built CloudLab to eliminate the "it works on my machine" problem. Local development environments are brittle, hard to set up, and impossible to share. CloudLab changes all of that by moving the entire development lifecycle into a secure, scalable cloud environment.
+            </p>
+            <ul style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', lineHeight: 1.8, listStyleType: 'none', paddingLeft: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <li>✅ <strong>Zero Setup Time:</strong> Click a button and get a fully configured workspace in seconds.</li>
+              <li>✅ <strong>Total Isolation:</strong> Every workspace runs in its own secure Docker container with root access.</li>
+              <li>✅ <strong>Accessible Anywhere:</strong> Code from your laptop, tablet, or any device with a modern browser.</li>
+            </ul>
+          </div>
+          <div style={{ flex: '1 1 500px', position: 'relative' }}>
+            <img src="/illustration.jpg" alt="3D Cloud Workspace Illustration" style={{ width: '100%', borderRadius: '16px', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)', border: '1px solid rgba(255,255,255,0.1)' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(5,5,5,0.8), transparent)', borderRadius: '16px', pointerEvents: 'none' }}></div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Bento Grid Section */}
       <section id="features" style={{ padding: '100px 24px', background: 'linear-gradient(to bottom, transparent, rgba(17,17,17,0.8))' }}>
         <div style={{ textAlign: 'center', marginBottom: '64px' }}>
@@ -100,20 +122,20 @@ cloudlab@workspace:~/project$ npm run dev
           <div className="bento-card" style={{ gridColumn: 'span 2' }}>
             <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '150px', height: '150px', background: 'rgba(0,255,65,0.1)', filter: 'blur(40px)', borderRadius: '50%' }}></div>
             <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', marginBottom: '16px' }}>Isolated Docker Workspaces</h3>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>Spin up a secure, isolated container for every project. Get full root access to your environment without risking your local machine.</p>
+            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>Spin up a secure, isolated container for every project. We use robust Docker virtualization to give you full root access to your environment without risking your local machine. Install dependencies, run servers, and execute scripts freely.</p>
           </div>
           <div className="bento-card">
             <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', marginBottom: '16px' }}>Real-time Collaboration</h3>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>Code together in real-time. See cursors, share terminals, and debug collectively like Google Docs for code.</p>
+            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>Powered by Yjs CRDT technology, you can code together in real-time. See cursors, share terminals, and debug collectively like Google Docs for code.</p>
           </div>
           <div className="bento-card">
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', marginBottom: '16px' }}>AI Coding Assistant</h3>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>Built-in AI that understands your codebase. Ask questions, generate code, and fix errors instantly.</p>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', marginBottom: '16px' }}>Advanced IDE Engine</h3>
+            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>Built on top of the Monaco Editor, providing desktop-grade syntax highlighting, intelligent autocomplete, and a robust file tree.</p>
           </div>
           <div className="bento-card" style={{ gridColumn: 'span 2' }}>
             <div style={{ position: 'absolute', bottom: '-50px', left: '-50px', width: '150px', height: '150px', background: 'rgba(157,0,255,0.1)', filter: 'blur(40px)', borderRadius: '50%' }}></div>
             <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', marginBottom: '16px' }}>Seamless GitHub Integration</h3>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>Import any repository with one click. Commit, push, and manage branches directly from the CloudLab UI.</p>
+            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>Import any repository with one click using GitHub OAuth. Your workspace is automatically linked, allowing you to commit, push, and manage branches directly from the CloudLab UI terminal.</p>
           </div>
         </div>
       </section>
@@ -123,7 +145,7 @@ cloudlab@workspace:~/project$ npm run dev
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: '48px', justifyContent: 'space-between' }}>
           <div style={{ flex: '1 1 300px' }}>
             <div className="flex items-center" style={{ gap: '12px', marginBottom: '16px' }}>
-              <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'linear-gradient(135deg, var(--accent-orange), var(--accent-purple))', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', color: '#fff', fontSize: '0.7rem' }}>CL</div>
+              <img src="/logo.jpg" alt="CloudLab Logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }} />
               <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff' }}>CloudLab</span>
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>
@@ -135,9 +157,9 @@ cloudlab@workspace:~/project$ npm run dev
             <div>
               <h4 style={{ color: '#fff', fontWeight: 600, marginBottom: '16px' }}>Product</h4>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <li><a href="#" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Features</a></li>
-                <li><a href="#" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Pricing</a></li>
-                <li><a href="#" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Changelog</a></li>
+                <li><a href="#about" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>About</a></li>
+                <li><a href="#features" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Features</a></li>
+                <li><Link href="/dashboard" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', transition: 'color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.color = '#fff'} onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Dashboard</Link></li>
               </ul>
             </div>
             <div>
