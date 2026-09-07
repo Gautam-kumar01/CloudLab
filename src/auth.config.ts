@@ -4,9 +4,12 @@ import type { NextAuthConfig } from "next-auth";
 export default {
   providers: [
     GitHub({
+      clientId: process.env.AUTH_GITHUB_ID || process.env.GITHUB_ID,
+      clientSecret: process.env.AUTH_GITHUB_SECRET || process.env.GITHUB_SECRET,
       authorization: { params: { scope: "read:user user:email repo" } },
     }),
   ],
+  trustHost: true,
   pages: {
     signIn: "/sign-in",
   },
