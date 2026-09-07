@@ -45,4 +45,5 @@ export async function GET() {
   }
 }
 
-export const revalidate = 300; // Cache for 5 mins
+export const dynamic = 'force-dynamic';
+
