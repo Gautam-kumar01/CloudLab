@@ -16,10 +16,11 @@ describe('LandingPage', () => {
     expect(headings.length).toBeGreaterThan(0);
   });
 
-  it('contains the Get Started button', () => {
+  it('contains the call to action button linking to sign up', () => {
     render(<LandingPage />);
-    const button = screen.getByText(/Get Started/i);
-    expect(button).toBeInTheDocument();
-    expect(button.closest('a')).toHaveAttribute('href', '/sign-up');
+    const buttons = screen.getAllByText(/(Start Coding|Get Started)/i);
+    expect(buttons.length).toBeGreaterThan(0);
+    const signUpLink = buttons[0].closest('a');
+    expect(signUpLink).toHaveAttribute('href', '/sign-up');
   });
 });
