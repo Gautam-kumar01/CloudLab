@@ -43,7 +43,7 @@ const comparisonRows = [
 
 export default function WhyCloudLab() {
   return (
-    <section id="comparison" className="cl-section relative overflow-hidden bg-grid-pattern">
+    <section id="comparison" className="cl-section relative overflow-hidden bg-grid-pattern scroll-mt-28">
       <div
         className="ambient-glow-purple"
         style={{ top: '30%', right: '-160px', opacity: 0.2 }}

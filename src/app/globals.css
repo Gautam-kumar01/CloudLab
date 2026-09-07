@@ -60,10 +60,10 @@
   --container-max: 1240px;
   --container-padding: 24px;
 
-  /* Section Spacing */
-  --section-gap: 120px;
-  --section-gap-md: 80px;
-  --section-gap-sm: 56px;
+  /* Section Spacing - Generous breathing room */
+  --section-gap: 140px;
+  --section-gap-md: 100px;
+  --section-gap-sm: 80px;
 }
 
 * {
@@ -97,6 +97,18 @@ body {
 }
 
 /* ============================================================
+   Anchor Scroll Margins (Prevents Fixed Navbar Overlap)
+   ============================================================ */
+#ide-demo,
+#features,
+#how-it-works,
+#comparison,
+#faq,
+#final-cta {
+  scroll-margin-top: 100px;
+}
+
+/* ============================================================
    Container & Section Utilities
    ============================================================ */
 .cl-container {
@@ -127,45 +139,45 @@ body {
 }
 
 /* ============================================================
-   Typography System
+   Typography System - Clean Line Height to Prevent Overlap
    ============================================================ */
 .typo-hero {
-  font-size: clamp(40px, 7vw, 76px);
-  line-height: 1.04;
-  letter-spacing: -0.035em;
-  font-weight: 800;
-}
-
-.typo-h1 {
-  font-size: clamp(32px, 4.5vw, 54px);
-  line-height: 1.1;
+  font-size: clamp(38px, 6vw, 68px);
+  line-height: 1.16;
   letter-spacing: -0.025em;
   font-weight: 800;
 }
 
-.typo-h2 {
-  font-size: clamp(24px, 3.2vw, 40px);
-  line-height: 1.15;
+.typo-h1 {
+  font-size: clamp(30px, 4.2vw, 48px);
+  line-height: 1.2;
   letter-spacing: -0.02em;
+  font-weight: 800;
+}
+
+.typo-h2 {
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1.25;
+  letter-spacing: -0.015em;
   font-weight: 700;
 }
 
 .typo-h3 {
   font-size: clamp(18px, 2vw, 22px);
-  line-height: 1.3;
+  line-height: 1.35;
   letter-spacing: -0.01em;
   font-weight: 600;
 }
 
 .typo-body-lg {
-  font-size: clamp(16px, 1.3vw, 19px);
-  line-height: 1.65;
+  font-size: clamp(16px, 1.2vw, 18px);
+  line-height: 1.7;
   color: var(--text-muted);
 }
 
 .typo-body {
   font-size: 15px;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--text-muted);
 }
 
@@ -358,11 +370,6 @@ body {
     linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
 
-.bg-dot-pattern {
-  background-size: 24px 24px;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-}
-
 .ambient-glow-green {
   position: absolute;
   width: 600px;
@@ -385,29 +392,6 @@ body {
   z-index: 0;
 }
 
-/* ============================================================
-   Animations & Reveals
-   ============================================================ */
-.cl-reveal {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.cl-reveal.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-@keyframes pulseGlow {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.05); }
-}
-
-.animate-pulse-glow {
-  animation: pulseGlow 4s ease-in-out infinite;
-}
-
 @keyframes cursorBlink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
@@ -423,25 +407,29 @@ body {
   animation: cursorBlink 1s step-end infinite;
 }
 
-/* Navbar */
+/* ============================================================
+   Fixed Navbar with Solid Glass Backdrop
+   ============================================================ */
 .cl-navbar {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 50;
-  height: 70px;
+  height: 72px;
   display: flex;
   align-items: center;
   transition: all 0.25s ease;
-  border-bottom: 1px solid transparent;
-}
-
-.cl-navbar.scrolled {
-  background: rgba(3, 7, 18, 0.82);
+  background: rgba(3, 7, 18, 0.88);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 1px solid var(--border);
+}
+
+.cl-navbar.scrolled {
+  background: rgba(3, 7, 18, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 /* Hide scrollbar */

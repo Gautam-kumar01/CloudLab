@@ -38,7 +38,7 @@ export default function FAQ() {
   };
 
   return (
-    <section id="faq" className="cl-section relative overflow-hidden bg-[#030712]">
+    <section id="faq" className="cl-section relative overflow-hidden bg-[#030712] scroll-mt-28">
       <div
         className="ambient-glow-green"
         style={{ top: '15%', left: '-120px', opacity: 0.15 }}

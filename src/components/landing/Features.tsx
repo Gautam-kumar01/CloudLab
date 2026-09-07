@@ -17,7 +17,7 @@ import {
 
 export default function Features() {
   return (
-    <section id="features" className="cl-section relative overflow-hidden bg-grid-pattern">
+    <section id="features" className="cl-section relative overflow-hidden bg-grid-pattern scroll-mt-28">
       <div
         className="ambient-glow-purple"
         style={{ top: '10%', right: '-120px', opacity: 0.25 }}

@@ -119,7 +119,7 @@ export default function ProductDemo() {
   const [terminalRunning, setTerminalRunning] = useState(true);
 
   return (
-    <section id="ide-demo" className="relative pb-24 sm:pb-32">
+    <section id="ide-demo" className="relative pt-12 pb-24 sm:pb-36 scroll-mt-28">
       <div
         className="ambient-glow-green"
         style={{ bottom: '-150px', left: '50%', transform: 'translateX(-50%)', opacity: 0.35 }}

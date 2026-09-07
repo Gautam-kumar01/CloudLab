@@ -5,7 +5,7 @@ import { ArrowRight, Sparkles, CheckCircle2, Shield, Zap } from 'lucide-react';
 
 export default function FinalCTA() {
   return (
-    <section className="relative py-28 overflow-hidden bg-grid-pattern">
+    <section id="final-cta" className="relative py-32 sm:py-40 overflow-hidden bg-grid-pattern scroll-mt-28">
       {/* Center Radiant Glow */}
       <div
         className="ambient-glow-green"

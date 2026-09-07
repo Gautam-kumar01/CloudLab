@@ -37,7 +37,7 @@ export default function HowItWorks() {
   const [activeStep, setActiveStep] = useState(0);
 
   return (
-    <section id="how-it-works" className="cl-section relative overflow-hidden bg-[#050914]">
+    <section id="how-it-works" className="cl-section relative overflow-hidden bg-[#050914] scroll-mt-28">
       <div
         className="ambient-glow-green"
         style={{ top: '20%', left: '-140px', opacity: 0.2 }}
