@@ -15,7 +15,10 @@ export default function Hero() {
   };
 
   return (
-    <section className="relative pt-36 sm:pt-48 pb-20 sm:pb-28 overflow-hidden bg-grid-pattern">
+    <section
+      className="relative overflow-hidden bg-grid-pattern"
+      style={{ paddingTop: '150px', paddingBottom: '90px' }}
+    >
       {/* Dynamic Ambient Mesh Glows */}
       <div
         className="ambient-glow-green"
