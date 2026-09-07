@@ -1,192 +1,112 @@
 'use client';
 
-import { useScrollReveal } from '@/hooks/useScrollReveal';
+import { Check, X, Sparkles, Shield, Zap, Terminal, Laptop, Cloud } from 'lucide-react';
 
-const traditional = [
+const comparisonRows = [
   {
-    t: '"It works on my machine"',
-    d: 'Inconsistent environments between team members.',
+    feature: 'Root Linux Docker Sandboxes',
+    local: 'Uses local machine RAM & CPU',
+    legacy: 'Limited in-browser WebContainer',
+    cloudlab: 'Dedicated isolated Docker container with root access',
   },
   {
-    t: 'Hours of setup',
-    d: 'Installing Node, Python, Docker, Postgres manually.',
+    feature: 'Terminal & Package Installation',
+    local: 'Pollutes local disk & PATH',
+    legacy: 'Restricted subset of Node.js only',
+    cloudlab: 'Full Linux shell (apt-get, pip, cargo, go, pnpm)',
   },
   {
-    t: 'Resource intensive',
-    d: 'Heavy IDEs and containers drain laptop battery.',
+    feature: 'Real-Time Multiplayer Pair Programming',
+    local: 'Requires screen share / Live Share plugins',
+    legacy: 'Basic lock-based editing',
+    cloudlab: 'Google Docs-tier Yjs CRDT real-time presence',
   },
   {
-    t: 'Clunky screen-share pairing',
-    d: 'Laggy Zoom calls, no simultaneous edits.',
-  },
-];
-
-const cloudlab = [
-  {
-    t: 'Standardized environments',
-    d: 'Docker containers guarantee it works everywhere.',
+    feature: 'Integrated Context-Aware AI Copilot',
+    local: 'Third-party heavy plugins',
+    legacy: 'Generic text chat only',
+    cloudlab: 'Multi-LLM agent with safe readFile, writeFile & runCommand',
   },
   {
-    t: 'Zero setup time',
-    d: 'Click a link and start coding instantly.',
+    feature: 'Zero Local Machine Battery & RAM Drain',
+    local: 'Heavy 16GB+ RAM consumption',
+    legacy: 'Crashes on heavy projects',
+    cloudlab: '100% runs on high-speed cloud infrastructure',
   },
   {
-    t: 'Cloud compute',
-    d: 'Leverage powerful servers; keep your laptop cool.',
-  },
-  {
-    t: 'Multiplayer collaboration',
-    d: 'Live cursors and shared terminals built-in.',
+    feature: 'Instant 1-Click Deployment Preview',
+    local: 'Requires separate cloud setup',
+    legacy: 'Read-only preview iframe',
+    cloudlab: 'Builds real container image with live HTTPS URL',
   },
 ];
 
 export default function WhyCloudLab() {
-  const hRef = useScrollReveal();
-  const leftRef = useScrollReveal({ threshold: 0.1 });
-  const rightRef = useScrollReveal({ threshold: 0.1 });
-
   return (
-    <section id="why-cloudlab" className="cl-section relative">
+    <section id="comparison" className="cl-section relative overflow-hidden bg-grid-pattern">
       <div
-        className="ambient-glow-orange"
-        style={{ top: '10%', left: '-150px' }}
-      />
-      <div
-        className="ambient-glow-green"
-        style={{ bottom: '5%', right: '-180px' }}
+        className="ambient-glow-purple"
+        style={{ top: '30%', right: '-160px', opacity: 0.2 }}
       />
 
       <div className="cl-container relative z-10">
-        <div className="text-center reveal-section" ref={hRef}>
-          <div className="eyebrow mb-5">WHY CLOUDLAB</div>
-          <h2 className="typo-h2 text-white">Local development is broken.</h2>
-          <p
-            className="typo-body-lg mt-5 mx-auto"
-            style={{ maxWidth: 640 }}
-          >
-            Stop wasting hours fixing environment issues. CloudLab standardizes
-            development so you can focus on writing code.
+        {/* Section Header */}
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <div className="cl-badge mb-4">
+            <Zap className="w-3.5 h-3.5 text-emerald-400" />
+            <span>The CloudLab Advantage</span>
+          </div>
+          <h2 className="typo-h1 text-white">
+            Why Developers Are Switching to CloudLab
+          </h2>
+          <p className="typo-body-lg mt-4 text-slate-400">
+            Compare the friction of traditional local development with CloudLab's instant cloud workspaces.
           </p>
         </div>
 
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-5 max-w-5xl mx-auto">
-          {/* Traditional */}
-          <div
-            ref={leftRef}
-            className="cl-card p-7 sm:p-8 reveal-section"
-            style={{
-              background: 'rgba(255,255,255,0.015)',
-            }}
-          >
-            <div className="flex items-center gap-3 mb-7">
-              <div
-                className="w-9 h-9 rounded-lg flex items-center justify-center"
-                style={{
-                  background: 'rgba(239,68,68,0.1)',
-                  color: '#ef4444',
-                  boxShadow: 'inset 0 0 0 1px rgba(239,68,68,0.2)',
-                }}
-              >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                  <path d="M18 6 6 18" />
-                  <path d="m6 6 12 12" />
-                </svg>
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.15em] font-semibold" style={{ color: 'var(--text-subtle)' }}>
-                  Traditional
-                </div>
-                <h3 className="typo-h3 text-white" style={{ fontSize: '18px' }}>
-                  Your local machine
-                </h3>
-              </div>
-            </div>
-
-            <ul className="flex flex-col gap-4">
-              {traditional.map((row) => (
-                <li key={row.t} className="flex gap-3">
-                  <div
-                    className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}
+        {/* Comparison Table */}
+        <div className="glass-card rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/10 bg-slate-900/90 text-xs uppercase tracking-wider font-mono">
+                  <th className="p-5 text-slate-400 font-semibold w-1/3">Capability</th>
+                  <th className="p-5 text-slate-500 font-medium hidden sm:table-cell">Local Setup</th>
+                  <th className="p-5 text-slate-500 font-medium hidden md:table-cell">Web Sandboxes</th>
+                  <th className="p-5 text-emerald-400 font-bold bg-emerald-500/10">CloudLab Studio</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-sm">
+                {comparisonRows.map((row, idx) => (
+                  <tr
+                    key={row.feature}
+                    className="hover:bg-white/[0.02] transition-colors"
                   >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-                      <path d="M18 6 6 18" />
-                      <path d="m6 6 12 12" />
-                    </svg>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[15px] font-semibold text-white leading-snug">
-                      {row.t}
-                    </div>
-                    <div className="mt-1 typo-body" style={{ fontSize: '14px' }}>
-                      {row.d}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* CloudLab */}
-          <div
-            ref={rightRef}
-            className="cl-card cl-card-glow p-7 sm:p-8 reveal-section relative"
-            style={{
-              background:
-                'linear-gradient(180deg, rgba(5,150,105,0.05) 0%, rgba(255,255,255,0.02) 60%)',
-              boxShadow: '0 0 0 1px rgba(5,150,105,0.15)',
-            }}
-          >
-            <div
-              className="absolute -top-24 -right-24 w-72 h-72 rounded-full pointer-events-none"
-              style={{ background: 'var(--accent-soft)', filter: 'blur(80px)' }}
-            />
-
-            <div className="flex items-center gap-3 mb-7 relative">
-              <div
-                className="w-9 h-9 rounded-lg flex items-center justify-center"
-                style={{
-                  background: 'var(--accent-soft)',
-                  color: 'var(--accent)',
-                  boxShadow: 'inset 0 0 0 1px rgba(5,150,105,0.25)',
-                }}
-              >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17.5 19a4.5 4.5 0 1 0-1.3-8.81A6 6 0 0 0 5 12.5 4 4 0 0 0 6 20h11.5Z" />
-                </svg>
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.15em] font-semibold" style={{ color: 'var(--accent)' }}>
-                  CloudLab
-                </div>
-                <h3 className="typo-h3 text-white" style={{ fontSize: '18px' }}>
-                  Cloud-native workflow
-                </h3>
-              </div>
-            </div>
-
-            <ul className="flex flex-col gap-4 relative">
-              {cloudlab.map((row) => (
-                <li key={row.t} className="flex gap-3">
-                  <div
-                    className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
-                  >
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[15px] font-semibold text-white leading-snug">
-                      {row.t}
-                    </div>
-                    <div className="mt-1 typo-body" style={{ fontSize: '14px' }}>
-                      {row.d}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                    <td className="p-5 font-medium text-slate-200">
+                      {row.feature}
+                    </td>
+                    <td className="p-5 text-slate-400 text-xs hidden sm:table-cell">
+                      <div className="flex items-center gap-1.5 text-slate-500">
+                        <X className="w-4 h-4 text-rose-500 flex-shrink-0" />
+                        <span>{row.local}</span>
+                      </div>
+                    </td>
+                    <td className="p-5 text-slate-400 text-xs hidden md:table-cell">
+                      <div className="flex items-center gap-1.5 text-slate-500">
+                        <X className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                        <span>{row.legacy}</span>
+                      </div>
+                    </td>
+                    <td className="p-5 text-xs bg-emerald-500/[0.04]">
+                      <div className="flex items-center gap-2 text-emerald-300 font-medium">
+                        <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                        <span>{row.cloudlab}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

@@ -1,34 +1,70 @@
+'use client';
+
 import Link from 'next/link';
+import { ArrowRight, Sparkles, CheckCircle2, Shield, Zap } from 'lucide-react';
 
 export default function FinalCTA() {
   return (
-    <section id="final-cta" className="cl-section relative overflow-hidden flex items-center justify-center">
-      <div className="absolute inset-0 bg-grid-subtle z-0"></div>
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full z-0 pointer-events-none" style={{background:'var(--accent-soft)', filter:'blur(100px)'}}></div>
-      <div className="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full z-0 pointer-events-none" style={{background:'var(--accent-purple-soft)', filter:'blur(100px)'}}></div>
+    <section className="relative py-28 overflow-hidden bg-grid-pattern">
+      {/* Center Radiant Glow */}
+      <div
+        className="ambient-glow-green"
+        style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '700px', height: '700px', opacity: 0.25 }}
+      />
+      <div
+        className="ambient-glow-purple"
+        style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '500px', height: '500px', opacity: 0.2 }}
+      />
 
-      <div className="cl-container text-center relative z-10">
-        <div className="max-w-3xl mx-auto">
-          <div className="eyebrow mb-6 inline-flex">
-            <span className="eyebrow-dot animate-pulse"></span>
-            Start Building Today
+      <div className="cl-container relative z-10 text-center max-w-4xl mx-auto">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold mb-6">
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Launch Your Cloud Studio</span>
+        </div>
+
+        <h2 className="typo-hero text-white tracking-tight">
+          Ready to Code <span className="gradient-text-emerald">Without Limits?</span>
+        </h2>
+
+        <p className="typo-body-lg mt-6 max-w-2xl mx-auto text-slate-300">
+          Spin up an isolated Linux container, edit with Monaco, pair program in real-time, and ship your next idea in seconds.
+        </p>
+
+        {/* CTAs */}
+        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Link
+            href="/sign-up"
+            className="cl-btn cl-btn-primary px-8 h-12 text-[15px] font-bold shadow-xl shadow-emerald-500/25 w-full sm:w-auto"
+          >
+            <span>Start Coding Free</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+
+          <Link
+            href="/sign-in"
+            className="cl-btn cl-btn-secondary px-7 h-12 text-[15px] w-full sm:w-auto"
+          >
+            <span>Sign In to Dashboard</span>
+          </Link>
+        </div>
+
+        {/* Benefits Badges */}
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-xs font-medium text-slate-400">
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>No Credit Card Required</span>
           </div>
-          <h2 className="typo-h1 mb-6 tracking-tight">
-            Your next project starts here.
-          </h2>
-          <p className="typo-body-lg mb-10 max-w-2xl mx-auto text-[var(--text-muted)]">
-            No complicated setup. No brittle local environments.<br className="hidden md:block"/>
-            Just open CloudLab and start building.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/sign-up" className="cl-btn cl-btn-primary">
-              Start Coding Free
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </Link>
-            <Link href="/docs" className="cl-btn cl-btn-secondary">
-              Read Documentation
-            </Link>
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>Instant Docker Sandboxes</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>Full Root Access</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>Multi-Model AI Included</span>
           </div>
         </div>
       </div>

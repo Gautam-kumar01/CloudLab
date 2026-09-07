@@ -1,261 +1,315 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import {
+  Terminal as TerminalIcon,
+  Play,
+  FileCode,
+  FolderTree,
+  Sparkles,
+  CheckCircle2,
+  Cpu,
+  Layers,
+  GitBranch,
+  ExternalLink,
+  Split,
+  ChevronRight,
+  Code2
+} from 'lucide-react';
 
-export default function ProductDemo() {
-  const [typed, setTyped] = useState('');
-  const command = 'npm run dev';
+interface TemplateCode {
+  id: string;
+  name: string;
+  file: string;
+  code: string;
+  terminalLog: string;
+  aiPrompt: string;
+  aiReply: string;
+}
 
-  useEffect(() => {
-    let i = 0;
-    const t = setTimeout(() => {
-      const iv = setInterval(() => {
-        setTyped(command.slice(0, i));
-        i += 1;
-        if (i > command.length) clearInterval(iv);
-      }, 75);
-      return () => clearInterval(iv);
-    }, 1200);
-    return () => clearTimeout(t);
-  }, []);
+const templates: TemplateCode[] = [
+  {
+    id: 'nextjs',
+    name: 'Next.js 16 & React 19',
+    file: 'src/app/page.tsx',
+    code: `import { auth } from '@/auth';
+import { db } from '@/lib/db';
+import { WorkspaceStudio } from '@/components/ide';
 
-  const running = typed === command;
+export default async function WorkspacePage({ params }: { params: { id: string } }) {
+  const session = await auth();
+  const project = await db.project.findUnique({
+    where: { id: params.id, ownerId: session?.user?.id },
+  });
 
   return (
-    <section className="relative pb-16 sm:pb-20">
+    <div className="flex h-screen bg-[#030712] text-slate-100">
+      <WorkspaceStudio project={project} user={session?.user} />
+    </div>
+  );
+}`,
+    terminalLog: `cloudlab@workspace:~/app$ docker ps
+CONTAINER ID   IMAGE                 STATUS          PORTS
+7f92b49c01ad   cloudlab/node20-alpine Up 4 minutes    0.0.0.0:3000->3000/tcp
+cloudlab@workspace:~/app$ pnpm run dev
+  ▲ Next.js 16.3.0 (Turbopack)
+  - Local:        http://localhost:3000
+  - Network:      http://172.18.0.2:3000
+✓ Ready in 640ms`,
+    aiPrompt: 'Refactor WorkspaceStudio to support real-time Yjs CRDT presence cursors',
+    aiReply: 'Added Yjs Monaco binding with multi-user cursor color assignments and auto-sync hook.',
+  },
+  {
+    id: 'python',
+    name: 'Python & FastAPI',
+    file: 'main.py',
+    code: `from fastapi import FastAPI, WebSocket
+import uvicorn
+
+app = FastAPI(title="CloudLab Python Microservice")
+
+@app.get("/api/v1/health")
+async def health_check():
+    return {"status": "healthy", "runtime": "docker-isolated-python3.11"}
+
+@app.websocket("/ws/telemetry")
+async def telemetry_socket(websocket: WebSocket):
+    await websocket.accept()
+    await websocket.send_json({"event": "connected", "cpu_percent": 1.4})`,
+    terminalLog: `cloudlab@workspace:~/pyapp$ uvicorn main:app --reload --port 8000
+INFO:     Will watch for changes in /workspace/pyapp
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [PID: 412] using StatReload
+INFO:     Application startup complete.`,
+    aiPrompt: 'Add async background task for data processing with Redis queue',
+    aiReply: 'Created Celery worker configuration and integrated FastAPI lifespan handler.',
+  },
+  {
+    id: 'ai-agent',
+    name: 'AI Agent & LLM Tools',
+    file: 'agent.ts',
+    code: `import { streamText, tool } from 'ai';
+import { google } from '@ai-sdk/google';
+import { z } from 'zod';
+
+export async function runCodingAgent(prompt: string) {
+  return streamText({
+    model: google('gemini-2.5-flash'),
+    system: 'You are an autonomous cloud coding agent with root container tools.',
+    prompt,
+    tools: {
+      writeFile: tool({ parameters: z.object({ path: z.string(), content: z.string() }) }),
+      runCommand: tool({ parameters: z.object({ command: z.string() }) }),
+    },
+  });
+}`,
+    terminalLog: `cloudlab@workspace:~/agent$ npx tsx agent.ts
+[AI Agent] Initializing Gemini 2.5 Flash model...
+[Tool Invoked] writeFile -> path: "src/lib/auth.ts" (Human Approved)
+[Tool Invoked] runCommand -> "npm test" (Exit Code 0: 7 passed)
+✓ Agent workflow finished with 0 errors.`,
+    aiPrompt: 'Inspect failing Jest tests and generate patch for OAuth token refresh',
+    aiReply: 'Ran automated test suite, isolated race condition in token refresh, and applied patch.',
+  },
+];
+
+export default function ProductDemo() {
+  const [selectedTemplate, setSelectedTemplate] = useState(templates[0]);
+  const [activeTab, setActiveTab] = useState<'editor' | 'terminal'>('editor');
+  const [terminalRunning, setTerminalRunning] = useState(true);
+
+  return (
+    <section id="ide-demo" className="relative pb-24 sm:pb-32">
       <div
         className="ambient-glow-green"
-        style={{ bottom: '-200px', left: '50%', transform: 'translateX(-50%)', width: '700px', height: '700px' }}
-      />
-      <div
-        className="ambient-glow-purple"
-        style={{ bottom: '-100px', left: '-160px' }}
+        style={{ bottom: '-150px', left: '50%', transform: 'translateX(-50%)', opacity: 0.35 }}
       />
 
       <div className="cl-container relative z-10">
-        <div
-          className="cl-ide-frame mx-auto cl-float"
-          style={{ animationDelay: '460ms' }}
-        >
-          <div className="flex items-center justify-between px-4 sm:px-5 h-12 border-b border-[--border] bg-[--surface-elevated]">
+        {/* Section Header */}
+        <div className="text-center max-w-3xl mx-auto mb-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold mb-4">
+            <Code2 className="w-3.5 h-3.5" />
+            <span>Interactive Studio Preview</span>
+          </div>
+          <h2 className="typo-h1 text-white">
+            A Pro IDE That Lives in Your Browser
+          </h2>
+          <p className="typo-body mt-3 text-slate-400">
+            Powered by Monaco, real Linux containers, and context-aware AI. Test drive the interface below:
+          </p>
+        </div>
+
+        {/* Stack Selector Pills */}
+        <div className="flex items-center justify-center gap-2 mb-6 flex-wrap">
+          {templates.map((tmpl) => (
+            <button
+              key={tmpl.id}
+              onClick={() => setSelectedTemplate(tmpl)}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                selectedTemplate.id === tmpl.id
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-lg shadow-emerald-500/10'
+                  : 'bg-slate-900/60 text-slate-400 border border-white/5 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              {tmpl.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Full IDE Frame */}
+        <div className="cl-ide-frame mx-auto max-w-5xl rounded-2xl overflow-hidden border border-white/10 bg-[#090d16] shadow-2xl">
+          {/* Top Window Bar */}
+          <div className="flex items-center justify-between px-4 py-3 bg-[#0d1322] border-b border-white/10">
+            {/* Window Traffic Lights */}
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full" style={{ background: '#ff5f56' }} />
-              <span className="w-3 h-3 rounded-full" style={{ background: '#ffbd2e' }} />
-              <span className="w-3 h-3 rounded-full" style={{ background: '#27c93f' }} />
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                className="text-[12px] text-[--text-muted] font-mono hidden sm:inline"
-              >
-                cloudlab.app / workspace
+              <span className="w-3 h-3 rounded-full bg-rose-500/80" />
+              <span className="w-3 h-3 rounded-full bg-amber-500/80" />
+              <span className="w-3 h-3 rounded-full bg-emerald-500/80" />
+              <span className="ml-3 text-xs font-mono text-slate-400 hidden sm:inline flex items-center gap-1.5">
+                <GitBranch className="w-3.5 h-3.5 text-emerald-400" />
+                <span>main • cloudlab-sandbox-{selectedTemplate.id}</span>
               </span>
-              <span
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
-                style={{
-                  background: 'var(--accent-soft)',
-                  color: 'var(--accent)',
-                  boxShadow: 'inset 0 0 0 1px rgba(5,150,105,0.25)',
-                }}
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full animate-pulse"
-                  style={{ background: 'var(--accent)' }}
-                />
-                Running
-              </span>
             </div>
-            <div className="flex items-center gap-2">
-              <div
-                className="w-6 h-6 rounded-full"
-                style={{
-                  background:
-                    'linear-gradient(135deg, var(--accent-purple), var(--accent))',
-                  boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.12)',
-                }}
-              />
+
+            {/* Status Gauges */}
+            <div className="flex items-center gap-3 text-[11px] font-mono">
+              <div className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Container Live</span>
+              </div>
+              <div className="hidden md:flex items-center gap-1.5 text-slate-400">
+                <Cpu className="w-3 h-3 text-purple-400" />
+                <span>0.8% CPU</span>
+              </div>
+              <div className="hidden md:flex items-center gap-1.5 text-slate-400">
+                <span>184MB / 2GB</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col lg:flex-row min-h-[460px] sm:min-h-[520px]">
-            {/* Explorer */}
-            <aside
-              className="hidden md:flex flex-col w-52 flex-shrink-0 border-r border-[--border] bg-[--surface]"
-            >
-              <div className="px-4 pt-4 pb-2 text-[10px] uppercase tracking-wider font-semibold text-[--text-subtle]">
-                Explorer
+          {/* IDE Body */}
+          <div className="grid grid-cols-1 md:grid-cols-12 min-h-[440px] text-xs">
+            {/* Left Sidebar: File Tree */}
+            <div className="hidden md:block md:col-span-3 bg-[#0a0f1d] border-r border-white/10 p-3 font-mono">
+              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
+                <span>Explorer</span>
+                <FolderTree className="w-3.5 h-3.5 text-slate-500" />
               </div>
-              <div className="px-2 pb-4 text-[13px] font-mono space-y-0.5">
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded text-white bg-white/5">
-                  <span style={{ color: 'var(--accent-orange)' }}>▾</span>
-                  <span className="text-[11px]">src</span>
+              <div className="space-y-1 text-slate-400">
+                <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-500/10 px-2 py-1.5 rounded font-semibold">
+                  <FileCode className="w-3.5 h-3.5" />
+                  <span className="truncate">{selectedTemplate.file}</span>
                 </div>
-                <div className="flex items-center gap-1.5 pl-5 px-2 py-1 rounded text-[--text-muted] hover:text-white hover:bg-white/5 cursor-pointer">
-                  <span style={{ color: '#e34c26' }}>JSX</span>
-                  <span className="text-[12px]">App.jsx</span>
+                <div className="flex items-center gap-1.5 px-2 py-1 hover:text-slate-200 cursor-pointer">
+                  <FileCode className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Dockerfile</span>
                 </div>
-                <div className="flex items-center gap-1.5 pl-5 px-2 py-1 rounded text-[--text-muted] hover:text-white hover:bg-white/5 cursor-pointer">
-                  <span style={{ color: '#264de4' }}>CSS</span>
-                  <span className="text-[12px]">index.css</span>
+                <div className="flex items-center gap-1.5 px-2 py-1 hover:text-slate-200 cursor-pointer">
+                  <FileCode className="w-3.5 h-3.5 text-slate-500" />
+                  <span>package.json</span>
                 </div>
-                <div className="flex items-center gap-1.5 pl-5 px-2 py-1 rounded text-[--text-muted] hover:text-white hover:bg-white/5 cursor-pointer">
-                  <span style={{ color: 'var(--accent-orange)' }}>▸</span>
-                  <span className="text-[11px]">api</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded text-[--text-muted] hover:text-white hover:bg-white/5 cursor-pointer mt-1">
-                  <span style={{ color: 'var(--accent)' }}>{ }</span>
-                  <span className="text-[12px]">package.json</span>
-                </div>
-              </div>
-            </aside>
-
-            {/* Main column */}
-            <div className="flex-1 flex flex-col min-w-0">
-              <div className="flex items-center border-b border-[--border] bg-[--surface] text-[12px] font-mono overflow-x-auto hide-scrollbar">
-                <div
-                  className="flex items-center gap-2 px-4 py-2.5 border-r border-[--border] text-white whitespace-nowrap"
-                  style={{
-                    background: 'var(--bg)',
-                    boxShadow: 'inset 0 2px 0 var(--accent)',
-                  }}
-                >
-                  <span style={{ color: '#e34c26', fontSize: '10px' }}>JSX</span>
-                  App.jsx
-                </div>
-                <div className="flex items-center gap-2 px-4 py-2.5 border-r border-[--border] text-[--text-muted] whitespace-nowrap">
-                  package.json
+                <div className="flex items-center gap-1.5 px-2 py-1 hover:text-slate-200 cursor-pointer">
+                  <FileCode className="w-3.5 h-3.5 text-slate-500" />
+                  <span>README.md</span>
                 </div>
               </div>
 
-              {/* Code area */}
-              <div
-                className="flex-1 flex overflow-hidden"
-                style={{ background: 'var(--bg)' }}
-              >
-                <div className="w-10 sm:w-12 flex-shrink-0 py-4 text-right pr-2 text-[11px] font-mono text-[--text-subtle] select-none border-r border-black/30 leading-[22px]">
-                  1<br />2<br />3<br />4<br />5<br />6<br />7<br />8<br />9<br />10
+              {/* AI Agent Status Pill */}
+              <div className="mt-8 p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300">
+                <div className="flex items-center gap-1.5 font-semibold text-[11px] mb-1">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                  <span>CloudLab Copilot</span>
                 </div>
-                <div className="flex-1 p-4 font-mono text-[13px] sm:text-[13.5px] leading-[22px] overflow-hidden">
-                  <div><span style={{ color: '#c586c0' }}>import</span> React <span style={{ color: '#c586c0' }}>from</span> <span style={{ color: '#ce9178' }}>'react'</span>;</div>
-                  <div><span style={{ color: '#c586c0' }}>import</span> <span style={{ color: '#ce9178' }}>'./index.css'</span>;</div>
-                  <div>&nbsp;</div>
-                  <div><span style={{ color: '#569cd6' }}>export default function</span> <span style={{ color: '#dcdcaa' }}>App</span>() {'{'}</div>
-                  <div>&nbsp;&nbsp;<span style={{ color: '#c586c0' }}>return</span> (</div>
-                  <div>&nbsp;&nbsp;&nbsp;&nbsp;&lt;<span style={{ color: '#569cd6' }}>div</span> className=<span style={{ color: '#ce9178' }}>'container'</span>&gt;</div>
-                  <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;<span style={{ color: '#569cd6' }}>h1</span>&gt;Hello CloudLab!&lt;/<span style={{ color: '#569cd6' }}>h1</span>&gt;</div>
-                  <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;<span style={{ color: '#569cd6' }}>p</span>&gt;Built in the cloud.&lt;/<span style={{ color: '#569cd6' }}>p</span>&gt;</div>
-                  <div>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/<span style={{ color: '#569cd6' }}>div</span>&gt;</div>
-                  <div>&nbsp;&nbsp;);</div>
-                  <div>{'}'}</div>
-                </div>
-              </div>
-
-              {/* Terminal */}
-              <div
-                className="h-44 flex flex-col border-t border-[--border]"
-                style={{ background: '#080808' }}
-              >
-                <div
-                  className="flex items-center px-4 h-8 border-b border-black/40 text-[11px] font-mono gap-5"
-                  style={{ background: 'var(--surface)' }}
-                >
-                  <span
-                    className="text-white pb-0"
-                    style={{ boxShadow: 'inset 0 -2px 0 var(--accent)' }}
-                  >
-                    TERMINAL
-                  </span>
-                  <span className="text-[--text-subtle] hover:text-white cursor-pointer">
-                    OUTPUT
-                  </span>
-                  <span className="text-[--text-subtle] hover:text-white cursor-pointer">
-                    PORTS
-                  </span>
-                </div>
-                <div className="flex-1 p-3 sm:p-3.5 font-mono text-[12.5px] overflow-hidden text-[--text]">
-                  <div>
-                    <span style={{ color: 'var(--accent)' }}>cloudlab@workspace</span>
-                    <span style={{ color: 'var(--text-subtle)' }}>:</span>
-                    <span style={{ color: 'var(--accent-purple)' }}>~/app</span>
-                    <span style={{ color: 'var(--text-subtle)' }}>$ </span>
-                    {typed}
-                    <span
-                      className={`inline-block w-2 h-3.5 align-middle ml-0.5 ${running ? 'animate-pulse' : ''}`}
-                      style={{ background: 'var(--text-muted)' }}
-                    />
-                  </div>
-                  {running && (
-                    <div
-                      className="mt-1 opacity-0"
-                      style={{
-                        animation: 'clFadeUp 0.35s 0.15s ease forwards',
-                      }}
-                    >
-                      <div className="text-[--text-subtle]">{'>'} app@0.1.0 dev</div>
-                      <div className="text-[--text-subtle]">{'>'} vite</div>
-                      <div className="mt-2" style={{ color: 'var(--accent)' }}>
-                        {'  '}VITE v5.4.0  ready in 152 ms
-                      </div>
-                      <div className="mt-2">
-                        {'  '}➜{'  '}<span className="font-semibold">Local</span>:{'   '}
-                        <a style={{ color: 'var(--accent-purple)' }} href="#">http://localhost:5173/</a>
-                      </div>
-                      <div>
-                        {'  '}➜{'  '}<span className="font-semibold">Network</span>: use --host to expose
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <p className="text-[10px] text-purple-200/70 line-clamp-2">
+                  {selectedTemplate.aiReply}
+                </p>
               </div>
             </div>
 
-            {/* Preview */}
-            <aside
-              className="hidden xl:flex flex-col w-80 flex-shrink-0 border-l border-[--border]"
-              style={{ background: '#fafafa' }}
-            >
-              <div className="h-10 flex items-center px-3 gap-2 border-b border-gray-200" style={{ background: '#f0f0f0' }}>
-                <div
-                  className="flex-1 bg-white rounded text-[11px] px-3 py-1.5 text-gray-500 flex items-center gap-2 shadow-[0_1px_0_rgba(0,0,0,0.04)]"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                  localhost:5173
+            {/* Center Area: Editor & Terminal */}
+            <div className="md:col-span-9 flex flex-col bg-[#070b14]">
+              {/* File Tabs */}
+              <div className="flex items-center justify-between bg-[#0b101e] border-b border-white/10 px-3">
+                <div className="flex items-center">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-[#070b14] border-r border-white/10 text-emerald-300 font-mono border-t-2 border-t-emerald-400">
+                    <FileCode className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{selectedTemplate.file}</span>
+                  </div>
                 </div>
-                <div className="w-6 h-6 rounded flex items-center justify-center text-gray-500 hover:bg-gray-200 cursor-pointer">
-                  ↻
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded">
+                    UTF-8
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded">
+                    LF
+                  </span>
                 </div>
               </div>
-              <div className="flex-1 p-8 text-black flex flex-col items-center justify-center bg-[linear-gradient(180deg,#fafafa,#f4f4f5)]">
-                {running ? (
-                  <div
-                    className="flex flex-col items-center text-center"
-                    style={{
-                      animation: 'clFadeUp 0.4s ease forwards',
-                      opacity: 0,
-                    }}
-                  >
-                    <div
-                      className="w-14 h-14 rounded-2xl mb-5 shadow-lg"
-                      style={{
-                        background:
-                          'linear-gradient(135deg, var(--accent) 0%, var(--accent-purple) 100%)',
-                        boxShadow:
-                          '0 10px 30px -10px rgba(5,150,105,0.5)',
-                      }}
-                    />
-                    <h2 className="text-2xl font-bold mb-1.5">Hello CloudLab!</h2>
-                    <p className="text-sm text-gray-500">Built in the cloud.</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center text-gray-400">
-                    <div className="w-7 h-7 border-[3px] border-gray-200 border-t-gray-400 rounded-full animate-spin mb-3" />
-                    <p className="text-xs">Connecting to preview…</p>
-                  </div>
-                )}
+
+              {/* Code Surface */}
+              <div className="p-4 font-mono text-[12px] sm:text-[13px] leading-relaxed text-slate-300 overflow-x-auto min-h-[220px]">
+                <pre className="text-slate-200">
+                  <code>
+                    {selectedTemplate.code.split('\n').map((line, idx) => (
+                      <div key={idx} className="table-row">
+                        <span className="table-cell select-none pr-4 text-right text-slate-600 text-[11px]">
+                          {idx + 1}
+                        </span>
+                        <span className="table-cell whitespace-pre">
+                          {line
+                            .replace(/import/g, '§c#93c5fd§import§r')
+                            .replace(/from/g, '§c#93c5fd§from§r')
+                            .replace(/export/g, '§c#c4b5fd§export§r')
+                            .replace(/default/g, '§c#c4b5fd§default§r')
+                            .replace(/async/g, '§c#c4b5fd§async§r')
+                            .replace(/function/g, '§c#93c5fd§function§r')
+                            .replace(/const/g, '§c#93c5fd§const§r')
+                            .replace(/return/g, '§c#f43f5e§return§r')
+                            .split('§')
+                            .map((chunk, cIdx) => {
+                              if (chunk.startsWith('c#')) {
+                                const color = chunk.slice(1, 8);
+                                const text = chunk.slice(9);
+                                return (
+                                  <span key={cIdx} style={{ color }}>
+                                    {text}
+                                  </span>
+                                );
+                              }
+                              return chunk.replace(/^r/, '');
+                            })}
+                        </span>
+                      </div>
+                    ))}
+                  </code>
+                </pre>
               </div>
-            </aside>
+
+              {/* Integrated Cloud Terminal Bottom Bar */}
+              <div className="mt-auto border-t border-white/10 bg-[#050811] p-3 font-mono">
+                <div className="flex items-center justify-between pb-2 border-b border-white/5 mb-2">
+                  <div className="flex items-center gap-2 text-slate-400 text-[11px]">
+                    <TerminalIcon className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="font-semibold text-slate-200">Terminal — bash</span>
+                    <span className="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                      PORT 3000 OPEN
+                    </span>
+                  </div>
+                  <button className="text-slate-500 hover:text-slate-300 transition">
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                </div>
+                <pre className="text-[11px] text-slate-300 leading-snug font-mono whitespace-pre-wrap">
+                  {selectedTemplate.terminalLog}
+                </pre>
+                <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-mono mt-1">
+                  <span>cloudlab@workspace:~/app$</span>
+                  <span className="animate-cursor" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -1,106 +1,95 @@
 'use client';
 
 import { useState } from 'react';
-import { useScrollReveal } from '@/hooks/useScrollReveal';
+import { ChevronDown, HelpCircle } from 'lucide-react';
 
 const faqs = [
   {
-    q: 'Do I need to install anything locally?',
-    a: 'No. CloudLab runs entirely in your browser. All you need is an internet connection and a modern web browser to start coding. No Node, no Docker, no IDE.',
+    q: 'How does CloudLab isolate my workspace and terminal?',
+    a: 'Each CloudLab workspace runs in a dedicated, isolated Docker container with capped RAM, CPU limits, and its own filesystem. You get full root privileges inside your container without risking security or cross-tenant leaks.',
   },
   {
-    q: 'How does the Docker integration work?',
-    a: 'When you start a workspace, we provision a dedicated Linux container on our infrastructure. You get full root access and can install any packages, databases, or system tools you need — exactly like a local VM, but managed for you.',
+    q: 'Can I install system packages, databases, and custom binaries?',
+    a: 'Yes! Because you have full root access in your Linux container, you can run apt-get, pip, npm, pnpm, cargo, go, or start background services like PostgreSQL, Redis, and SQLite directly.',
   },
   {
-    q: 'Can I use my own GitHub repositories?',
-    a: 'Yes. Connect your GitHub account and import any public or private repository in one click. CloudLab automatically clones it, detects the framework, installs dependencies, and boots the dev server.',
+    q: 'How does real-time multiplayer collaboration work?',
+    a: 'CloudLab uses Yjs CRDTs (Conflict-free Replicated Data Types) connected over low-latency WebSockets. Multiple users can edit the same files concurrently, view each other’s colored cursor movements, and share terminal output without race conditions or overwriting work.',
   },
   {
-    q: 'Is my code secure?',
-    a: 'Absolutely. Every workspace is isolated with strict Docker namespaces, cgroups, and network policies. Your code is private to you and anyone you explicitly share with. Environment variables are encrypted at rest.',
+    q: 'What AI models are supported in the AI Copilot?',
+    a: 'CloudLab AI supports Google Gemini 2.5 Flash, OpenAI GPT-4o, Anthropic Claude, Groq Qwen/Llama, and OpenRouter models. You can use our built-in provider or bring your own API keys for unlimited usage.',
   },
   {
-    q: 'What about persistence?',
-    a: 'Every workspace has persistent storage. Files, databases, and environment state are saved between sessions. Come back tomorrow and everything is exactly how you left it.',
+    q: 'Can I import and export my GitHub repositories?',
+    a: 'Yes. You can import any public or private GitHub repository using OAuth. CloudLab automatically detects your tech stack, prepares dependencies, and lets you commit and push changes back directly.',
   },
   {
-    q: 'How much does it cost?',
-    a: 'CloudLab is free for hobby and student use. Paid plans unlock more powerful instances, longer uptime, and team collaboration features. See the pricing page for details.',
+    q: 'Is CloudLab free to use?',
+    a: 'Yes! CloudLab provides a generous free tier with instant workspaces, Monaco editing, GitHub imports, and AI assistant access to build and test your projects.',
   },
 ];
 
 export default function FAQ() {
-  const [open, setOpen] = useState<number | null>(0);
-  const hRef = useScrollReveal();
-  const listRef = useScrollReveal();
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
 
-  const toggle = (i: number) => setOpen(open === i ? null : i);
+  const toggle = (idx: number) => {
+    setOpenIndex(openIndex === idx ? null : idx);
+  };
 
   return (
-    <section id="faq" className="cl-section relative">
-      <div className="cl-container relative z-10">
-        <div className="text-center reveal-section" ref={hRef}>
-          <div className="eyebrow mb-5">FAQ</div>
-          <h2 className="typo-h2 text-white">Questions, answered.</h2>
-          <p
-            className="typo-body-lg mt-5 mx-auto"
-            style={{ maxWidth: 560 }}
-          >
-            Everything you need to know about CloudLab.
+    <section id="faq" className="cl-section relative overflow-hidden bg-[#030712]">
+      <div
+        className="ambient-glow-green"
+        style={{ top: '15%', left: '-120px', opacity: 0.15 }}
+      />
+
+      <div className="cl-container relative z-10 max-w-4xl">
+        {/* Section Header */}
+        <div className="text-center mb-16">
+          <div className="cl-badge mb-4">
+            <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Got Questions?</span>
+          </div>
+          <h2 className="typo-h1 text-white">
+            Frequently Asked Questions
+          </h2>
+          <p className="typo-body-lg mt-4 text-slate-400">
+            Everything you need to know about CloudLab workspaces, security, and features.
           </p>
         </div>
 
-        <div
-          ref={listRef}
-          className="mt-14 reveal-section max-w-3xl mx-auto border-t border-[--border]"
-        >
-          {faqs.map((f, i) => {
-            const isOpen = open === i;
+        {/* Accordion List */}
+        <div className="space-y-4">
+          {faqs.map((faq, idx) => {
+            const isOpen = openIndex === idx;
             return (
               <div
-                key={i}
-                className={`cl-faq-item ${isOpen ? 'open' : ''}`}
+                key={faq.q}
+                className={`glass-card rounded-2xl border transition-all duration-200 overflow-hidden ${
+                  isOpen ? 'border-emerald-500/30 bg-slate-900/80 shadow-lg shadow-emerald-500/5' : 'border-white/5 bg-slate-900/40'
+                }`}
               >
                 <button
-                  type="button"
-                  className="cl-faq-question"
-                  onClick={() => toggle(i)}
+                  onClick={() => toggle(idx)}
+                  className="w-full p-6 text-left flex items-center justify-between gap-4 font-semibold text-white hover:text-emerald-300 transition-colors"
                   aria-expanded={isOpen}
-                  aria-controls={`faq-a-${i}`}
-                  id={`faq-q-${i}`}
                 >
-                  <span
-                    className="text-[16px] sm:text-[17px] font-medium"
-                    style={{
-                      color: isOpen ? 'var(--text)' : 'var(--text)',
-                    }}
+                  <span className="text-base sm:text-lg">{faq.q}</span>
+                  <div
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 text-slate-400 transition-transform duration-300 flex-shrink-0 ${
+                      isOpen ? 'rotate-180 bg-emerald-500/20 text-emerald-300' : ''
+                    }`}
                   >
-                    {f.q}
-                  </span>
-                  <span className="cl-faq-icon" aria-hidden>
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    >
-                      <path d="M12 5v14" />
-                      <path d="M5 12h14" />
-                    </svg>
-                  </span>
+                    <ChevronDown className="w-4 h-4" />
+                  </div>
                 </button>
-                <div
-                  id={`faq-a-${i}`}
-                  role="region"
-                  aria-labelledby={`faq-q-${i}`}
-                  className={`cl-faq-answer-wrapper ${isOpen ? 'open' : ''}`}
-                >
-                  <div className="cl-faq-answer">{f.a}</div>
-                </div>
+
+                {isOpen && (
+                  <div className="px-6 pb-6 pt-1 text-sm sm:text-base text-slate-400 leading-relaxed border-t border-white/5">
+                    {faq.a}
+                  </div>
+                )}
               </div>
             );
           })}
