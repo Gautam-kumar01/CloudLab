@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   Check,
@@ -114,6 +114,63 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <div className="section-label">
       <span className="section-label__line" />
       <span>{children}</span>
+    </div>
+  );
+}
+
+const heroTerminalFrames = [
+  { command: "npm install", output: "resolved 142 packages" },
+  { command: "git push origin main", output: "objects: 100% • synced" },
+  { command: "cloudlab workspace ready", output: "port 3000 • live" },
+  { command: "deploy --production", output: "deploying..." },
+];
+
+function HeroTerminal() {
+  const [frameIndex, setFrameIndex] = useState(0);
+  const [typedCommand, setTypedCommand] = useState("");
+  const [showOutput, setShowOutput] = useState(false);
+
+  useEffect(() => {
+    const frame = heroTerminalFrames[frameIndex];
+    let characterIndex = 0;
+    let rotateTimer: number | undefined;
+    const typingTimer = window.setInterval(() => {
+      characterIndex += 1;
+      setTypedCommand(frame.command.slice(0, characterIndex));
+      if (characterIndex >= frame.command.length) {
+        window.clearInterval(typingTimer);
+        setShowOutput(true);
+        rotateTimer = window.setTimeout(() => {
+          setShowOutput(false);
+          setFrameIndex((current) => (current + 1) % heroTerminalFrames.length);
+        }, 1700);
+      }
+    }, 58);
+
+    return () => {
+      window.clearInterval(typingTimer);
+      if (rotateTimer) window.clearTimeout(rotateTimer);
+    };
+  }, [frameIndex]);
+
+  const frame = heroTerminalFrames[frameIndex];
+
+  return (
+    <div className="hero-terminal" aria-hidden="true">
+      <div className="hero-terminal__glow" />
+      <div className="hero-terminal__orbit hero-terminal__orbit--one" />
+      <div className="hero-terminal__orbit hero-terminal__orbit--two" />
+      <div className="hero-terminal__card">
+        <div className="hero-terminal__topbar">
+          <span className="hero-terminal__dots"><i /><i /><i /></span>
+          <span className="hero-terminal__label">cloudlab / terminal</span>
+          <span className="hero-terminal__status"><i /> LIVE</span>
+        </div>
+        <div className="hero-terminal__body">
+          <div className="hero-terminal__prompt"><span>›</span><code>{typedCommand}</code><i className="hero-terminal__cursor" /></div>
+          <div className={`hero-terminal__output ${showOutput ? "is-visible" : ""}`}><span>✓</span>{frame.output}</div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -281,7 +338,7 @@ export default function Home() {
               <div className="hero-copy__actions"><Link href="/sign-up" className="button button--primary button--large">Get Started <ArrowRight size={17} /></Link><a href="#workspace" className="button button--ghost button--large"><span className="button-play"><Play size={12} fill="currentColor" /></span> See how it works</a></div>
               <div className="hero-proof"><div className="avatar-stack"><span className="avatar avatar--lime">J</span><span className="avatar avatar--violet">A</span><span className="avatar avatar--orange">M</span><span className="avatar avatar--blue">+</span></div><p><strong>1,200+ builders</strong><br />are already shipping in CloudLab</p></div>
             </div>
-            <div className="hero-signal" aria-hidden="true"><div className="hero-signal__line" /><div className="hero-signal__card hero-signal__card--top"><span className="hero-signal__icon hero-signal__icon--mint"><Zap size={15} /></span><span><b>Fast feedback loops</b><small>Preview in seconds</small></span></div><div className="hero-signal__card hero-signal__card--bottom"><span className="hero-signal__icon hero-signal__icon--violet"><Users size={15} /></span><span><b>Work in sync</b><small>3 teammates online</small></span></div><div className="hero-signal__node hero-signal__node--one" /><div className="hero-signal__node hero-signal__node--two" /><div className="hero-signal__node hero-signal__node--three" /></div>
+            <div className="hero-signal" aria-hidden="true"><div className="hero-signal__line" /><div className="hero-signal__card hero-signal__card--top"><span className="hero-signal__icon hero-signal__icon--mint"><Zap size={15} /></span><span><b>Fast feedback loops</b><small>Preview in seconds</small></span></div><div className="hero-signal__card hero-signal__card--bottom"><span className="hero-signal__icon hero-signal__icon--violet"><Users size={15} /></span><span><b>Work in sync</b><small>3 teammates online</small></span></div><HeroTerminal /><div className="hero-signal__node hero-signal__node--one" /><div className="hero-signal__node hero-signal__node--two" /><div className="hero-signal__node hero-signal__node--three" /></div>
           </div>
           <div className="site-container hero-metrics"><div><strong>10×</strong><span>faster to first commit</span></div><div><strong>0</strong><span>local setup required</span></div><div><strong>99.9%</strong><span>workspace uptime</span></div><div><strong>∞</strong><span>ways to build</span></div></div>
         </section>
