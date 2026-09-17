@@ -18,7 +18,7 @@ export default function RepoCard({ project }: { project: any }) {
         });
         
         if (res.ok) {
-          router.push(`/workspace?id=${encodeURIComponent(project.name)}`);
+          router.push(`/workspace?id=${encodeURIComponent(project.id)}`);
         } else {
           alert('Failed to clone repository');
           setIsCloning(false);

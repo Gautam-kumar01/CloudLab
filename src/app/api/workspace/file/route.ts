@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { canAccessWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
-import { apiResponse, apiError } from '@/lib/api-utils';
+import { apiError } from '@/lib/api-utils';
 
 import { promises as fs } from 'fs';
 import path from 'path';
+import { workspaceFilePath, workspacePath } from '@/lib/workspace-paths';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -21,15 +22,15 @@ export async function GET(request: Request) {
   }
 
   const project = await getWorkspaceProject(session.user.id, workspaceId);
-  if (!project) {
+  if (!project || !(await canAccessWorkspace(session.user.id, workspaceId))) {
     return apiError('Forbidden', 403);
   }
 
-  const workspacePath = path.resolve(process.cwd(), 'workspaces', project.name);
-  const filePath = path.resolve(workspacePath, filename);
+  const workspaceRoot = workspacePath(project.id);
+  const filePath = workspaceFilePath(project.id, filename);
 
   // Security check to prevent path traversal
-  if (!filePath.startsWith(workspacePath)) {
+  if (!filePath.startsWith(`${workspaceRoot}${path.sep}`)) {
     return apiError('Invalid file path: path traversal detected', 403);
   }
 

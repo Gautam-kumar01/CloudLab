@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { getWorkspaceProject } from '@/lib/workspace-auth';
 const archiver = require('archiver');
 
 
 
-import path from 'path';
 import { promises as fs } from 'fs';
+import { workspacePath } from '@/lib/workspace-paths';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,12 +15,16 @@ export async function GET(request: Request) {
   if (!workspaceId) {
     return NextResponse.json({ error: 'Missing workspace id' }, { status: 400 });
   }
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const project = await getWorkspaceProject(session.user.id, workspaceId);
+  if (!project) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const workspacePath = path.resolve(process.cwd(), 'workspaces', workspaceId);
+  const workspaceRoot = workspacePath(project.id);
 
   // Ensure workspace exists
   try {
-    await fs.access(workspacePath);
+    await fs.access(workspaceRoot);
   } catch {
     return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
   }
@@ -36,7 +42,7 @@ export async function GET(request: Request) {
       archive.on('error', (err: any) => controller.error(err));
 
       // Append files from the workspace directory, putting them in the root of the archive
-      archive.directory(workspacePath, false);
+      archive.directory(workspaceRoot, false);
 
       // Finalize the archive (we are done appending files)
       archive.finalize();

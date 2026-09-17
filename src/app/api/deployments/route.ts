@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
-import { LocalDockerDeployer } from '@/lib/deployer';
+import { addJob } from '@/lib/queue';
+import { canManageWorkspace, canAccessWorkspace } from '@/lib/workspace-auth';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -16,9 +17,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
   }
 
+  if (!(await canAccessWorkspace(session.user.id, projectId))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const deployments = await db.deployment.findMany({
     where: { projectId },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: 50,
   });
 
   return NextResponse.json({ deployments });
@@ -37,24 +43,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
   }
 
-  // 0. Ensure Project exists in DB (for unmanaged local workspaces)
-  let project = await db.project.findUnique({ where: { id: projectId } });
-  if (!project) {
-    const fs = require('fs');
-    const path = require('path');
-    const workspacePath = path.join(process.cwd(), 'workspaces', projectId);
-    if (fs.existsSync(workspacePath)) {
-      project = await db.project.create({
-        data: {
-          id: projectId,
-          name: projectId,
-          ownerId: session.user.id
-        }
-      });
-    } else {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-    }
+  if (!(await canManageWorkspace(session.user.id, projectId))) {
+    return NextResponse.json({ error: 'Only project owners can deploy' }, { status: 403 });
   }
+  const project = await db.project.findUnique({ where: { id: projectId } });
+  if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
   // 1. Create Deployment Record
   const deployment = await db.deployment.create({
@@ -73,39 +66,7 @@ export async function POST(req: NextRequest) {
     return acc;
   }, {} as Record<string, string>);
 
-  // 3. Trigger Async Deployment (Fire and Forget)
-  // In a real app we'd use a message queue, but for MVP we run async
-  const deployer = new LocalDockerDeployer();
-  
-  (async () => {
-    try {
-      await db.deployment.update({
-        where: { id: deployment.id },
-        data: { status: 'RUNNING' }
-      });
-
-      const result = await deployer.deploy(projectId, envVars);
-
-      if (result.success) {
-        await db.deployment.update({
-          where: { id: deployment.id },
-          data: { status: 'SUCCESS', url: result.url }
-        });
-      } else {
-        await db.deployment.update({
-          where: { id: deployment.id },
-          data: { status: 'FAILED' }
-        });
-        console.error(`Deployment ${deployment.id} failed:`, result.error);
-      }
-    } catch (e: any) {
-      await db.deployment.update({
-        where: { id: deployment.id },
-        data: { status: 'FAILED' }
-      });
-      console.error(`Deployment ${deployment.id} failed exceptionally:`, e.message);
-    }
-  })();
+  await addJob('deployment', { deploymentId: deployment.id, projectId, envVars }, { singletonKey: deployment.id });
 
   return NextResponse.json({ deployment });
 }

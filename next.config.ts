@@ -2,6 +2,11 @@ import type { NextConfig } from 'next';
 import { withSentryConfig } from '@sentry/nextjs';
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    resolveAlias: {
+      'monaco-editor/esm/vs/editor/editor.api.js': 'monaco-editor',
+    },
+  },
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,

@@ -36,18 +36,18 @@ function getPostgresUrl(): string {
   return url;
 }
 
-const boss = new PgBoss(getPostgresUrl());
-
-boss.on('error', (error: Error) => logger.error({ err: error }, 'pg-boss error'));
+let boss: PgBoss | null = null;
 
 let isStarting = false;
 let isReady = false;
 
-export async function getQueue() {
-  if (isReady) return boss;
+export async function getQueue(): Promise<PgBoss> {
+  if (isReady && boss) return boss;
   if (!isStarting) {
     isStarting = true;
     try {
+      boss = new PgBoss(getPostgresUrl());
+      boss.on('error', (error: Error) => logger.error({ err: error }, 'pg-boss error'));
       await boss.start();
       isReady = true;
     } catch (err) {
@@ -60,6 +60,7 @@ export async function getQueue() {
       await new Promise((r) => setTimeout(r, 100));
     }
   }
+  if (!boss) throw new Error('Queue failed to initialize');
   return boss;
 }
 

@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import { apiResponse, apiError } from '@/lib/api-utils';
 import fs from 'fs';
-import path from 'path';
+import { workspacePath } from '@/lib/workspace-paths';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -34,15 +34,16 @@ export async function GET(request: Request) {
     });
 
     if (!project) {
-      const workspacePath = path.join(process.cwd(), 'workspaces', workspaceId);
-      console.log(`[AccessCheck] Project not found in DB. Checking local path: ${workspacePath}`);
-      if (fs.existsSync(workspacePath)) {
+      const localPath = workspacePath(workspaceId);
+      console.log(`[AccessCheck] Project not found in DB. Checking local path: ${localPath}`);
+      if (fs.existsSync(localPath)) {
         console.log(`[AccessCheck] Local path exists. Granting OWNER access.`);
         // For local fallback, we assume the name is the ID provided
         return apiResponse({
           success: true,
           role: 'OWNER',
           user: session.user,
+          projectId: workspaceId,
           projectName: workspaceId,
         });
       }
@@ -54,9 +55,10 @@ export async function GET(request: Request) {
     if (project.ownerId === userId) {
       return apiResponse({
         success: true,
-        role: 'OWNER',
-        user: session.user,
-        projectName: project.name,
+          role: 'OWNER',
+          user: session.user,
+          projectId: project.id,
+          projectName: project.name,
       });
     }
 
@@ -65,9 +67,10 @@ export async function GET(request: Request) {
     if (member) {
       return apiResponse({
         success: true,
-        role: member.role,
-        user: session.user,
-        projectName: project.name,
+          role: member.role,
+          user: session.user,
+          projectId: project.id,
+          projectName: project.name,
       });
     }
 

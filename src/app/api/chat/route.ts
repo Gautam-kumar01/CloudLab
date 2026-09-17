@@ -7,6 +7,9 @@ import path from 'path';
 import { exec } from 'child_process';
 import util from 'util';
 import { logAgentAction } from '@/lib/agent-logger';
+import { auth } from '@/auth';
+import { canAccessWorkspace } from '@/lib/workspace-auth';
+import { workspaceFilePath, workspacePath } from '@/lib/workspace-paths';
 
 // In-memory rate limiting map for the AI endpoint
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -19,14 +22,9 @@ export const maxDuration = 30;
 // Security: Prevent path traversal
 function getSafePath(relativePath: string, workspaceId?: string) {
   const workspaceRoot = workspaceId
-    ? path.join(process.cwd(), 'workspaces', workspaceId)
+    ? workspacePath(workspaceId)
     : process.cwd();
-  const absolutePath = path.resolve(workspaceRoot, relativePath);
-
-  if (!absolutePath.startsWith(workspaceRoot)) {
-    throw new Error('Path traversal detected. Access denied.');
-  }
-  return absolutePath;
+  return workspaceId ? workspaceFilePath(workspaceId, relativePath) : path.resolve(workspaceRoot, relativePath);
 }
 
 export async function POST(req: Request) {
@@ -52,6 +50,11 @@ export async function POST(req: Request) {
     rateLimitMap.set(ip, record);
 
     const { messages, workspaceId } = await req.json();
+    const session = await auth();
+    if (!session?.user?.id) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    if (!workspaceId || !(await canAccessWorkspace(session.user.id, workspaceId))) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
+    }
 
     const modelsToTry = [];
     if (process.env.GROQ_API_KEY) {
@@ -110,9 +113,7 @@ export async function POST(req: Request) {
                   'Local execution is disabled. Production Docker execution not yet implemented.',
                 );
               }
-              const workspaceRoot = workspaceId
-                ? path.join(process.cwd(), 'workspaces', workspaceId)
-                : process.cwd();
+              const workspaceRoot = workspacePath(workspaceId);
               const { stdout, stderr } = await execPromise(content.args.command, {
                 cwd: workspaceRoot,
                 timeout: 15000,

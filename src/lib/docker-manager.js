@@ -1,34 +1,52 @@
-const { exec } = require('child_process');
-const util = require('util');
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
+const path = require('node:path');
 
-const execAsync = util.promisify(exec);
+const execFileAsync = promisify(execFile);
+const WORKSPACES_ROOT = path.resolve(process.cwd(), 'workspaces');
+
+function assertWorkspaceId(workspaceId) {
+  if (!/^[a-zA-Z0-9_-]+$/.test(workspaceId)) throw new Error('Invalid workspace identifier');
+}
+
+function containerName(workspaceId) {
+  assertWorkspaceId(workspaceId);
+  return `cloudlab-workspace-${workspaceId}`;
+}
+
+async function docker(args, timeout = 30000) {
+  return execFileAsync('docker', args, { timeout, maxBuffer: 2 * 1024 * 1024, windowsHide: true });
+}
 
 const DockerManager = {
   /**
    * Starts a persistent Docker container for a workspace if it's not already running.
    */
   async startWorkspace(workspaceId, workspacePath) {
-    const containerName = `cloudlab-workspace-${workspaceId}`;
-    
+    assertWorkspaceId(workspaceId);
+    const name = containerName(workspaceId);
+    const root = path.resolve(workspacePath || path.join(WORKSPACES_ROOT, workspaceId));
+    if (root !== WORKSPACES_ROOT && !root.startsWith(`${WORKSPACES_ROOT}${path.sep}`)) {
+      throw new Error('Workspace path is outside the workspace root');
+    }
     try {
-      // Check if container already exists and is running
       const status = await this.getWorkspaceStatus(workspaceId);
-      
-      if (status === 'running') {
-        return true;
-      }
-      
+      if (status === 'running') return true;
       if (status === 'exited') {
-        // Start the stopped container
-        await execAsync(`docker start ${containerName}`);
+        await docker(['start', name]);
         return true;
       }
-      
-      // If it doesn't exist, create and start it
-      // Using --network="host" (Option A) for easy local development access to ports like 3000
-      const dockerCmd = `docker run -d --name ${containerName} --network="host" -v "${workspacePath}:/workspace" --cpus="1.0" --memory="1g" --pids-limit=100 --security-opt="no-new-privileges:true" --label cloudlab.workspace=true cloudlab-base-image sleep infinity`;
-      
-      await execAsync(dockerCmd);
+      await docker([
+        'run', '-d', '--name', name,
+        '--network', 'bridge',
+        '--volume', `${root}:/workspace:rw`,
+        '--cpus', '1.0', '--memory', '1g', '--pids-limit', '100',
+        '--security-opt', 'no-new-privileges:true', '--cap-drop', 'ALL',
+        '--tmpfs', '/tmp:rw,noexec,nosuid,size=256m',
+        '--label', 'cloudlab.workspace=true',
+        '--label', `cloudlab.workspace-id=${workspaceId}`,
+        'cloudlab-base-image', 'sleep', 'infinity',
+      ], 60000);
       return true;
     } catch (error) {
       console.error(`Failed to start Docker workspace ${workspaceId}:`, error);
@@ -40,9 +58,8 @@ const DockerManager = {
    * Stops and removes a workspace container.
    */
   async stopWorkspace(workspaceId) {
-    const containerName = `cloudlab-workspace-${workspaceId}`;
     try {
-      await execAsync(`docker rm -f ${containerName}`);
+      await docker(['rm', '-f', containerName(workspaceId)]);
       return true;
     } catch (error) {
       // If it fails, the container probably doesn't exist, which is fine
@@ -56,9 +73,8 @@ const DockerManager = {
    * Returns 'running', 'exited', or 'not_found'.
    */
   async getWorkspaceStatus(workspaceId) {
-    const containerName = `cloudlab-workspace-${workspaceId}`;
     try {
-      const { stdout } = await execAsync(`docker inspect -f "{{.State.Status}}" ${containerName}`);
+      const { stdout } = await docker(['inspect', '--format={{.State.Status}}', containerName(workspaceId)]);
       const status = stdout.trim();
       if (status === 'running') return 'running';
       return 'exited';
@@ -73,7 +89,7 @@ const DockerManager = {
   async listContainers() {
     try {
       // Get all containers labeled with cloudlab.workspace=true
-      const { stdout } = await execAsync(`docker ps --filter "label=cloudlab.workspace=true" --format "{{json .}}"`);
+      const { stdout } = await docker(['ps', '--filter', 'label=cloudlab.workspace=true', '--format', '{{json .}}']);
       const lines = stdout.trim().split('\n').filter(Boolean);
       return lines.map(line => {
         try {
@@ -92,14 +108,18 @@ const DockerManager = {
    * Kills any docker container by name or ID (useful for Admin force kill).
    */
   async killContainer(containerId) {
+    if (!/^[a-f0-9]{12,64}$/i.test(containerId) && !/^cloudlab-workspace-[a-zA-Z0-9_-]+$/.test(containerId)) {
+      throw new Error('Invalid container identifier');
+    }
     try {
-      await execAsync(`docker rm -f ${containerId}`);
+      await docker(['rm', '-f', containerId]);
       return true;
     } catch (error) {
       console.error(`Failed to force kill container ${containerId}:`, error);
       return false;
     }
-  }
+  },
+  containerName,
 };
 
 module.exports = { DockerManager };

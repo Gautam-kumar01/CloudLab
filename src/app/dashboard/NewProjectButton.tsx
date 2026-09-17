@@ -31,13 +31,12 @@ export default function NewProjectButton() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ name, templateId: selectedTemplate })
+        body: JSON.stringify({ name, template: selectedTemplate })
       });
 
       if (res.ok) {
         const data = await res.json();
-        // Redirect to workspace IDE, passing the project name (which is currently used as the physical folder name)
-        router.push(`/workspace?id=${encodeURIComponent(data.project.name)}`);
+        router.push(`/workspace?id=${encodeURIComponent(data.project.id)}`);
       } else {
         alert('Failed to create project');
       }

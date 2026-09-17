@@ -1,9 +1,7 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import path from 'path';
-import fs from 'fs';
-
-const execAsync = promisify(exec);
+import path from 'node:path';
+import fs from 'node:fs';
+import { workspacePath } from './workspace-paths';
+import { runCommand } from './process';
 
 export interface DeployResult {
   success: boolean;
@@ -17,18 +15,18 @@ export interface Deployer {
 
 export class LocalDockerDeployer implements Deployer {
   async deploy(workspaceId: string, envVars: Record<string, string>): Promise<DeployResult> {
-    const workspacePath = path.resolve(process.cwd(), 'workspaces', workspaceId);
+    const cwd = workspacePath(workspaceId);
     
     // Check if Docker is installed
     try {
-      await execAsync('docker --version');
+      await runCommand('docker', ['--version']);
     } catch (e) {
       return { success: false, error: 'Docker is not installed or not running on the host.' };
     }
 
     try {
       // 1. Ensure Dockerfile exists, if not create a default Node.js one
-      const dockerfilePath = path.join(workspacePath, 'Dockerfile');
+      const dockerfilePath = path.join(cwd, 'Dockerfile');
       if (!fs.existsSync(dockerfilePath)) {
         // Fallback Dockerfile for Node/React/Vite apps
         const defaultDockerfile = `
@@ -45,21 +43,23 @@ CMD ["npm", "run", "dev"]
 
       // 2. Build the Docker image
       const imageName = `cloudlab-${workspaceId.toLowerCase()}`;
-      await execAsync(`docker build -t ${imageName} .`, { cwd: workspacePath });
+      await runCommand('docker', ['build', '--tag', imageName, '.'], { cwd, timeout: 10 * 60 * 1000 });
 
       // 3. Stop existing container if it exists
       try {
-        await execAsync(`docker stop ${imageName}-container`);
-        await execAsync(`docker rm ${imageName}-container`);
+        await runCommand('docker', ['stop', `${imageName}-container`]);
+        await runCommand('docker', ['rm', `${imageName}-container`]);
       } catch (e) {
         // Container might not exist, ignore
       }
 
       // 4. Run the container
       const hostPort = Math.floor(Math.random() * 10000) + 10000;
-      const envArgs = Object.entries(envVars).map(([k, v]) => `-e ${k}="${v}"`).join(' ');
-      
-      const packageJsonPath = path.join(workspacePath, 'package.json');
+      const envArgs = Object.entries(envVars).flatMap(([key, value]) => {
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) throw new Error(`Invalid environment variable name: ${key}`);
+        return ['--env', `${key}=${value}`];
+      });
+      const packageJsonPath = path.join(cwd, 'package.json');
       let targetPort = '3000';
       if (fs.existsSync(packageJsonPath)) {
         const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
@@ -68,7 +68,13 @@ CMD ["npm", "run", "dev"]
         }
       }
 
-      await execAsync(`docker run -d -p ${hostPort}:${targetPort} ${envArgs} --name ${imageName}-container ${imageName}`);
+      await runCommand('docker', [
+        'run', '-d', '--publish', `${hostPort}:${targetPort}`,
+        ...envArgs, '--name', `${imageName}-container`,
+        '--label', 'cloudlab.deployment=true', '--network', 'bridge',
+        '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges:true',
+        imageName,
+      ], { timeout: 60_000 });
 
       return {
         success: true,

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { canAccessWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
+import { getWorkspaceProject } from '@/lib/workspace-auth';
 
 import { getDirectorySize, WORKSPACE_QUOTA_BYTES } from '@/lib/storage';
-import path from 'path';
+import { workspacePath } from '@/lib/workspace-paths';
 import { promises as fs } from 'fs';
 
 export async function GET(request: Request) {
@@ -23,15 +23,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const workspacePath = path.resolve(process.cwd(), 'workspaces', project.name);
+  const workspaceRoot = workspacePath(project.id);
 
   try {
-    await fs.access(workspacePath);
+    await fs.access(workspaceRoot);
   } catch {
     return NextResponse.json({ usedBytes: 0, quotaBytes: WORKSPACE_QUOTA_BYTES });
   }
 
-  const usedBytes = await getDirectorySize(workspacePath);
+  const usedBytes = await getDirectorySize(workspaceRoot);
 
   return NextResponse.json({
     usedBytes,

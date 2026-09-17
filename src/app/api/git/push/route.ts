@@ -1,14 +1,11 @@
 
 import { auth } from '@/auth';
-import { canAccessWorkspace } from '@/lib/workspace-auth';
+import { canEditWorkspace } from '@/lib/workspace-auth';
 import { apiResponse, apiError, apiValidationError } from '@/lib/api-utils';
 import { GitPushSchema } from '@/lib/validations/api';
 
-import { exec } from 'child_process';
-import util from 'util';
-import path from 'path';
-
-const execPromise = util.promisify(exec);
+import { workspacePath } from '@/lib/workspace-paths';
+import { runCommand } from '@/lib/process';
 
 export async function POST(request: Request) {
   try {
@@ -25,22 +22,20 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return apiError('Unauthorized', 401);
     }
-    const hasAccess = await canAccessWorkspace(session.user.id, workspaceId);
+    const hasAccess = await canEditWorkspace(session.user.id, workspaceId);
     if (!hasAccess) {
       return apiError('Forbidden', 403);
     }
 
-    const workspacePath = path.resolve(process.cwd(), 'workspaces', workspaceId);
+    const cwd = workspacePath(workspaceId);
 
     // Execute git add
-    await execPromise('git add .', { cwd: workspacePath });
+    await runCommand('git', ['add', '--', '.'], { cwd });
 
     // Execute git commit
     const commitMsg = message || 'Update from CloudLab';
     try {
-      await execPromise(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`, {
-        cwd: workspacePath,
-      });
+      await runCommand('git', ['commit', '-m', commitMsg], { cwd });
     } catch (e: any) {
       // If nothing to commit, just proceed
       if (!e.stdout?.includes('nothing to commit')) {
@@ -49,7 +44,7 @@ export async function POST(request: Request) {
     }
 
     // Execute git push
-    const { stdout } = await execPromise('git push', { cwd: workspacePath });
+    const { stdout } = await runCommand('git', ['push'], { cwd });
 
     return apiResponse({ success: true, stdout });
   } catch (error: any) {

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { canAccessWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
+import { canEditWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
 
 import path from 'path';
+import { workspaceFilePath, workspacePath } from '@/lib/workspace-paths';
 import { promises as fs } from 'fs';
 
 export async function POST(request: Request) {
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const project = await getWorkspaceProject(session.user.id, workspaceId);
-    if (!project) {
+    if (!project || !(await canEditWorkspace(session.user.id, workspaceId))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -36,14 +37,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const workspacePath = path.resolve(process.cwd(), 'workspaces', project.name);
+    const workspaceRoot = workspacePath(project.id);
 
     // Resolve absolute paths
-    const absoluteOldPath = path.resolve(workspacePath, oldPath);
-    const absoluteNewPath = path.resolve(workspacePath, newPath);
+    const absoluteOldPath = workspaceFilePath(project.id, oldPath);
+    const absoluteNewPath = workspaceFilePath(project.id, newPath);
 
     // Security check to prevent path traversal
-    if (!absoluteOldPath.startsWith(workspacePath) || !absoluteNewPath.startsWith(workspacePath)) {
+    if (!absoluteOldPath.startsWith(workspaceRoot) || !absoluteNewPath.startsWith(workspaceRoot)) {
       return NextResponse.json(
         { error: 'Invalid file path: path traversal detected' },
         { status: 403 },

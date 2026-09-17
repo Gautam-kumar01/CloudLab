@@ -136,6 +136,8 @@ model AiLog {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
 }
 
 model Deployment {
@@ -147,6 +149,8 @@ model Deployment {
   createdAt DateTime @default(now())
 
   @@index([projectId])
+  @@index([projectId, createdAt])
+  @@index([status, createdAt])
 }
 
 model AuditLog {
@@ -158,6 +162,8 @@ model AuditLog {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }
 
 model EnvironmentVariable {

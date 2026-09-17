@@ -1,10 +1,11 @@
 import { auth } from '@/auth';
-import { canAccessWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
+import { canEditWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
 import { apiResponse, apiError, apiValidationError } from '@/lib/api-utils';
 import { FileWriteSchema } from '@/lib/validations/api';
 
 import { promises as fs } from 'fs';
 import path from 'path';
+import { workspaceFilePath, workspacePath } from '@/lib/workspace-paths';
 
 // Helper to determine language for Monaco editor
 function getLanguageFromFilename(filename: string) {
@@ -41,28 +42,28 @@ export async function GET(request: Request) {
     return apiError('Unauthorized', 401);
   }
   const project = await getWorkspaceProject(session.user.id, workspaceId);
-  if (!project) {
+  if (!project || !(await canEditWorkspace(session.user.id, workspaceId))) {
     return apiError('Forbidden', 403);
   }
 
-  const workspacePath = path.join(process.cwd(), 'workspaces', project.name);
+  const workspaceRoot = workspacePath(project.id);
 
   try {
     // Check if workspace exists, if not, create it and populate with initial files
     try {
-      await fs.access(workspacePath);
+      await fs.access(workspaceRoot);
     } catch {
-      await fs.mkdir(workspacePath, { recursive: true });
+      await fs.mkdir(workspaceRoot, { recursive: true });
       for (const [filename, content] of Object.entries(initialFiles)) {
-        await fs.writeFile(path.join(workspacePath, filename), content, 'utf-8');
+        await fs.writeFile(path.join(workspaceRoot, filename), content, 'utf-8');
       }
     }
 
     // If the directory was created by Docker mount, it might be empty
-    const rootFiles = await fs.readdir(workspacePath);
+    const rootFiles = await fs.readdir(workspaceRoot);
     if (rootFiles.length === 0) {
       for (const [filename, content] of Object.entries(initialFiles)) {
-        await fs.writeFile(path.join(workspacePath, filename), content, 'utf-8');
+        await fs.writeFile(path.join(workspaceRoot, filename), content, 'utf-8');
       }
     }
 
@@ -104,7 +105,7 @@ export async function GET(request: Request) {
       return tree;
     };
 
-    const result = await buildTree(workspacePath);
+    const result = await buildTree(workspaceRoot);
 
     return apiResponse(result);
   } catch (error: any) {
@@ -129,7 +130,7 @@ export async function POST(request: Request) {
       return apiError('Unauthorized', 401);
     }
     const project = await getWorkspaceProject(session.user.id, workspaceId);
-    if (!project) {
+    if (!project || !(await canEditWorkspace(session.user.id, workspaceId))) {
       return apiError('Forbidden', 403);
     }
 
@@ -138,17 +139,17 @@ export async function POST(request: Request) {
       return apiError('Invalid file path: path traversal detected', 403);
     }
 
-    const workspacePath = path.resolve(process.cwd(), 'workspaces', project.name);
-    const filePath = path.resolve(workspacePath, filename);
+    const workspaceRoot = workspacePath(project.id);
+    const filePath = workspaceFilePath(project.id, filename);
 
     // Security check to prevent path traversal
-    if (!filePath.startsWith(workspacePath)) {
+    if (!filePath.startsWith(`${workspaceRoot}${path.sep}`)) {
       return apiError('Invalid file path: path traversal detected', 403);
     }
 
     // Ensure workspace exists
     try {
-      await fs.access(workspacePath);
+      await fs.access(workspaceRoot);
     } catch {
       return apiError('Workspace not found', 404);
     }
@@ -165,13 +166,13 @@ export async function POST(request: Request) {
       try {
         const stat = await fs.stat(filePath);
         existingSize = stat.size;
-      } catch (e) {
+      } catch {
         // File doesn't exist yet
       }
 
       const sizeDiff = contentBuffer.byteLength - existingSize;
       if (sizeDiff > 0) {
-        const quota = await checkQuota(workspacePath, sizeDiff);
+        const quota = await checkQuota(workspaceRoot, sizeDiff);
         if (!quota.ok) {
           return apiError('Storage quota exceeded (500 MB limit)', 403);
         }
@@ -201,7 +202,7 @@ export async function DELETE(request: Request) {
     return apiError('Unauthorized', 401);
   }
   const project = await getWorkspaceProject(session.user.id, workspaceId);
-  if (!project) {
+  if (!project || !(await canEditWorkspace(session.user.id, workspaceId))) {
     return apiError('Forbidden', 403);
   }
 
@@ -210,11 +211,11 @@ export async function DELETE(request: Request) {
     return apiError('Invalid file path: path traversal detected', 403);
   }
 
-  const workspacePath = path.resolve(process.cwd(), 'workspaces', project.name);
-  const filePath = path.resolve(workspacePath, filename);
+  const workspaceRoot = workspacePath(project.id);
+  const filePath = workspaceFilePath(project.id, filename);
 
   // Security check to prevent path traversal
-  if (!filePath.startsWith(workspacePath)) {
+  if (!filePath.startsWith(`${workspaceRoot}${path.sep}`)) {
     return apiError('Invalid file path: path traversal detected', 403);
   }
 

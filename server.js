@@ -92,7 +92,11 @@ app.prepare().then(() => {
           return;
         }
 
-        const resolvedWorkspaceName = access.data.projectName || workspaceId;
+        const resolvedWorkspaceId = access.data.projectId || workspaceId;
+        if (!/^[a-zA-Z0-9_-]+$/.test(resolvedWorkspaceId) || !file || file.includes('..')) {
+          socket.destroy();
+          return;
+        }
 
         // Room name includes workspace and file
         const docName = `workspace/${workspaceId}/file/${file}`;
@@ -106,7 +110,7 @@ app.prepare().then(() => {
             doc.__hasSaveHook = true;
 
             // Load initial content if it exists
-            const workspacePath = path.join(process.cwd(), 'workspaces', resolvedWorkspaceName);
+            const workspacePath = path.join(process.cwd(), 'workspaces', resolvedWorkspaceId);
             const filePath = path.join(workspacePath, file);
 
             if (fs.existsSync(filePath)) {
@@ -185,7 +189,7 @@ app.prepare().then(() => {
     let windowStart = Date.now();
 
     socket.on('terminal.spawn', async ({ id, shellType, workspaceId }) => {
-      let resolvedWorkspaceName = workspaceId;
+      let resolvedWorkspaceId = workspaceId;
 
       // Auth check for workspace
       if (workspaceId) {
@@ -208,7 +212,7 @@ app.prepare().then(() => {
             });
             return;
           }
-          resolvedWorkspaceName = access.data.projectName || workspaceId; // Resolve to project name
+          resolvedWorkspaceId = access.data.projectId || workspaceId;
         } catch (err) {
           socket.emit('terminal.incData', {
             id,
@@ -220,8 +224,8 @@ app.prepare().then(() => {
 
       let shell = '';
       let args = [];
-      const workspacePath = resolvedWorkspaceName
-        ? require('path').join(process.cwd(), 'workspaces', resolvedWorkspaceName)
+      const workspacePath = resolvedWorkspaceId
+        ? require('path').join(process.cwd(), 'workspaces', resolvedWorkspaceId)
         : process.cwd();
       require('fs').mkdirSync(workspacePath, { recursive: true });
 
@@ -230,14 +234,13 @@ app.prepare().then(() => {
         
         try {
           // Ensure container is running
-          const started = await DockerManager.startWorkspace(resolvedWorkspaceName, workspacePath);
+          const started = await DockerManager.startWorkspace(resolvedWorkspaceId, workspacePath);
           if (!started) {
             throw new Error('Failed to start container');
           }
           
-          const dockerCmd = `docker exec -it cloudlab-workspace-${resolvedWorkspaceName} /bin/bash`;
-          shell = isWin ? 'powershell.exe' : 'bash';
-          args = isWin ? ['-Command', dockerCmd] : ['-c', dockerCmd];
+          shell = 'docker';
+          args = ['exec', '-it', DockerManager.containerName(resolvedWorkspaceId), '/bin/bash'];
         } catch (error) {
           console.error('Docker Error:', error);
           socket.emit('terminal.incData', {

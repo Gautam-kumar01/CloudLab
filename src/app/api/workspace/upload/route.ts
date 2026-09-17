@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { canAccessWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
+import { canEditWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
 
 import { promises as fs } from 'fs';
 import path from 'path';
+import { workspacePath } from '@/lib/workspace-paths';
 import { checkQuota } from '@/lib/storage';
 
 
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const project = await getWorkspaceProject(session.user.id, workspaceId);
-    if (!project) {
+    if (!project || !(await canEditWorkspace(session.user.id, workspaceId))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const workspacePath = path.resolve(process.cwd(), 'workspaces', project.name);
+    const workspaceRoot = workspacePath(project.id);
 
     // Read multipart form data
     const formData = await request.formData();
@@ -46,13 +47,13 @@ export async function POST(request: Request) {
     }
 
     // Safety checks
-    const targetFilePath = path.resolve(workspacePath, folderPath, file.name);
-    if (!targetFilePath.startsWith(workspacePath)) {
+    const targetFilePath = path.resolve(workspaceRoot, folderPath, file.name);
+    if (!targetFilePath.startsWith(`${workspaceRoot}${path.sep}`)) {
       return NextResponse.json({ error: 'Invalid path traversal detected' }, { status: 403 });
     }
 
     // Check quota
-    const quota = await checkQuota(workspacePath, file.size);
+    const quota = await checkQuota(workspaceRoot, file.size);
     if (!quota.ok) {
       return NextResponse.json(
         {
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       filename: file.name,
-      path: targetFilePath.replace(workspacePath + path.sep, ''),
+      path: targetFilePath.replace(workspaceRoot + path.sep, ''),
     });
   } catch (error: any) {
     console.error('Error uploading file:', error);

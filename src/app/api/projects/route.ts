@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { builtInTemplates } from '@/lib/templates';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { workspacePath } from '@/lib/workspace-paths';
 import { apiResponse, apiError, apiValidationError } from '@/lib/api-utils';
 import { CreateProjectSchema } from '@/lib/validations/api';
 
@@ -57,20 +58,20 @@ export async function POST(req: NextRequest) {
     });
 
     // Create workspace directory
-    const workspacePath = path.join(process.cwd(), 'workspaces', project.name); // Using project.name instead of ID to match the Dockerfile logic from Phase 14
+    const workspaceRoot = workspacePath(project.id); // Using project.name instead of ID to match the Dockerfile logic from Phase 14
 
     // Ensure the workspaces directory exists
     await fs.mkdir(path.join(process.cwd(), 'workspaces'), { recursive: true });
 
     try {
-      await fs.access(workspacePath);
+      await fs.access(workspaceRoot);
     } catch {
-      await fs.mkdir(workspacePath, { recursive: true });
+      await fs.mkdir(workspaceRoot, { recursive: true });
     }
 
     // Write template files
     for (const [filename, content] of Object.entries(template.files)) {
-      const filePath = path.join(workspacePath, filename);
+      const filePath = path.join(workspaceRoot, filename);
       // Ensure subdirectories exist if the template has nested files
       await fs.mkdir(path.dirname(filePath), { recursive: true });
       await fs.writeFile(filePath, content, 'utf-8');

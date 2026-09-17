@@ -45,3 +45,22 @@ export async function canAccessWorkspace(userId: string, workspaceId: string): P
   const project = await getWorkspaceProject(userId, workspaceId);
   return !!project;
 }
+
+const ROLE_LEVELS: Record<string, number> = { VIEWER: 1, EDITOR: 2, OWNER: 3 };
+
+export async function getWorkspaceRole(userId: string, workspaceId: string): Promise<string | null> {
+  const project = await getWorkspaceProject(userId, workspaceId);
+  if (!project) return null;
+  if (project.ownerId === userId) return 'OWNER';
+  return project.members.find((member) => member.userId === userId)?.role || null;
+}
+
+export async function canEditWorkspace(userId: string, workspaceId: string): Promise<boolean> {
+  const role = await getWorkspaceRole(userId, workspaceId);
+  return !!role && ROLE_LEVELS[role] >= ROLE_LEVELS.EDITOR;
+}
+
+export async function canManageWorkspace(userId: string, workspaceId: string): Promise<boolean> {
+  const role = await getWorkspaceRole(userId, workspaceId);
+  return role === 'OWNER';
+}
