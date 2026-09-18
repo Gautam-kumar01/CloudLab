@@ -1255,6 +1255,9 @@ body {
   font-size: 10px;
 }
 .terminal-view__path span { color: var(--home-mint); }
+.terminal-view__toolbar-actions { display: inline-flex; align-items: center; gap: 10px; }
+.terminal-control-button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid rgba(218, 255, 232, 0.12); border-radius: 5px; background: rgba(255, 255, 255, 0.035); color: var(--home-dim); cursor: pointer; font: inherit; font-size: 8px; letter-spacing: 0.08em; transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease; }
+.terminal-control-button:hover, .terminal-control-button[aria-pressed="true"] { border-color: rgba(200, 255, 85, 0.46); background: rgba(200, 255, 85, 0.08); color: var(--home-mint); }
 .terminal-view__connection { gap: 6px; color: #86efac; letter-spacing: 0.05em; }
 .terminal-view__connection b { color: var(--home-dim); font-weight: 500; }
 
@@ -2845,6 +2848,8 @@ html[data-theme="light"] .tech-badge__name {
   .terminal-view__meta > span:last-child { display: none; }
   .terminal-view__toolbar { padding: 0 14px; }
   .terminal-view__connection b { display: none; }
+  .terminal-view__toolbar-actions { gap: 5px; }
+  .terminal-control-button { padding: 4px 5px; font-size: 7px; }
   .terminal-view__output { padding: 20px 16px 24px; font-size: 10.5px; }
   .terminal-view__quick-actions { padding: 10px 13px; }
   .terminal-view__command { margin: 12px 13px 14px; }

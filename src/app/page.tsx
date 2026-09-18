@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Activity,
   ArrowRight,
@@ -40,6 +40,8 @@ import {
   Sparkles,
   Terminal,
   Users,
+  Volume2,
+  VolumeX,
   Wand2,
   Workflow,
   X,
@@ -737,17 +739,48 @@ function WorkspaceTerminal() {
     }>
   >([]);
   const [copied, setCopied] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [liveAnimationEnabled, setLiveAnimationEnabled] = useState(true);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const currentStep = workspaceTerminalFrames[stepIndex];
 
+  const playTerminalTone = (kind: "keypress" | "output" | "complete") => {
+    if (!soundEnabled || typeof window === "undefined") return;
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const audioContext = audioContextRef.current || new AudioContextClass();
+    audioContextRef.current = audioContext;
+    if (audioContext.state === "suspended") void audioContext.resume();
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    const frequencies = { keypress: 520, output: 680, complete: 880 };
+    const duration = kind === "complete" ? 0.16 : 0.055;
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequencies[kind], audioContext.currentTime);
+    gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(kind === "complete" ? 0.045 : 0.018, audioContext.currentTime + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+    oscillator.connect(gain).connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + duration + 0.01);
+  };
+
   useEffect(() => {
+    if (!liveAnimationEnabled) return;
     if (typedChars < currentStep.command.length) {
-      const timer = setTimeout(() => setTypedChars((prev) => prev + 1), 32);
+      const timer = setTimeout(() => {
+        setTypedChars((prev) => prev + 1);
+        if (typedChars % 3 === 0) playTerminalTone("keypress");
+      }, 32);
       return () => clearTimeout(timer);
     }
 
     if (visibleOutputsCount < currentStep.outputs.length) {
-      const timer = setTimeout(() => setVisibleOutputsCount((prev) => prev + 1), 200);
+      const timer = setTimeout(() => {
+        setVisibleOutputsCount((prev) => prev + 1);
+        playTerminalTone("output");
+      }, 200);
       return () => clearTimeout(timer);
     }
 
@@ -774,13 +807,14 @@ function WorkspaceTerminal() {
           setStepIndex(0);
           setTypedChars(0);
           setVisibleOutputsCount(0);
+          playTerminalTone("complete");
         }, 3200);
         return () => clearTimeout(resetTimer);
       }
     }, 1400);
 
     return () => clearTimeout(nextTimer);
-  }, [typedChars, visibleOutputsCount, stepIndex, currentStep]);
+  }, [typedChars, visibleOutputsCount, stepIndex, currentStep, liveAnimationEnabled]);
 
   const runCustomCommand = (cmd: string) => {
     const matchingIdx = workspaceTerminalFrames.findIndex((s) => s.command.includes(cmd));
@@ -801,6 +835,14 @@ function WorkspaceTerminal() {
     }
   };
 
+  const toggleSound = () => {
+    setSoundEnabled((enabled) => {
+      const nextEnabled = !enabled;
+      if (nextEnabled) playTerminalTone("output");
+      return nextEnabled;
+    });
+  };
+
   return (
     <div className="terminal-view" role="tabpanel">
       <div className="terminal-view__header">
@@ -815,7 +857,15 @@ function WorkspaceTerminal() {
       </div>
       <div className="terminal-view__toolbar">
         <span className="terminal-view__path"><span>~/</span>acme-dashboard</span>
-        <span className="terminal-view__connection"><Radio size={11} /> P2P SYNC <b>8ms</b></span>
+        <div className="terminal-view__toolbar-actions">
+          <button type="button" className="terminal-control-button" onClick={toggleSound} aria-pressed={soundEnabled} title={soundEnabled ? "Mute terminal sounds" : "Enable terminal sounds"}>
+            {soundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />} {soundEnabled ? "SOUND ON" : "SOUND OFF"}
+          </button>
+          <button type="button" className="terminal-control-button" onClick={() => setLiveAnimationEnabled((enabled) => !enabled)} aria-pressed={liveAnimationEnabled} title={liveAnimationEnabled ? "Pause live animation" : "Resume live animation"}>
+            {liveAnimationEnabled ? <Pause size={11} /> : <Play size={11} />} {liveAnimationEnabled ? "LIVE" : "PAUSED"}
+          </button>
+          <span className="terminal-view__connection"><Radio size={11} /> P2P SYNC <b>8ms</b></span>
+        </div>
       </div>
       <div className="terminal-view__output">
         {history.map((item, idx) => (
