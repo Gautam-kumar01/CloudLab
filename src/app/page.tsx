@@ -804,8 +804,18 @@ function WorkspaceTerminal() {
   return (
     <div className="terminal-view" role="tabpanel">
       <div className="terminal-view__header">
-        <span>TERMINAL (LIVE CLOUD ENGINE)</span>
-        <span>bash — 80×24 · NVMe Node.js v20</span>
+        <div className="terminal-view__titlebar">
+          <span className="terminal-view__traffic" aria-hidden="true"><i /><i /><i /></span>
+          <span className="terminal-view__tab"><Terminal size={12} /> cloudlab / acme-dashboard</span>
+        </div>
+        <div className="terminal-view__meta">
+          <span className="terminal-view__live"><i /> LIVE</span>
+          <span>bash · NVMe Node.js v20</span>
+        </div>
+      </div>
+      <div className="terminal-view__toolbar">
+        <span className="terminal-view__path"><span>~/</span>acme-dashboard</span>
+        <span className="terminal-view__connection"><Radio size={11} /> P2P SYNC <b>8ms</b></span>
       </div>
       <div className="terminal-view__output">
         {history.map((item, idx) => (
@@ -884,8 +894,9 @@ function WorkspaceTerminal() {
       </div>
 
       <div className="terminal-view__command">
-        <span>$</span>
+        <span className="terminal-view__command-prompt">$</span>
         <code>npx cloudlab dev</code>
+        <span className="terminal-view__command-state"><i /> ready</span>
         <button type="button" onClick={copyCommand} aria-label="Copy CloudLab command">
           {copied ? <Check size={14} /> : <Copy size={14} />}
         </button>
