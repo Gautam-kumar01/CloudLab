@@ -16,21 +16,32 @@ import {
   Cpu,
   Database,
   ExternalLink,
+  Eye,
   Flame,
+  Gauge,
   GitBranch,
   Globe2,
+  HardDrive,
   Layers,
+  Layers3,
   LockKeyhole,
   Menu,
+  Network,
+  Pause,
   Play,
+  Radio,
   RefreshCw,
   Rocket,
+  RotateCcw,
   Server,
+  Share2,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   Terminal,
   Users,
   Wand2,
+  Workflow,
   X,
   Zap,
 } from "lucide-react";
@@ -883,36 +894,245 @@ function WorkspaceTerminal() {
   );
 }
 
+type WorkflowStageId = "microvm" | "editor" | "terminal" | "mesh" | "preview";
+
+interface WorkflowStage {
+  id: WorkflowStageId;
+  stepNumber: string;
+  title: string;
+  subtitle: string;
+  tagline: string;
+  badge: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+}
+
+const workflowStages: WorkflowStage[] = [
+  {
+    id: "microvm",
+    stepNumber: "01",
+    title: "MicroVM Sandboxing",
+    subtitle: "Isolated rootless Linux container with 140ms cold start",
+    tagline: "2 vCPU · 2.4GB RAM · NVMe",
+    badge: "CORE RUNTIME",
+    icon: Cpu,
+  },
+  {
+    id: "editor",
+    stepNumber: "02",
+    title: "Multiplayer CRDT Editor",
+    subtitle: "Sub-50ms peer replication with live multi-cursors & presence",
+    tagline: "Zero Merge Conflicts",
+    badge: "P2P SYNC",
+    icon: Code2,
+  },
+  {
+    id: "terminal",
+    stepNumber: "03",
+    title: "Live Turbo Terminal",
+    subtitle: "PTY bash multiplexing with hot reload output stream",
+    tagline: "Instant Dev Feedback",
+    badge: "BASH & TURBO",
+    icon: Terminal,
+  },
+  {
+    id: "mesh",
+    stepNumber: "04",
+    title: "Visual Mesh & DB Canvas",
+    subtitle: "Interconnected microservices with real-time telemetry",
+    tagline: "Live Infrastructure Graph",
+    badge: "CANVAS MESH",
+    icon: Network,
+  },
+  {
+    id: "preview",
+    stepNumber: "05",
+    title: "Global Edge Deployment",
+    subtitle: "Instant public HTTPS URL with automatic wildcard SSL",
+    tagline: "1-Click Production URL",
+    badge: "EDGE CLOUD",
+    icon: Globe2,
+  },
+];
+
+interface CanvasNode {
+  id: string;
+  name: string;
+  role: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  status: "active" | "synced" | "connected";
+  port?: string;
+  metrics: {
+    cpu: string;
+    ram: string;
+    latency: string;
+    throughput: string;
+  };
+  details: string;
+}
+
+const canvasNodes: Record<string, CanvasNode> = {
+  frontend: {
+    id: "frontend",
+    name: "Next.js 15 Web Service",
+    role: "Fullstack App & UI Engine",
+    icon: Cloud,
+    status: "active",
+    port: "Port 3000",
+    metrics: { cpu: "8.4%", ram: "340MB", latency: "14ms", throughput: "48 req/s" },
+    details: "Server components, streaming SSR, and Turbopack compiler running in rootless container.",
+  },
+  crdt: {
+    id: "crdt",
+    name: "Yjs CRDT Collab Engine",
+    role: "P2P Realtime Replication",
+    icon: Users,
+    status: "synced",
+    port: "WebSocket /collaboration",
+    metrics: { cpu: "3.2%", ram: "128MB", latency: "8ms", throughput: "3 online peers" },
+    details: "Sub-50ms keystroke replication with Google Docs-style multi-cursor sync.",
+  },
+  postgres: {
+    id: "postgres",
+    name: "Neon Serverless Postgres",
+    role: "Prisma Managed Database",
+    icon: Database,
+    status: "connected",
+    port: "Port 5432 (SSL Pooled)",
+    metrics: { cpu: "4.1%", ram: "512MB", latency: "18ms", throughput: "12 active pool conn" },
+    details: "Instant autoscaling PostgreSQL instance with branch-based preview schemas.",
+  },
+  worker: {
+    id: "worker",
+    name: "Async Background Worker",
+    role: "BullMQ & Redis Task Queue",
+    icon: Cpu,
+    status: "active",
+    port: "Queue: default",
+    metrics: { cpu: "2.8%", ram: "180MB", latency: "5ms", throughput: "0 backlog" },
+    details: "Handles heavy async jobs, automated build artifacts, and scheduled webhook triggers.",
+  },
+  edge: {
+    id: "edge",
+    name: "Global Edge CDN Proxy",
+    role: "Wildcard SSL & Anycast DNS",
+    icon: Globe2,
+    status: "active",
+    port: "https://*.cloudlab.run",
+    metrics: { cpu: "1.2%", ram: "96MB", latency: "22ms global", throughput: "100% Cache Hit" },
+    details: "Automatic SSL/TLS provisioning with instant global edge routing.",
+  },
+};
+
 function WorkspacePreview() {
-  const [activeTab, setActiveTab] = useState<DemoTab>("editor");
+  const [activeStage, setActiveStage] = useState<WorkflowStageId>("microvm");
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [stageProgress, setStageProgress] = useState(0);
+  const [selectedNodeKey, setSelectedNodeKey] = useState<string>("frontend");
+
+  const stageDurationMs = 6500;
+  const tickIntervalMs = 65;
+
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const interval = setInterval(() => {
+      setStageProgress((prev) => {
+        if (prev >= 100) {
+          // Advance to next stage smoothly
+          setActiveStage((current) => {
+            const currentIndex = workflowStages.findIndex((s) => s.id === current);
+            const nextIndex = (currentIndex + 1) % workflowStages.length;
+            return workflowStages[nextIndex].id;
+          });
+          return 0;
+        }
+        return prev + (tickIntervalMs / stageDurationMs) * 100;
+      });
+    }, tickIntervalMs);
+
+    return () => clearInterval(interval);
+  }, [isPlaying]);
+
+  const handleStageSelect = (stageId: WorkflowStageId) => {
+    setActiveStage(stageId);
+    setStageProgress(0);
+  };
+
+  const handleTogglePlay = () => {
+    setIsPlaying((prev) => !prev);
+  };
+
+  const handleRestart = () => {
+    setActiveStage("microvm");
+    setStageProgress(0);
+    setIsPlaying(true);
+  };
+
+  const selectedNode = canvasNodes[selectedNodeKey] || canvasNodes.frontend;
+  const currentStageObj = workflowStages.find((s) => s.id === activeStage) || workflowStages[0];
 
   return (
-    <div id="workspace">
-      <div className="workspace-quick-steps" aria-label="How it works interactive guide">
-        <button
-          type="button"
-          className={`workspace-step-btn ${activeTab === "editor" ? "is-active" : ""}`}
-          onClick={() => setActiveTab("editor")}
-        >
-          <Code2 size={13} /> 01. Code & Realtime CRDT Editor
-        </button>
-        <button
-          type="button"
-          className={`workspace-step-btn ${activeTab === "terminal" ? "is-active" : ""}`}
-          onClick={() => setActiveTab("terminal")}
-        >
-          <Terminal size={13} /> 02. Live Turbo Terminal Execution
-        </button>
-        <button
-          type="button"
-          className={`workspace-step-btn ${activeTab === "preview" ? "is-active" : ""}`}
-          onClick={() => setActiveTab("preview")}
-        >
-          <Globe2 size={13} /> 03. Instant Edge Live URL Preview
-        </button>
+    <div id="workspace" className="railway-workflow-canvas">
+      {/* Video-Like Scrubber Timeline Header */}
+      <div className="workflow-player-header">
+        <div className="workflow-player-controls">
+          <button
+            type="button"
+            className={`workflow-play-btn ${isPlaying ? "is-playing" : ""}`}
+            onClick={handleTogglePlay}
+            title={isPlaying ? "Pause automated tour" : "Play automated tour"}
+            aria-label={isPlaying ? "Pause automated tour" : "Play automated tour"}
+          >
+            {isPlaying ? <Pause size={14} /> : <Play size={14} className="play-icon-offset" />}
+            <span>{isPlaying ? "PAUSE TOUR" : "PLAY TOUR"}</span>
+          </button>
+          <button
+            type="button"
+            className="workflow-restart-btn"
+            onClick={handleRestart}
+            title="Restart tour from Step 01"
+            aria-label="Restart tour"
+          >
+            <RotateCcw size={13} />
+          </button>
+        </div>
+
+        {/* 5 Step Pills with Progress Bar */}
+        <div className="workflow-timeline-pills" role="tablist" aria-label="Interactive workflow stages">
+          {workflowStages.map((stage) => {
+            const isActive = activeStage === stage.id;
+            const StageIcon = stage.icon;
+
+            return (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                key={stage.id}
+                className={`workflow-timeline-pill ${isActive ? "is-active" : ""}`}
+                onClick={() => handleStageSelect(stage.id)}
+              >
+                {isActive && (
+                  <div
+                    className="workflow-timeline-pill__progress"
+                    style={{ width: `${stageProgress}%` }}
+                  />
+                )}
+                <span className="workflow-timeline-pill__icon">
+                  <StageIcon size={14} />
+                </span>
+                <div className="workflow-timeline-pill__meta">
+                  <span className="workflow-timeline-pill__num">{stage.stepNumber}</span>
+                  <strong className="workflow-timeline-pill__title">{stage.title}</strong>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="workspace-shell">
+      {/* Main Interactive Stage Canvas Container */}
+      <div className="workspace-shell railway-shell">
         <div className="workspace-shell__bar">
           <div className="window-controls" aria-hidden="true">
             <span className="window-controls__dot window-controls__dot--red" />
@@ -921,37 +1141,117 @@ function WorkspacePreview() {
           </div>
           <div className="workspace-shell__path">
             <span className="workspace-shell__path-dot" />
-            cloudlab / acme-dashboard
+            cloudlab / {currentStageObj.title.toLowerCase().replace(/\s+/g, "-")}
           </div>
           <div className="workspace-shell__live">
-            <span /> Live
+            <span /> {currentStageObj.badge}
           </div>
         </div>
-        <div className="workspace-shell__tabs" role="tablist" aria-label="Workspace preview">
-          {([
-            ["editor", "Editor", Code2],
-            ["terminal", "Terminal", Terminal],
-            ["preview", "Preview", Globe2],
-          ] as const).map(([tab, label, Icon]) => (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab}
-              key={tab}
-              className={`workspace-shell__tab ${activeTab === tab ? "is-active" : ""}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              <Icon size={14} />
-              {label}
-            </button>
-          ))}
+
+        {/* Stage Sub-Navigation Tabs */}
+        <div className="workspace-shell__tabs" role="tablist" aria-label="Workspace view modes">
+          {workflowStages.map((stage) => {
+            const StageIcon = stage.icon;
+            const isActive = activeStage === stage.id;
+            return (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                key={`tab-${stage.id}`}
+                className={`workspace-shell__tab ${isActive ? "is-active" : ""}`}
+                onClick={() => handleStageSelect(stage.id)}
+              >
+                <StageIcon size={13} />
+                <span>{stage.title}</span>
+              </button>
+            );
+          })}
           <div className="workspace-shell__tab-spacer" />
           <span className="workspace-shell__collaborators">
-            <span /> 3 online
+            <span /> 3 teammates connected
           </span>
         </div>
+
+        {/* Stage Body Views */}
         <div className="workspace-shell__body">
-          {activeTab === "editor" && (
+          {/* ===================================================
+              STAGE 01: MICROVM SANDBOXING
+             =================================================== */}
+          {activeStage === "microvm" && (
+            <div className="microvm-view" role="tabpanel">
+              <div className="microvm-grid">
+                <div className="microvm-specs">
+                  <div className="microvm-badge">
+                    <Cpu size={14} /> DEDICATED ROOTLESS MICROVM
+                  </div>
+                  <h3>Isolated Firecracker Linux Sandbox</h3>
+                  <p>
+                    Every CloudLab project launches in a dedicated, hardware-isolated microVM container.
+                    Dependencies, memory heaps, and system sockets never leak between tenants.
+                  </p>
+
+                  <div className="microvm-metrics-cards">
+                    <div className="microvm-metric-card">
+                      <span className="microvm-metric-card__label">BOOT LATENCY</span>
+                      <strong>140ms</strong>
+                      <small className="text-mint">⚡ Sub-second start</small>
+                    </div>
+                    <div className="microvm-metric-card">
+                      <span className="microvm-metric-card__label">COMPUTE CORES</span>
+                      <strong>2 vCPU</strong>
+                      <small>Burstable x86_64</small>
+                    </div>
+                    <div className="microvm-metric-card">
+                      <span className="microvm-metric-card__label">MEMORY ALLOCATION</span>
+                      <strong>2.4 GB</strong>
+                      <small>Isolated RAM</small>
+                    </div>
+                    <div className="microvm-metric-card">
+                      <span className="microvm-metric-card__label">NVME STORAGE</span>
+                      <strong>10 GB</strong>
+                      <small>Persistent Cache</small>
+                    </div>
+                  </div>
+
+                  <div className="microvm-security-tags">
+                    <span className="hero-tag"><ShieldCheck size={12} /> Rootless Sandbox</span>
+                    <span className="hero-tag"><LockKeyhole size={12} /> AES-256 Volume</span>
+                    <span className="hero-tag"><Zap size={12} /> Fast Snapshotting</span>
+                  </div>
+                </div>
+
+                <div className="microvm-boot-terminal">
+                  <div className="microvm-boot-terminal__header">
+                    <span>CONTAINER BOOT STREAM (INIT)</span>
+                    <span className="text-mint">● READY</span>
+                  </div>
+                  <pre className="microvm-boot-terminal__code">
+                    <code>{`[0.002s] ⚡ Initializing isolated Firecracker microVM instance...
+[0.018s] 🔒 Mounting rootless unprivileged container namespace (uid: 1001)
+[0.042s] 💾 Attached 10GB NVMe storage volume (ext4 filesystem)
+[0.086s] 📦 Restored node_modules global cache (48 packages in 44ms)
+[0.120s] 🌐 Socket tunnel established on virtual tap0 (10.0.0.2/24)
+[0.140s] ✔ MicroVM sandbox ready in 140ms. Spawning bash session.`}</code>
+                  </pre>
+                  <div className="microvm-boot-terminal__action">
+                    <button
+                      type="button"
+                      className="button button--primary button--small"
+                      onClick={() => handleStageSelect("editor")}
+                    >
+                      Next: Open CRDT Editor <ArrowRight size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ===================================================
+              STAGE 02: MULTIPLAYER CRDT EDITOR
+             =================================================== */}
+          {activeStage === "editor" && (
             <div className="editor-view" role="tabpanel">
               <aside className="editor-tree">
                 <div className="editor-tree__title">EXPLORER</div>
@@ -971,13 +1271,17 @@ function WorkspacePreview() {
                   <Circle size={11} /> README.md
                 </div>
                 <div className="editor-tree__branch">
-                  <GitBranch size={12} /> main
+                  <GitBranch size={12} /> main (up to date)
                 </div>
               </aside>
+
               <div className="editor-code">
                 <div className="editor-code__topline">
-                  <span>app.tsx</span>
-                  <span>saved 2s ago</span>
+                  <div className="editor-code__file-badge">
+                    <span>app.tsx</span>
+                    <span className="editor-code__diff-pill">+42 -0</span>
+                  </div>
+                  <span className="text-mint">CRDT sync active · 8ms latency</span>
                 </div>
                 <div className="editor-code__content">
                   {codeLines.map((line, index) => (
@@ -1003,41 +1307,261 @@ function WorkspacePreview() {
                     </div>
                   ))}
                   <div className="editor-code__cursor" />
+
+                  {/* Collaborative Remote Cursors Floating Flags */}
+                  <div className="editor-collaborator-cursor editor-collaborator-cursor--maya">
+                    <span className="editor-collaborator-cursor__flag">Maya (editing app.tsx)</span>
+                  </div>
+                  <div className="editor-collaborator-cursor editor-collaborator-cursor--leo">
+                    <span className="editor-collaborator-cursor__flag">Leo (routes.ts)</span>
+                  </div>
                 </div>
               </div>
+
               <aside className="editor-inspector">
-                <div className="editor-inspector__title">ACTIVITY</div>
+                <div className="editor-inspector__title">PEER PRESENCE</div>
                 <div className="activity-item">
                   <span className="activity-avatar activity-avatar--pink">M</span>
                   <p>
                     <strong>Maya</strong> edited <b>app.tsx</b>
-                    <small>just now</small>
+                    <small>Real-time cursor on line 4</small>
                   </p>
                 </div>
                 <div className="activity-item">
                   <span className="activity-avatar activity-avatar--blue">L</span>
                   <p>
-                    <strong>Leo</strong> joined the workspace
-                    <small>2 min ago</small>
+                    <strong>Leo</strong> editing <b>api/routes.ts</b>
+                    <small>Sub-50ms Yjs sync</small>
                   </p>
                 </div>
                 <div className="activity-item">
                   <span className="activity-avatar activity-avatar--yellow">A</span>
                   <p>
-                    <strong>Amir</strong> pushed to <b>main</b>
-                    <small>8 min ago</small>
+                    <strong>Amir</strong> review approved
+                    <small>Ready to deploy</small>
                   </p>
+                </div>
+
+                <div className="editor-inspector__quick-jump">
+                  <button
+                    type="button"
+                    className="button button--ghost button--small w-full"
+                    onClick={() => handleStageSelect("terminal")}
+                  >
+                    Run in Terminal <Terminal size={12} />
+                  </button>
                 </div>
               </aside>
             </div>
           )}
-          {activeTab === "terminal" && <WorkspaceTerminal />}
-          {activeTab === "preview" && (
+
+          {/* ===================================================
+              STAGE 03: LIVE TURBO TERMINAL
+             =================================================== */}
+          {activeStage === "terminal" && <WorkspaceTerminal />}
+
+          {/* ===================================================
+              STAGE 04: VISUAL MESH & DATABASE CANVAS (RAILWAY STYLE)
+             =================================================== */}
+          {activeStage === "mesh" && (
+            <div className="mesh-canvas-view" role="tabpanel">
+              <div className="mesh-canvas-layout">
+                {/* SVG Visual Interconnected Canvas */}
+                <div className="mesh-canvas-area" aria-label="Visual Infrastructure Canvas">
+                  <div className="mesh-canvas-bg-grid" />
+
+                  {/* SVG Animated Connector Pipes */}
+                  <svg className="mesh-canvas-svg" viewBox="0 0 680 400" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="cableGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#c8ff55" stopOpacity="0.8" />
+                        <stop offset="50%" stopColor="#9e8cff" stopOpacity="0.9" />
+                        <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.8" />
+                      </linearGradient>
+                      <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                      </filter>
+                    </defs>
+
+                    {/* Cables Connecting Nodes with animated stroke flow */}
+                    <path
+                      d="M 170 100 C 250 100, 270 70, 360 70"
+                      className="mesh-cable mesh-cable--animated"
+                      filter="url(#glowEffect)"
+                    />
+                    <path
+                      d="M 170 110 C 250 110, 270 290, 360 290"
+                      className="mesh-cable mesh-cable--animated"
+                      filter="url(#glowEffect)"
+                    />
+                    <path
+                      d="M 170 120 C 170 200, 150 250, 170 310"
+                      className="mesh-cable mesh-cable--animated"
+                    />
+                    <path
+                      d="M 480 70 C 530 70, 530 170, 560 170"
+                      className="mesh-cable mesh-cable--animated"
+                      filter="url(#glowEffect)"
+                    />
+                    <path
+                      d="M 480 290 C 530 290, 530 190, 560 190"
+                      className="mesh-cable mesh-cable--animated"
+                    />
+                  </svg>
+
+                  {/* Interactive Nodes Placed in Canvas */}
+                  <div
+                    className={`canvas-node-card canvas-node-card--frontend ${
+                      selectedNodeKey === "frontend" ? "is-selected" : ""
+                    }`}
+                    style={{ left: "20px", top: "60px" }}
+                    onClick={() => setSelectedNodeKey("frontend")}
+                  >
+                    <div className="canvas-node-card__top">
+                      <Cloud size={16} className="text-mint" />
+                      <span className="canvas-node-card__tag">Next.js 15</span>
+                      <span className="canvas-node-card__dot" />
+                    </div>
+                    <strong>Frontend & API</strong>
+                    <small>Port 3000 · 48 req/s</small>
+                  </div>
+
+                  <div
+                    className={`canvas-node-card canvas-node-card--crdt ${
+                      selectedNodeKey === "crdt" ? "is-selected" : ""
+                    }`}
+                    style={{ left: "330px", top: "30px" }}
+                    onClick={() => setSelectedNodeKey("crdt")}
+                  >
+                    <div className="canvas-node-card__top">
+                      <Users size={16} className="text-violet" />
+                      <span className="canvas-node-card__tag">CRDT Yjs</span>
+                      <span className="canvas-node-card__dot canvas-node-card__dot--violet" />
+                    </div>
+                    <strong>Collab Engine</strong>
+                    <small>3 peers · 8ms sync</small>
+                  </div>
+
+                  <div
+                    className={`canvas-node-card canvas-node-card--postgres ${
+                      selectedNodeKey === "postgres" ? "is-selected" : ""
+                    }`}
+                    style={{ left: "330px", top: "250px" }}
+                    onClick={() => setSelectedNodeKey("postgres")}
+                  >
+                    <div className="canvas-node-card__top">
+                      <Database size={16} className="text-sky" />
+                      <span className="canvas-node-card__tag">Neon DB</span>
+                      <span className="canvas-node-card__dot canvas-node-card__dot--sky" />
+                    </div>
+                    <strong>PostgreSQL Serverless</strong>
+                    <small>Port 5432 · Pooled SSL</small>
+                  </div>
+
+                  <div
+                    className={`canvas-node-card canvas-node-card--worker ${
+                      selectedNodeKey === "worker" ? "is-selected" : ""
+                    }`}
+                    style={{ left: "30px", top: "270px" }}
+                    onClick={() => setSelectedNodeKey("worker")}
+                  >
+                    <div className="canvas-node-card__top">
+                      <Cpu size={16} className="text-orange" />
+                      <span className="canvas-node-card__tag">Worker</span>
+                      <span className="canvas-node-card__dot canvas-node-card__dot--orange" />
+                    </div>
+                    <strong>Async Task Queue</strong>
+                    <small>BullMQ · 0 backlog</small>
+                  </div>
+
+                  <div
+                    className={`canvas-node-card canvas-node-card--edge ${
+                      selectedNodeKey === "edge" ? "is-selected" : ""
+                    }`}
+                    style={{ left: "520px", top: "135px" }}
+                    onClick={() => setSelectedNodeKey("edge")}
+                  >
+                    <div className="canvas-node-card__top">
+                      <Globe2 size={16} className="text-mint" />
+                      <span className="canvas-node-card__tag">Edge SSL</span>
+                      <span className="canvas-node-card__dot" />
+                    </div>
+                    <strong>Global CDN</strong>
+                    <small>Wildcard *.cloudlab.run</small>
+                  </div>
+                </div>
+
+                {/* Node Telemetry Inspector Sidebar */}
+                <aside className="mesh-inspector-panel">
+                  <div className="mesh-inspector-header">
+                    <span className="mesh-inspector-badge">
+                      <Activity size={12} /> LIVE NODE TELEMETRY
+                    </span>
+                    <h3>{selectedNode.name}</h3>
+                    <p>{selectedNode.details}</p>
+                  </div>
+
+                  <div className="mesh-inspector-stats">
+                    <div className="mesh-stat-row">
+                      <span>Service Status</span>
+                      <strong className="text-mint">● {selectedNode.status.toUpperCase()}</strong>
+                    </div>
+                    <div className="mesh-stat-row">
+                      <span>Port / Endpoint</span>
+                      <code>{selectedNode.port}</code>
+                    </div>
+                    <div className="mesh-stat-row">
+                      <span>CPU Utilization</span>
+                      <strong>{selectedNode.metrics.cpu}</strong>
+                    </div>
+                    <div className="mesh-stat-row">
+                      <span>RAM Allocation</span>
+                      <strong>{selectedNode.metrics.ram}</strong>
+                    </div>
+                    <div className="mesh-stat-row">
+                      <span>P99 Latency</span>
+                      <strong className="text-mint">{selectedNode.metrics.latency}</strong>
+                    </div>
+                    <div className="mesh-stat-row">
+                      <span>Throughput</span>
+                      <strong>{selectedNode.metrics.throughput}</strong>
+                    </div>
+                  </div>
+
+                  <div className="mesh-inspector-footer">
+                    <button
+                      type="button"
+                      className="button button--primary button--small w-full"
+                      onClick={() => handleStageSelect("preview")}
+                    >
+                      Next: View Live Production URL <ArrowRight size={13} />
+                    </button>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          )}
+
+          {/* ===================================================
+              STAGE 05: GLOBAL EDGE DEPLOYMENT & LIVE PREVIEW
+             =================================================== */}
+          {activeStage === "preview" && (
             <div className="preview-view" role="tabpanel">
               <div className="preview-view__browserbar">
-                <span className="preview-view__lock">⌁</span>
-                <span>acme-dashboard.cloudlab.run</span>
-                <span className="preview-view__reload">↻</span>
+                <span className="preview-view__lock" title="SSL Certificate Valid">
+                  <LockKeyhole size={12} />
+                </span>
+                <span className="preview-view__url">https://acme-dashboard.cloudlab.run</span>
+                <a
+                  href="https://acme-dashboard.cloudlab.run"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="preview-view__reload"
+                  title="Open live preview in new tab"
+                >
+                  <ExternalLink size={13} />
+                </a>
               </div>
               <div className="preview-view__canvas">
                 <div className="preview-view__nav">
@@ -1050,43 +1574,61 @@ function WorkspacePreview() {
                   <span className="preview-view__avatar">M</span>
                 </div>
                 <div className="preview-view__hero">
-                  <span className="preview-view__kicker">MONDAY, SEPTEMBER 07</span>
+                  <span className="preview-view__kicker">LIVE PRODUCTION DEPLOYMENT</span>
                   <h3>Good morning, Maya.</h3>
-                  <p>Here&apos;s what&apos;s moving across your projects.</p>
+                  <p>All microservices synced & operating with 100% health score.</p>
                 </div>
                 <div className="preview-view__cards">
                   <div>
-                    <span>Active projects</span>
-                    <strong>12</strong>
-                    <small>↑ 18% this week</small>
+                    <span>Active users</span>
+                    <strong>1,240</strong>
+                    <small>↑ 28% today</small>
                   </div>
                   <div>
                     <span>Deployments</span>
-                    <strong>48</strong>
-                    <small>↑ 24% this week</small>
+                    <strong>48 / 48</strong>
+                    <small className="text-mint">100% successful</small>
                   </div>
                   <div>
-                    <span>Team velocity</span>
-                    <strong>8.4</strong>
-                    <small>↑ 6% this week</small>
+                    <span>Global Latency</span>
+                    <strong>18ms</strong>
+                    <small className="text-mint">Sub-50ms worldwide</small>
+                  </div>
+                </div>
+
+                <div className="preview-view__lighthouse-strip">
+                  <div className="lighthouse-chip">
+                    <span className="lighthouse-score">100</span> Performance
+                  </div>
+                  <div className="lighthouse-chip">
+                    <span className="lighthouse-score">100</span> Accessibility
+                  </div>
+                  <div className="lighthouse-chip">
+                    <span className="lighthouse-score">100</span> Best Practices
+                  </div>
+                  <div className="lighthouse-chip">
+                    <span className="lighthouse-score">100</span> SEO
                   </div>
                 </div>
               </div>
             </div>
           )}
         </div>
+
+        {/* Global Shell Bottom Status Bar */}
         <div className="workspace-shell__status">
           <span>
-            <Check size={13} /> main • synced
+            <Check size={13} /> Stage: {currentStageObj.title} ({currentStageObj.stepNumber}/05)
           </span>
           <span>
-            UTF-8 <span className="status-divider">|</span> TypeScript
+            MicroVM 2 vCPU · 2.4GB RAM <span className="status-divider">|</span> Neon PostgreSQL 15 <span className="status-divider">|</span> Wildcard SSL Live
           </span>
         </div>
       </div>
     </div>
   );
 }
+
 
 function FAQItem({
   question,
