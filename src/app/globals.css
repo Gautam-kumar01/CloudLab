@@ -2743,6 +2743,7 @@ html[data-theme="light"] .auth-page { background: var(--home-ink); } html[data-t
   border-radius: 22px;
   background: linear-gradient(135deg, rgba(17, 24, 26, 0.92), rgba(11, 16, 17, 0.95));
   box-shadow: 0 25px 70px rgba(0, 0, 0, 0.35);
+  align-items: center;
 }
 
 .architecture-panel__copy {
@@ -2801,49 +2802,269 @@ html[data-theme="light"] .auth-page { background: var(--home-ink); } html[data-t
   flex: 0 0 auto;
 }
 
-.architecture-panel__code {
-  border: 1px solid rgba(230, 241, 235, 0.14);
-  border-radius: 14px;
-  background: #090d0e;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+/* 3D Architecture Terminal Styles */
+.arch-3d-wrapper {
+  perspective: 1200px;
+  position: relative;
+  width: 100%;
 }
 
-.architecture-panel__code-top {
+.arch-3d-card {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid rgba(83, 165, 48, 0.25);
+  background: linear-gradient(165deg, rgba(14, 20, 21, 0.98), rgba(7, 11, 12, 0.99));
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(83, 165, 48, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: transform 0.15s ease-out, box-shadow 0.2s ease, border-color 0.2s ease;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.arch-3d-card.is-tilted {
+  border-color: rgba(83, 165, 48, 0.5);
+  box-shadow: 0 35px 85px rgba(0, 0, 0, 0.75), 0 0 55px rgba(83, 165, 48, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.arch-3d-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 16px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  background: radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0) 65%);
+  z-index: 1;
+}
+
+.arch-3d-card.is-tilted .arch-3d-glare {
+  opacity: 1;
+}
+
+.arch-3d-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 16px;
+  opacity: 0.18;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.3) 2px, rgba(0, 0, 0, 0.3) 4px);
+  z-index: 1;
+}
+
+.arch-3d-floating-stat {
+  position: absolute;
+  top: -14px;
+  right: 22px;
+  z-index: 10;
+  transform: translateZ(30px);
+  background: rgba(14, 25, 20, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(83, 165, 48, 0.4);
+  border-radius: 999px;
+  padding: 5px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 20px rgba(83, 165, 48, 0.2);
+  animation: floatSlow 4s ease-in-out infinite alternate;
+}
+
+.arch-3d-floating-stat strong {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--home-mint);
+}
+
+.arch-3d-floating-stat span {
+  font-size: 11px;
+  color: var(--home-dim);
+  font-weight: 600;
+}
+
+.arch-3d-stat-chip {
+  font-size: 9px !important;
+  font-weight: 750 !important;
+  color: #08110b !important;
+  background: var(--home-mint) !important;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.arch-3d-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 36px;
-  padding: 0 14px;
+  padding: 10px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: #111718;
+  background: rgba(18, 25, 26, 0.85);
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  position: relative;
+  z-index: 2;
+}
+
+.arch-3d-traffic {
+  display: flex;
+  gap: 6px;
+}
+
+.arch-3d-traffic i {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.arch-3d-traffic i:nth-child(1) { background: #ff5f56; }
+.arch-3d-traffic i:nth-child(2) { background: #ffbd2e; }
+.arch-3d-traffic i:nth-child(3) { background: #27c93f; }
+
+.arch-3d-modes {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.arch-3d-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-family: var(--font-geist-mono), monospace;
   font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   color: var(--home-dim);
+  background: transparent;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.architecture-panel__code-top span:first-child {
+.arch-3d-mode-btn:hover {
+  color: var(--home-text);
+}
+
+.arch-3d-mode-btn.is-active {
+  background: rgba(83, 165, 48, 0.22);
+  color: var(--home-mint);
+  border: 1px solid rgba(83, 165, 48, 0.38);
+}
+
+.arch-3d-copy-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: var(--home-dim);
+  padding: 6px;
+  cursor: pointer;
   display: flex;
-  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
 
-.architecture-panel__code-top i {
-  display: block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #394542;
+.arch-3d-copy-btn:hover {
+  color: var(--home-mint);
+  border-color: rgba(83, 165, 48, 0.35);
+  background: rgba(83, 165, 48, 0.12);
 }
 
-.architecture-panel__code pre {
+.arch-3d-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 290px;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  position: relative;
+  z-index: 2;
+}
+
+.arch-3d-output {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.arch-3d-prompt-line {
+  margin: 0 0 6px 0;
+  color: var(--home-text);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12.5px;
+}
+
+.arch-3d-code-view {
   margin: 0;
-  padding: 22px 20px;
+  padding: 4px 0;
   font-family: var(--font-geist-mono), monospace;
   font-size: 12px;
-  line-height: 1.8;
-  color: #c9e8d4;
+  line-height: 1.7;
+  color: #b7e8c6;
+  white-space: pre-wrap;
+  word-break: break-word;
   overflow-x: auto;
+}
+
+.arch-3d-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.arch-3d-action-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(83, 165, 48, 0.25);
+  background: rgba(83, 165, 48, 0.07);
+  color: var(--home-text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.arch-3d-action-chip:hover {
+  border-color: var(--home-mint);
+  background: rgba(83, 165, 48, 0.18);
+  transform: translateY(-1px);
+  color: #fff;
+}
+
+.arch-3d-action-chip.is-active {
+  border-color: var(--home-mint);
+  background: var(--home-mint);
+  color: #08110b;
+  font-weight: 750;
+  box-shadow: 0 0 14px rgba(83, 165, 48, 0.35);
+}
+
+/* Light mode overrides */
+html[data-theme="light"] .arch-3d-card {
+  border-color: rgba(65, 132, 44, 0.4);
+  background: linear-gradient(155deg, rgba(16, 52, 30, 0.98), rgba(10, 34, 21, 0.98));
+  box-shadow: 0 25px 60px rgba(27, 48, 31, 0.22), 0 0 45px rgba(83, 165, 48, 0.18);
 }
 
 /* Light mode overrides */

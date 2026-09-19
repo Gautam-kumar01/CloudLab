@@ -142,6 +142,17 @@ const architectureTabs: Record<
     description: string;
     points: string[];
     code: string;
+    terminal: {
+      prompt: string;
+      command: string;
+      outputs: Array<{ text: string; type?: "info" | "success" | "warn" | "url" | "dim" | "accent" }>;
+      statBadge: { value: string; label: string; highlight: string };
+      actions: Array<{
+        label: string;
+        command: string;
+        outputs: Array<{ text: string; type?: "info" | "success" | "warn" | "url" | "dim" | "accent" }>;
+      }>;
+    };
   }
 > = {
   microvm: {
@@ -163,6 +174,38 @@ const container = await cloudlab.runtime.spawn({
   isolation: "strict-microvm"
 });
 // Container ready in 140ms`,
+    terminal: {
+      prompt: "cloudlab:~/microvm-root",
+      command: "cloudlab runtime spawn --strict-microvm",
+      outputs: [
+        { text: "[0.002s] ⚡ Initializing Firecracker microVM instance...", type: "dim" },
+        { text: "[0.018s] 🔒 Rootless Linux namespace mounted (uid: 1001, cgroups v2)", type: "accent" },
+        { text: "[0.042s] 💾 Attached 10GB NVMe storage volume (ext4)", type: "dim" },
+        { text: "[0.086s] 📦 Restored node_modules global cache (48 packages in 44ms)", type: "success" },
+        { text: "[0.140s] ✔ MicroVM sandbox ready in 140ms. Dedicated 2 vCPU · 2.4GB RAM.", type: "success" },
+      ],
+      statBadge: { value: "140ms", label: "Cold Start Latency", highlight: "⚡ Sub-second boot" },
+      actions: [
+        {
+          label: "Bench Cold Start",
+          command: "cloudlab bench --cold-start --runs=10",
+          outputs: [
+            { text: "⚡ Running 10 cold container boot benchmarks...", type: "dim" },
+            { text: "  Run 1..10: [138ms, 142ms, 137ms, 140ms, 139ms]", type: "info" },
+            { text: "✔ Mean Boot: 139.2ms ± 1.8ms (NVMe cluster cached)", type: "success" },
+          ],
+        },
+        {
+          label: "Inspect Cgroups",
+          command: "cat /sys/fs/cgroup/memory.max && nproc",
+          outputs: [
+            { text: "cgroup: 2576980377 (2.4 GB hard limit)", type: "info" },
+            { text: "cpu cores: 2 dedicated burstable x86_64 threads", type: "accent" },
+            { text: "✔ Zero memory leakage to adjacent tenants", type: "success" },
+          ],
+        },
+      ],
+    },
   },
   crdt: {
     title: "Multiplayer CRDT Sync",
@@ -183,6 +226,35 @@ const peerSession = new CloudLab.Collab({
   presence: { user: "Maya", role: "Frontend" }
 });
 peerSession.on("peer-join", (peer) => syncCursors(peer));`,
+    terminal: {
+      prompt: "cloudlab:~/collaboration",
+      command: "cloudlab sync --crdt-webrtc --room=acme-dashboard",
+      outputs: [
+        { text: "⇄ Initializing Yjs CRDT peer stream over WebSockets...", type: "dim" },
+        { text: "● Maya (Frontend) joined • RTT: 7.8ms • cursor on page.tsx:4", type: "accent" },
+        { text: "● Leo (Backend) joined • RTT: 11.2ms • editing api/routes.ts", type: "accent" },
+        { text: "✔ Mathematical convergence verified • 0 merge conflicts (60fps sync)", type: "success" },
+      ],
+      statBadge: { value: "8ms", label: "Peer-to-Peer RTT", highlight: "● 3 peers online" },
+      actions: [
+        {
+          label: "Simulate Keystroke",
+          command: 'cloudlab crdt inject --peer="Maya" --op="insert" --text="<NavBar />"',
+          outputs: [
+            { text: "⇄ Delta [op:insert, pos:42, len:11] broadcast to 3 peers", type: "info" },
+            { text: "✔ State synchronized in 6.4ms across all connected clients", type: "success" },
+          ],
+        },
+        {
+          label: "Test Fork Convergence",
+          command: "cloudlab crdt test-fork --peers=4 --concurrent-edits=100",
+          outputs: [
+            { text: "⚡ Injected 100 concurrent edits across 4 virtual peers...", type: "dim" },
+            { text: "✔ Lamport timestamps converged (LWW-Register verified)", type: "success" },
+          ],
+        },
+      ],
+    },
   },
   ai: {
     title: "AI Code Accelerator",
@@ -203,6 +275,35 @@ const diagnostics = await cloudlab.ai.diagnose({
   fixConfidence: 0.99
 });
 await diagnostics.applyPatch();`,
+    terminal: {
+      prompt: "cloudlab:~/copilot",
+      command: "cloudlab ai diagnose --auto-fix --file=app/api/route.ts",
+      outputs: [
+        { text: "🔍 Indexing workspace AST tree & compiler error stream...", type: "dim" },
+        { text: "✦ Found TypeError: Cannot read property 'map' of undefined (line 24)", type: "warn" },
+        { text: "💡 Gemini 2.0 suggested fix: Use optional chaining 'items?.map(...)'", type: "accent" },
+        { text: "✔ Patch applied to app/api/route.ts in 280ms. Type check passed.", type: "success" },
+      ],
+      statBadge: { value: "99.4%", label: "Fix Confidence", highlight: "✦ Gemini 2.0 & GPT-4o" },
+      actions: [
+        {
+          label: "Auto-Fix Route",
+          command: "cloudlab ai refactor --target=routes.ts --strict-types",
+          outputs: [
+            { text: "✦ Inferred strict TypeScript interface types for 8 models", type: "info" },
+            { text: "✔ Added Zod payload validator schema with 0 runtime warnings", type: "success" },
+          ],
+        },
+        {
+          label: "Explain Error",
+          command: "cloudlab ai explain --error=500",
+          outputs: [
+            { text: "💡 Cause: Database connection pool exhausted during burst", type: "dim" },
+            { text: "✔ Solution: Configured connection pooling (-pooler) for Neon Postgres", type: "success" },
+          ],
+        },
+      ],
+    },
   },
   edge: {
     title: "1-Click Edge Deploy",
@@ -224,6 +325,35 @@ const deployment = await cloudlab.deploy({
 });
 console.log("Deployed to:", deployment.url);
 // → https://acme-saas.cloudlab.run`,
+    terminal: {
+      prompt: "cloudlab:~/deploy",
+      command: "cloudlab deploy --edge-global --target=production",
+      outputs: [
+        { text: "⚡ Building optimized standalone bundle with Turbopack...", type: "dim" },
+        { text: "🔒 Auto wildcard SSL certificate issued for *.cloudlab.run", type: "accent" },
+        { text: "🚀 Live at: https://acme-saas.cloudlab.run", type: "url" },
+        { text: "✨ 18ms global edge latency across 42 POPs · 100/100 Lighthouse", type: "success" },
+      ],
+      statBadge: { value: "18ms", label: "Global Edge Latency", highlight: "🌍 42 Edge POPs" },
+      actions: [
+        {
+          label: "Ping Edge POPs",
+          command: "cloudlab ping --regions=ams,sfo,nrt,syd",
+          outputs: [
+            { text: "AMS: 8ms | SFO: 14ms | NRT: 22ms | SYD: 28ms", type: "info" },
+            { text: "✔ Anycast DNS routed to nearest edge node", type: "success" },
+          ],
+        },
+        {
+          label: "Verify SSL Cert",
+          command: "cloudlab ssl inspect --domain=acme-saas.cloudlab.run",
+          outputs: [
+            { text: "🔒 TLS v1.3 • Issuer: Let's Encrypt Authority • 2048-bit RSA", type: "success" },
+            { text: "✔ HTTP/3 (QUIC) enabled with zero handshake overhead", type: "accent" },
+          ],
+        },
+      ],
+    },
   },
 };
 
@@ -604,6 +734,208 @@ function BenchmarkSection() {
   );
 }
 
+function ArchitectureTerminal3D({
+  tabKey,
+  data,
+}: {
+  tabKey: ArchitectureTab;
+  data: (typeof architectureTabs)[ArchitectureTab];
+}) {
+  const [viewMode, setViewMode] = useState<"terminal" | "code">("terminal");
+  const [activeActionIdx, setActiveActionIdx] = useState<number | null>(null);
+  const [typedChars, setTypedChars] = useState(0);
+  const [visibleOutputsCount, setVisibleOutputsCount] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [tilt, setTilt] = useState({
+    rotateX: 0,
+    rotateY: 0,
+    glareX: 50,
+    glareY: 50,
+    isHovered: false,
+  });
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  const activeCommand =
+    activeActionIdx !== null
+      ? data.terminal.actions[activeActionIdx].command
+      : data.terminal.command;
+  const activeOutputs =
+    activeActionIdx !== null
+      ? data.terminal.actions[activeActionIdx].outputs
+      : data.terminal.outputs;
+
+  // Reset typewriter when tab or action changes
+  useEffect(() => {
+    setTypedChars(0);
+    setVisibleOutputsCount(0);
+  }, [tabKey, activeActionIdx]);
+
+  useEffect(() => {
+    if (typedChars < activeCommand.length) {
+      const timer = setTimeout(() => setTypedChars((prev) => prev + 1), 20);
+      return () => clearTimeout(timer);
+    }
+    if (visibleOutputsCount < activeOutputs.length) {
+      const timer = setTimeout(() => setVisibleOutputsCount((prev) => prev + 1), 130);
+      return () => clearTimeout(timer);
+    }
+  }, [typedChars, visibleOutputsCount, activeCommand, activeOutputs]);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const card = cardRef.current;
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = -((y - centerY) / centerY) * 9;
+    const rotateY = ((x - centerX) / centerX) * 11;
+    const glareX = (x / rect.width) * 100;
+    const glareY = (y / rect.height) * 100;
+    setTilt({ rotateX, rotateY, glareX, glareY, isHovered: true });
+  };
+
+  const handleMouseLeave = () => {
+    setTilt({ rotateX: 0, rotateY: 0, glareX: 50, glareY: 50, isHovered: false });
+  };
+
+  const handleCopy = async () => {
+    try {
+      const textToCopy = viewMode === "code" ? data.code : activeCommand;
+      await navigator.clipboard.writeText(textToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div
+      className="arch-3d-wrapper"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div
+        ref={cardRef}
+        className={`arch-3d-card ${tilt.isHovered ? "is-tilted" : ""}`}
+        style={{
+          transform: tilt.isHovered
+            ? `rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) scale3d(1.02, 1.02, 1.02)`
+            : "rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)",
+          ["--glare-x" as string]: `${tilt.glareX}%`,
+          ["--glare-y" as string]: `${tilt.glareY}%`,
+        }}
+      >
+        <div className="arch-3d-glare" />
+        <div className="arch-3d-scanlines" />
+
+        {/* 3D Floating Telemetry Stat Badge */}
+        <div className="arch-3d-floating-stat" aria-hidden="true">
+          <strong>{data.terminal.statBadge.value}</strong>
+          <span>{data.terminal.statBadge.label}</span>
+          <span className="arch-3d-stat-chip">{data.terminal.statBadge.highlight}</span>
+        </div>
+
+        {/* 3D Topbar with Traffic Lights & View Mode Switches */}
+        <div className="arch-3d-topbar">
+          <div className="arch-3d-traffic" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </div>
+
+          <div className="arch-3d-modes">
+            <button
+              type="button"
+              className={`arch-3d-mode-btn ${viewMode === "terminal" ? "is-active" : ""}`}
+              onClick={() => setViewMode("terminal")}
+            >
+              <Terminal size={11} /> LIVE RUNTIME
+            </button>
+            <button
+              type="button"
+              className={`arch-3d-mode-btn ${viewMode === "code" ? "is-active" : ""}`}
+              onClick={() => setViewMode("code")}
+            >
+              <Code2 size={11} /> CONFIG SPEC
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="arch-3d-copy-btn"
+            onClick={handleCopy}
+            title={copied ? "Copied to clipboard!" : "Copy code / command"}
+            aria-label="Copy code or command"
+          >
+            {copied ? <Check size={13} className="text-mint" /> : <Copy size={13} />}
+          </button>
+        </div>
+
+        {/* Body Area: Terminal Stream or Config Code */}
+        <div className="arch-3d-body">
+          {viewMode === "terminal" ? (
+            <div className="arch-3d-output">
+              <p className="arch-3d-prompt-line">
+                <span className="terminal-muted">{data.terminal.prompt}</span>{" "}
+                <span className="terminal-prompt">$</span>{" "}
+                <span className="terminal-command-text">
+                  {activeCommand.slice(0, typedChars)}
+                </span>
+                <span className="terminal-cursor" />
+              </p>
+              {activeOutputs.slice(0, visibleOutputsCount).map((out, idx) => (
+                <p
+                  key={`arch-out-${idx}`}
+                  className={`terminal-output-line terminal-output--${out.type || "dim"}`}
+                >
+                  {out.text}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <pre className="arch-3d-code-view">
+              <code>{data.code}</code>
+            </pre>
+          )}
+
+          {/* Interactive Workable Action Chips for This Architecture Component */}
+          <div className="arch-3d-actions">
+            <span className="hero-tag">
+              <Zap size={10} /> Test Live:
+            </span>
+            {data.terminal.actions.map((act, idx) => (
+              <button
+                type="button"
+                key={`act-${idx}`}
+                className={`arch-3d-action-chip ${activeActionIdx === idx ? "is-active" : ""}`}
+                onClick={() => {
+                  setViewMode("terminal");
+                  setActiveActionIdx(idx);
+                }}
+              >
+                <Play size={9} /> {act.label}
+              </button>
+            ))}
+            {activeActionIdx !== null && (
+              <button
+                type="button"
+                className="arch-3d-action-chip"
+                onClick={() => setActiveActionIdx(null)}
+                title="Reset to default stream"
+              >
+                <RotateCcw size={10} /> Reset
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ArchitectureSection() {
   const [activeTab, setActiveTab] = useState<ArchitectureTab>("microvm");
   const tabData = architectureTabs[activeTab];
@@ -669,20 +1001,7 @@ function ArchitectureSection() {
               </Link>
             </div>
 
-            <div className="architecture-panel__code">
-              <div className="architecture-panel__code-top">
-                <span>
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <small>runtime-config.ts</small>
-                <span>TypeScript</span>
-              </div>
-              <pre>
-                <code>{tabData.code}</code>
-              </pre>
-            </div>
+            <ArchitectureTerminal3D tabKey={activeTab} data={tabData} />
           </div>
         </div>
       </div>
