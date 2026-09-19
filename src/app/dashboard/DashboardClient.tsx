@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Search,
   Filter,
-  Github,
+  GitBranch,
   Terminal,
   Cpu,
   Zap,
@@ -115,7 +115,7 @@ export default function DashboardClient({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 my-8">
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 backdrop-blur-md">
             <div className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-1">
-              <Github size={13} className="text-emerald-400" />
+              <GitBranch size={13} className="text-emerald-400" />
               <span>Repositories</span>
             </div>
             <div className="text-2xl font-bold font-mono text-white">{initialProjects.length}</div>

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, Loader2, X, Github, AlertCircle, Sparkles } from 'lucide-react';
+import { Download, Loader2, X, GitBranch, AlertCircle, Sparkles } from 'lucide-react';
 
 export default function ImportButton() {
   const router = useRouter();
@@ -69,7 +69,7 @@ export default function ImportButton() {
             <div className="flex items-center justify-between pb-4 mb-6 border-b border-white/10">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                  <Github size={18} />
+                  <GitBranch size={18} />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-white">Import GitHub Repository</h2>
