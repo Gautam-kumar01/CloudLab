@@ -1,9 +1,9 @@
-FROM node:20-bullseye-slim AS base
+FROM node:20-bookworm-slim AS base
 
-# Step 1: Dependencies with C++ build tools for node-pty
+# Step 1: Dependencies with build tools for node-pty and native modules
 FROM base AS deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 make g++ libc6-dev openssl \
+    python3 make g++ openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
@@ -12,11 +12,15 @@ RUN npm ci
 
 # Step 2: Build the Next.js application
 FROM base AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
 RUN npx prisma generate
 RUN npm run build
 
@@ -30,7 +34,7 @@ ENV PORT=3000
 ENV HOST=0.0.0.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl \
+    openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system --gid 1001 nodejs && \
