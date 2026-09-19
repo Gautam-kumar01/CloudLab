@@ -1485,6 +1485,7 @@ body {
    Stage 04: Visual Mesh Canvas (Railway Style)
    ============================================================ */
 .mesh-canvas-view {
+  perspective: 1100px;
   min-height: 480px;
   background: #080c0d;
 }
@@ -1500,6 +1501,21 @@ body {
   overflow: hidden;
   border-right: 1px solid var(--home-line);
   background: radial-gradient(circle at 45% 45%, rgba(200, 255, 85, 0.03), transparent 70%);
+  transform: perspective(1100px) rotateX(var(--mesh-rotate-x, 0deg)) rotateY(var(--mesh-rotate-y, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mesh-canvas-area::after {
+  position: absolute;
+  inset: 12% 18%;
+  z-index: 0;
+  pointer-events: none;
+  content: "";
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.08), transparent 68%);
+  filter: blur(18px);
+  animation: mesh-core-breathe 4s ease-in-out infinite;
 }
 
 .mesh-canvas-bg-grid {
@@ -1532,6 +1548,11 @@ body {
   animation: mesh-cable-flow 1.4s linear infinite;
 }
 
+.mesh-packet { filter: drop-shadow(0 0 5px currentColor); }
+.mesh-packet--mint { fill: var(--home-mint); color: var(--home-mint); }
+.mesh-packet--violet { fill: var(--home-violet); color: var(--home-violet); }
+.mesh-packet--sky { fill: #38bdf8; color: #38bdf8; }
+
 @keyframes mesh-cable-flow {
   from {
     stroke-dashoffset: 24;
@@ -1539,6 +1560,11 @@ body {
   to {
     stroke-dashoffset: 0;
   }
+}
+
+@keyframes mesh-core-breathe {
+  0%, 100% { opacity: 0.45; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.08); }
 }
 
 .canvas-node-card {
@@ -1562,6 +1588,11 @@ body {
   transform: translateY(-3px) scale(1.02);
   border-color: rgba(200, 255, 85, 0.6);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(200, 255, 85, 0.15);
+}
+
+.canvas-node-card:focus-visible {
+  outline: 2px solid var(--home-mint);
+  outline-offset: 4px;
 }
 
 .canvas-node-card.is-selected {
@@ -3201,4 +3232,17 @@ html[data-theme="light"] .tech-badge__name {
 
 @media (max-width: 640px) {
   .terminal-key-hint { display: none; }
+}
+
+
+@media (max-width: 720px) {
+  .mesh-canvas-area { transform: none !important; }
+  .mesh-packet { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesh-canvas-area { transform: none !important; transition: none; }
+  .mesh-canvas-area::after,
+  .mesh-cable--animated { animation: none; }
+  .mesh-packet { display: none; }
 }

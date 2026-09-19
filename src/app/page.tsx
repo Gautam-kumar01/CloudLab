@@ -1778,6 +1778,7 @@ function WorkspacePreview() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [stageProgress, setStageProgress] = useState(0);
   const [selectedNodeKey, setSelectedNodeKey] = useState<string>("frontend");
+  const [meshTilt, setMeshTilt] = useState({ x: 0, y: 0 });
 
   const stageDurationMs = 6500;
   const tickIntervalMs = 65;
@@ -1816,6 +1817,23 @@ function WorkspacePreview() {
     setActiveStage("microvm");
     setStageProgress(0);
     setIsPlaying(true);
+  };
+
+  const handleMeshPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) / bounds.width - 0.5;
+    const y = (event.clientY - bounds.top) / bounds.height - 0.5;
+    setMeshTilt({ x: Number((y * -5).toFixed(2)), y: Number((x * 5).toFixed(2)) });
+  };
+
+  const resetMeshTilt = () => setMeshTilt({ x: 0, y: 0 });
+
+  const selectNodeWithKeyboard = (event: React.KeyboardEvent<HTMLDivElement>, nodeKey: string) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setSelectedNodeKey(nodeKey);
+    }
   };
 
   const selectedNode = canvasNodes[selectedNodeKey] || canvasNodes.frontend;
@@ -2114,7 +2132,13 @@ function WorkspacePreview() {
               STAGE 04: VISUAL MESH & DATABASE CANVAS (RAILWAY STYLE)
              =================================================== */}
           {activeStage === "mesh" && (
-            <div className="mesh-canvas-view" role="tabpanel">
+            <div
+              className="mesh-canvas-view"
+              role="tabpanel"
+              onPointerMove={handleMeshPointerMove}
+              onPointerLeave={resetMeshTilt}
+              style={{ "--mesh-rotate-x": `${meshTilt.x}deg`, "--mesh-rotate-y": `${meshTilt.y}deg` } as React.CSSProperties}
+            >
               <div className="mesh-canvas-layout">
                 {/* SVG Visual Interconnected Canvas */}
                 <div className="mesh-canvas-area" aria-label="Visual Infrastructure Canvas">
@@ -2158,6 +2182,15 @@ function WorkspacePreview() {
                       d="M 480 290 C 530 290, 530 190, 560 190"
                       className="mesh-cable mesh-cable--animated"
                     />
+                    <circle className="mesh-packet mesh-packet--mint" r="3">
+                      <animateMotion dur="2.8s" repeatCount="indefinite" path="M 170 100 C 250 100, 270 70, 360 70" />
+                    </circle>
+                    <circle className="mesh-packet mesh-packet--violet" r="3">
+                      <animateMotion dur="3.6s" begin="-.8s" repeatCount="indefinite" path="M 170 110 C 250 110, 270 290, 360 290" />
+                    </circle>
+                    <circle className="mesh-packet mesh-packet--sky" r="3">
+                      <animateMotion dur="2.4s" begin="-1.2s" repeatCount="indefinite" path="M 480 70 C 530 70, 530 170, 560 170" />
+                    </circle>
                   </svg>
 
                   {/* Interactive Nodes Placed in Canvas */}
@@ -2167,6 +2200,10 @@ function WorkspacePreview() {
                     }`}
                     style={{ left: "20px", top: "60px" }}
                     onClick={() => setSelectedNodeKey("frontend")}
+                    onKeyDown={(event) => selectNodeWithKeyboard(event, "frontend")}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedNodeKey === "frontend"}
                   >
                     <div className="canvas-node-card__top">
                       <Cloud size={16} className="text-mint" />
@@ -2183,6 +2220,10 @@ function WorkspacePreview() {
                     }`}
                     style={{ left: "330px", top: "30px" }}
                     onClick={() => setSelectedNodeKey("crdt")}
+                    onKeyDown={(event) => selectNodeWithKeyboard(event, "crdt")}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedNodeKey === "crdt"}
                   >
                     <div className="canvas-node-card__top">
                       <Users size={16} className="text-violet" />
@@ -2199,6 +2240,10 @@ function WorkspacePreview() {
                     }`}
                     style={{ left: "330px", top: "250px" }}
                     onClick={() => setSelectedNodeKey("postgres")}
+                    onKeyDown={(event) => selectNodeWithKeyboard(event, "postgres")}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedNodeKey === "postgres"}
                   >
                     <div className="canvas-node-card__top">
                       <Database size={16} className="text-sky" />
@@ -2215,6 +2260,10 @@ function WorkspacePreview() {
                     }`}
                     style={{ left: "30px", top: "270px" }}
                     onClick={() => setSelectedNodeKey("worker")}
+                    onKeyDown={(event) => selectNodeWithKeyboard(event, "worker")}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedNodeKey === "worker"}
                   >
                     <div className="canvas-node-card__top">
                       <Cpu size={16} className="text-orange" />
@@ -2231,6 +2280,10 @@ function WorkspacePreview() {
                     }`}
                     style={{ left: "520px", top: "135px" }}
                     onClick={() => setSelectedNodeKey("edge")}
+                    onKeyDown={(event) => selectNodeWithKeyboard(event, "edge")}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedNodeKey === "edge"}
                   >
                     <div className="canvas-node-card__top">
                       <Globe2 size={16} className="text-mint" />
