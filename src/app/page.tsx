@@ -26,6 +26,8 @@ import {
   Layers3,
   LockKeyhole,
   Menu,
+  MousePointer,
+  MousePointerClick,
   Network,
   Pause,
   Play,
@@ -741,15 +743,47 @@ function WorkspaceTerminal() {
   const [copied, setCopied] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [liveAnimationEnabled, setLiveAnimationEnabled] = useState(true);
+<<<<<<< Updated upstream
+=======
+  const [autoCursorEnabled, setAutoCursorEnabled] = useState(true);
+  const [isUserHovering, setIsUserHovering] = useState(false);
+>>>>>>> Stashed changes
   const [isInteractive, setIsInteractive] = useState(false);
   const [commandDraft, setCommandDraft] = useState("");
   const [cursorPosition, setCursorPosition] = useState(0);
   const [commandHistoryIndex, setCommandHistoryIndex] = useState(-1);
+<<<<<<< Updated upstream
+=======
+  const [virtualCursor, setVirtualCursor] = useState<{
+    x: number;
+    y: number;
+    visible: boolean;
+    isClicking: boolean;
+    label: string;
+    activeChip: string | null;
+  }>({
+    x: 160,
+    y: 80,
+    visible: true,
+    isClicking: false,
+    label: "Auto Pilot",
+    activeChip: null,
+  });
+  const [clickRipples, setClickRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
+
+>>>>>>> Stashed changes
   const audioContextRef = useRef<AudioContext | null>(null);
+  const terminalRef = useRef<HTMLDivElement | null>(null);
+  const pnpmChipRef = useRef<HTMLButtonElement | null>(null);
+  const commitChipRef = useRef<HTMLButtonElement | null>(null);
+  const deployChipRef = useRef<HTMLButtonElement | null>(null);
+  const restartChipRef = useRef<HTMLButtonElement | null>(null);
+  const copyBtnRef = useRef<HTMLButtonElement | null>(null);
+  const userHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentStep = workspaceTerminalFrames[stepIndex];
 
-  const playTerminalTone = (kind: "keypress" | "output" | "complete") => {
+  const playTerminalTone = (kind: "keypress" | "output" | "complete" | "click") => {
     if (!soundEnabled || typeof window === "undefined") return;
     const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
@@ -758,16 +792,153 @@ function WorkspaceTerminal() {
     if (audioContext.state === "suspended") void audioContext.resume();
     const oscillator = audioContext.createOscillator();
     const gain = audioContext.createGain();
-    const frequencies = { keypress: 520, output: 680, complete: 880 };
-    const duration = kind === "complete" ? 0.16 : 0.055;
+    const frequencies = { keypress: 520, output: 680, complete: 880, click: 740 };
+    const duration = kind === "complete" ? 0.16 : kind === "click" ? 0.07 : 0.055;
     oscillator.type = "sine";
     oscillator.frequency.setValueAtTime(frequencies[kind], audioContext.currentTime);
     gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-    gain.gain.exponentialRampToValueAtTime(kind === "complete" ? 0.045 : 0.018, audioContext.currentTime + 0.008);
+    gain.gain.exponentialRampToValueAtTime(kind === "complete" ? 0.045 : 0.024, audioContext.currentTime + 0.008);
     gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
     oscillator.connect(gain).connect(audioContext.destination);
     oscillator.start();
     oscillator.stop(audioContext.currentTime + duration + 0.01);
+  };
+
+  const getRelativeCoords = (el: HTMLElement | null) => {
+    if (!el || !terminalRef.current) return null;
+    const termRect = terminalRef.current.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    return {
+      x: Math.round(elRect.left - termRect.left + elRect.width / 2),
+      y: Math.round(elRect.top - termRect.top + elRect.height / 2),
+    };
+  };
+
+  const triggerVirtualClickOnElement = (
+    el: HTMLElement | null,
+    chipKey: string,
+    onAction?: () => void
+  ) => {
+    const coords = getRelativeCoords(el);
+    if (!coords) {
+      if (onAction) onAction();
+      return;
+    }
+
+    // 1. Move cursor smoothly to target button
+    setVirtualCursor((prev) => ({
+      ...prev,
+      x: coords.x,
+      y: coords.y,
+      visible: true,
+      activeChip: chipKey,
+    }));
+
+    // 2. Trigger click ripple & press effect
+    setTimeout(() => {
+      setVirtualCursor((prev) => ({ ...prev, isClicking: true }));
+      setClickRipples((prev) => [
+        ...prev.slice(-4),
+        { id: Date.now() + Math.random(), x: coords.x, y: coords.y },
+      ]);
+      playTerminalTone("click");
+      if (onAction) onAction();
+
+      // 3. Release button click press
+      setTimeout(() => {
+        setVirtualCursor((prev) => ({ ...prev, isClicking: false, activeChip: null }));
+      }, 220);
+    }, 460);
+  };
+
+  const enterInteractiveMode = () => {
+    if (!isInteractive) {
+      setIsInteractive(true);
+      setLiveAnimationEnabled(false);
+      setCommandDraft("");
+      setCursorPosition(0);
+      setCommandHistoryIndex(-1);
+    }
+  };
+
+  const executeInteractiveCommand = () => {
+    const command = commandDraft.trim();
+    if (!command) return;
+    const matchingIdx = workspaceTerminalFrames.findIndex(
+      (frame) => frame.command === command || frame.command.includes(command)
+    );
+    if (matchingIdx !== -1) {
+      setStepIndex(matchingIdx);
+      setTypedChars(0);
+      setVisibleOutputsCount(0);
+      setIsInteractive(false);
+      setLiveAnimationEnabled(true);
+      playTerminalTone("complete");
+    } else {
+      setHistory((previous) =>
+        [
+          ...previous,
+          {
+            prompt: "~/acme-dashboard",
+            command,
+            outputs: [{ text: `bash: ${command}: command not found`, type: "dim" as const }],
+          },
+        ].slice(-2)
+      );
+      setCommandDraft("");
+      setCursorPosition(0);
+      playTerminalTone("output");
+    }
+  };
+
+  const handleTerminalKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (["INPUT", "TEXTAREA", "BUTTON"].includes((event.target as HTMLElement).tagName)) return;
+    event.preventDefault();
+    enterInteractiveMode();
+    if (event.key === "ArrowUp") {
+      const nextIndex = Math.min(commandHistoryIndex + 1, workspaceTerminalFrames.length - 1);
+      const nextCommand =
+        workspaceTerminalFrames[workspaceTerminalFrames.length - 1 - nextIndex]?.command || "";
+      setCommandHistoryIndex(nextIndex);
+      setCommandDraft(nextCommand);
+      setCursorPosition(nextCommand.length);
+      playTerminalTone("keypress");
+    } else if (event.key === "ArrowDown") {
+      const nextIndex = Math.max(commandHistoryIndex - 1, -1);
+      const nextCommand =
+        nextIndex === -1
+          ? ""
+          : workspaceTerminalFrames[workspaceTerminalFrames.length - 1 - nextIndex]?.command || "";
+      setCommandHistoryIndex(nextIndex);
+      setCommandDraft(nextCommand);
+      setCursorPosition(nextCommand.length);
+      playTerminalTone("keypress");
+    } else if (event.key === "ArrowLeft") {
+      setCursorPosition((position) => Math.max(0, position - 1));
+    } else if (event.key === "ArrowRight") {
+      setCursorPosition((position) => Math.min(commandDraft.length, position + 1));
+    } else if (event.key === "Home") {
+      setCursorPosition(0);
+    } else if (event.key === "End") {
+      setCursorPosition(commandDraft.length);
+    } else if (event.key === "Backspace") {
+      if (cursorPosition > 0) {
+        setCommandDraft((draft) => draft.slice(0, cursorPosition - 1) + draft.slice(cursorPosition));
+        setCursorPosition((position) => position - 1);
+        playTerminalTone("keypress");
+      }
+    } else if (event.key === "Delete") {
+      setCommandDraft((draft) => draft.slice(0, cursorPosition) + draft.slice(cursorPosition + 1));
+      playTerminalTone("keypress");
+    } else if (event.key === "Enter") {
+      executeInteractiveCommand();
+    } else if (event.key.length === 1 && !event.metaKey && !event.ctrlKey) {
+      setCommandDraft(
+        (draft) => draft.slice(0, cursorPosition) + event.key + draft.slice(cursorPosition)
+      );
+      setCursorPosition((position) => position + 1);
+      playTerminalTone("keypress");
+    }
   };
 
   useEffect(() => {
@@ -802,94 +973,73 @@ function WorkspaceTerminal() {
       });
 
       if (stepIndex < workspaceTerminalFrames.length - 1) {
-        setStepIndex((prev) => prev + 1);
-        setTypedChars(0);
-        setVisibleOutputsCount(0);
-      } else {
-        const resetTimer = setTimeout(() => {
-          setHistory([]);
-          setStepIndex(0);
+        const nextStepIdx = stepIndex + 1;
+        const targetRef = nextStepIdx === 1 ? commitChipRef.current : deployChipRef.current;
+        const chipName = nextStepIdx === 1 ? "git commit" : "cloudlab deploy";
+
+        if (autoCursorEnabled && !isUserHovering && targetRef) {
+          triggerVirtualClickOnElement(targetRef, chipName, () => {
+            setStepIndex(nextStepIdx);
+            setTypedChars(0);
+            setVisibleOutputsCount(0);
+          });
+        } else {
+          setStepIndex(nextStepIdx);
           setTypedChars(0);
           setVisibleOutputsCount(0);
-          playTerminalTone("complete");
-        }, 3200);
+        }
+      } else {
+        // Finished all 3 frames!
+        // Virtual cursor clicks the copy button
+        if (autoCursorEnabled && !isUserHovering && copyBtnRef.current) {
+          triggerVirtualClickOnElement(copyBtnRef.current, "copy", async () => {
+            try {
+              await navigator.clipboard.writeText("npx cloudlab dev");
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1600);
+            } catch {
+              // Ignore clipboard permissions
+            }
+          });
+        }
+
+        const resetTimer = setTimeout(() => {
+          const restartRef = restartChipRef.current || pnpmChipRef.current;
+          if (autoCursorEnabled && !isUserHovering && restartRef) {
+            triggerVirtualClickOnElement(restartRef, "restart", () => {
+              setHistory([]);
+              setStepIndex(0);
+              setTypedChars(0);
+              setVisibleOutputsCount(0);
+              playTerminalTone("complete");
+            });
+          } else {
+            setHistory([]);
+            setStepIndex(0);
+            setTypedChars(0);
+            setVisibleOutputsCount(0);
+            playTerminalTone("complete");
+          }
+        }, 3400);
         return () => clearTimeout(resetTimer);
       }
-    }, 1400);
+    }, 1500);
 
     return () => clearTimeout(nextTimer);
-  }, [typedChars, visibleOutputsCount, stepIndex, currentStep, liveAnimationEnabled, isInteractive]);
-
-  const enterInteractiveMode = () => {
-    if (!isInteractive) {
-      setIsInteractive(true);
-      setLiveAnimationEnabled(false);
-      setCommandDraft("");
-      setCursorPosition(0);
-      setCommandHistoryIndex(-1);
-    }
-  };
-
-  const executeInteractiveCommand = () => {
-    const command = commandDraft.trim();
-    if (!command) return;
-    const matchingIdx = workspaceTerminalFrames.findIndex((frame) => frame.command === command || frame.command.includes(command));
-    if (matchingIdx !== -1) {
-      setStepIndex(matchingIdx);
-      setTypedChars(0);
-      setVisibleOutputsCount(0);
-      setIsInteractive(false);
-      setLiveAnimationEnabled(true);
-    } else {
-      setHistory((previous) => [
-        ...previous,
-        { prompt: "~/acme-dashboard", command, outputs: [{ text: `bash: ${command}: command not found`, type: "dim" as const }] },
-      ].slice(-2));
-      setCommandDraft("");
-      setCursorPosition(0);
-    }
-  };
-
-  const handleTerminalKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (["INPUT", "TEXTAREA", "BUTTON"].includes((event.target as HTMLElement).tagName)) return;
-    event.preventDefault();
-    enterInteractiveMode();
-    if (event.key === "ArrowUp") {
-      const nextIndex = Math.min(commandHistoryIndex + 1, workspaceTerminalFrames.length - 1);
-      const nextCommand = workspaceTerminalFrames[workspaceTerminalFrames.length - 1 - nextIndex]?.command || "";
-      setCommandHistoryIndex(nextIndex);
-      setCommandDraft(nextCommand);
-      setCursorPosition(nextCommand.length);
-    } else if (event.key === "ArrowDown") {
-      const nextIndex = Math.max(commandHistoryIndex - 1, -1);
-      const nextCommand = nextIndex === -1 ? "" : workspaceTerminalFrames[workspaceTerminalFrames.length - 1 - nextIndex]?.command || "";
-      setCommandHistoryIndex(nextIndex);
-      setCommandDraft(nextCommand);
-      setCursorPosition(nextCommand.length);
-    } else if (event.key === "ArrowLeft") {
-      setCursorPosition((position) => Math.max(0, position - 1));
-    } else if (event.key === "ArrowRight") {
-      setCursorPosition((position) => Math.min(commandDraft.length, position + 1));
-    } else if (event.key === "Home") {
-      setCursorPosition(0);
-    } else if (event.key === "End") {
-      setCursorPosition(commandDraft.length);
-    } else if (event.key === "Backspace") {
-      if (cursorPosition > 0) {
-        setCommandDraft((draft) => draft.slice(0, cursorPosition - 1) + draft.slice(cursorPosition));
-        setCursorPosition((position) => position - 1);
-      }
-    } else if (event.key === "Delete") {
-      setCommandDraft((draft) => draft.slice(0, cursorPosition) + draft.slice(cursorPosition + 1));
-    } else if (event.key === "Enter") {
-      executeInteractiveCommand();
-    } else if (event.key.length === 1 && !event.metaKey && !event.ctrlKey) {
-      setCommandDraft((draft) => draft.slice(0, cursorPosition) + event.key + draft.slice(cursorPosition));
-      setCursorPosition((position) => position + 1);
-    }
-  };
+  }, [
+    typedChars,
+    visibleOutputsCount,
+    stepIndex,
+    currentStep,
+    liveAnimationEnabled,
+    autoCursorEnabled,
+    isUserHovering,
+    isInteractive,
+  ]);
 
   const runCustomCommand = (cmd: string) => {
+    setIsInteractive(false);
+    setLiveAnimationEnabled(true);
     const matchingIdx = workspaceTerminalFrames.findIndex((s) => s.command.includes(cmd));
     if (matchingIdx !== -1) {
       setStepIndex(matchingIdx);
@@ -917,29 +1067,122 @@ function WorkspaceTerminal() {
   };
 
   return (
-    <div className={`terminal-view ${isInteractive ? "is-interactive" : ""}`} role="tabpanel" tabIndex={0} onKeyDown={handleTerminalKeyDown} onClick={(event) => {
-      if (!(event.target as HTMLElement).closest("button")) enterInteractiveMode();
-    }}>
+    <div
+      ref={terminalRef}
+      className={`terminal-view ${isInteractive ? "is-interactive" : ""}`}
+      role="tabpanel"
+      tabIndex={0}
+      onKeyDown={handleTerminalKeyDown}
+      onClick={(event) => {
+        if (!(event.target as HTMLElement).closest("button")) enterInteractiveMode();
+      }}
+      onMouseEnter={() => {
+        setIsUserHovering(true);
+        if (userHoverTimeoutRef.current) clearTimeout(userHoverTimeoutRef.current);
+      }}
+      onMouseLeave={() => {
+        if (userHoverTimeoutRef.current) clearTimeout(userHoverTimeoutRef.current);
+        userHoverTimeoutRef.current = setTimeout(() => {
+          setIsUserHovering(false);
+        }, 2200);
+      }}
+    >
+      {/* Animated Virtual Mouse Cursor Layer (Railway-Style Auto-Pilot) */}
+      {autoCursorEnabled && !isInteractive && (
+        <div className="terminal-virtual-cursor-layer" aria-hidden="true">
+          {clickRipples.map((ripple) => (
+            <div
+              key={ripple.id}
+              className="terminal-virtual-cursor__ripple"
+              style={{ left: `${ripple.x}px`, top: `${ripple.y}px` }}
+            />
+          ))}
+          <div
+            className={`terminal-virtual-cursor ${isUserHovering ? "is-hidden" : ""} ${
+              virtualCursor.isClicking ? "is-clicking" : ""
+            }`}
+            style={{
+              transform: `translate3d(${virtualCursor.x}px, ${virtualCursor.y}px, 0)`,
+            }}
+          >
+            <svg
+              className="terminal-virtual-cursor__svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.45 0 .67-.54.35-.85L5.85 2.85a.5.5 0 0 0-.35.36z"
+                fill="#0b1210"
+                stroke="#c8ff55"
+                strokeWidth="1.6"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <div className="terminal-virtual-cursor__badge">
+              <span className="terminal-virtual-cursor__badge-dot" />
+              <span>{virtualCursor.label}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="terminal-view__header">
         <div className="terminal-view__titlebar">
-          <span className="terminal-view__traffic" aria-hidden="true"><i /><i /><i /></span>
-          <span className="terminal-view__tab"><Terminal size={12} /> cloudlab / acme-dashboard</span>
+          <span className="terminal-view__traffic" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span className="terminal-view__tab">
+            <Terminal size={12} /> cloudlab / acme-dashboard
+          </span>
         </div>
         <div className="terminal-view__meta">
-          <span className="terminal-view__live"><i /> LIVE</span>
+          <span className="terminal-view__live">
+            <i /> LIVE
+          </span>
           <span>bash · NVMe Node.js v20</span>
         </div>
       </div>
       <div className="terminal-view__toolbar">
-        <span className="terminal-view__path"><span>~/</span>acme-dashboard</span>
+        <span className="terminal-view__path">
+          <span>~/</span>acme-dashboard
+        </span>
         <div className="terminal-view__toolbar-actions">
-          <button type="button" className="terminal-control-button" onClick={toggleSound} aria-pressed={soundEnabled} title={soundEnabled ? "Mute terminal sounds" : "Enable terminal sounds"}>
-            {soundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />} {soundEnabled ? "SOUND ON" : "SOUND OFF"}
+          <button
+            type="button"
+            className="terminal-control-button"
+            onClick={() => setAutoCursorEnabled((enabled) => !enabled)}
+            aria-pressed={autoCursorEnabled}
+            title={autoCursorEnabled ? "Disable auto cursor demo" : "Enable auto cursor demo"}
+          >
+            {autoCursorEnabled ? <MousePointer size={11} /> : <MousePointerClick size={11} />}
+            {autoCursorEnabled ? "AUTO CURSOR" : "MANUAL"}
           </button>
-          <button type="button" className="terminal-control-button" onClick={() => setLiveAnimationEnabled((enabled) => !enabled)} aria-pressed={liveAnimationEnabled} title={liveAnimationEnabled ? "Pause live animation" : "Resume live animation"}>
-            {liveAnimationEnabled ? <Pause size={11} /> : <Play size={11} />} {liveAnimationEnabled ? "LIVE" : "PAUSED"}
+          <button
+            type="button"
+            className="terminal-control-button"
+            onClick={toggleSound}
+            aria-pressed={soundEnabled}
+            title={soundEnabled ? "Mute terminal sounds" : "Enable terminal sounds"}
+          >
+            {soundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
+            {soundEnabled ? "SOUND ON" : "SOUND OFF"}
           </button>
-          <span className="terminal-view__connection"><Radio size={11} /> P2P SYNC <b>8ms</b></span>
+          <button
+            type="button"
+            className="terminal-control-button"
+            onClick={() => setLiveAnimationEnabled((enabled) => !enabled)}
+            aria-pressed={liveAnimationEnabled}
+            title={liveAnimationEnabled ? "Pause live animation" : "Resume live animation"}
+          >
+            {liveAnimationEnabled ? <Pause size={11} /> : <Play size={11} />}
+            {liveAnimationEnabled ? "LIVE" : "PAUSED"}
+          </button>
+          <span className="terminal-view__connection">
+            <Radio size={11} /> P2P SYNC <b>8ms</b>
+          </span>
         </div>
       </div>
       <div className="terminal-view__output">
@@ -973,19 +1216,22 @@ function WorkspaceTerminal() {
               </span>
             ) : (
               <>
-                <span className="terminal-command-text">{currentStep.command.slice(0, typedChars)}</span>
+                <span className="terminal-command-text">
+                  {currentStep.command.slice(0, typedChars)}
+                </span>
                 <span className="terminal-cursor" />
               </>
             )}
           </p>
-          {currentStep.outputs.slice(0, visibleOutputsCount).map((out, outIdx) => (
-            <p
-              key={`ws-curr-out-${outIdx}`}
-              className={`terminal-output-line terminal-output--${out.type || "dim"}`}
-            >
-              {out.text}
-            </p>
-          ))}
+          {!isInteractive &&
+            currentStep.outputs.slice(0, visibleOutputsCount).map((out, outIdx) => (
+              <p
+                key={`ws-curr-out-${outIdx}`}
+                className={`terminal-output-line terminal-output--${out.type || "dim"}`}
+              >
+                {out.text}
+              </p>
+            ))}
         </div>
       </div>
 
@@ -994,29 +1240,57 @@ function WorkspaceTerminal() {
           <Zap size={11} /> Quick Run:
         </span>
         <button
+          ref={pnpmChipRef}
           type="button"
-          className="terminal-quick-chip"
+          className={`terminal-quick-chip ${
+            virtualCursor.activeChip === "pnpm dev"
+              ? virtualCursor.isClicking
+                ? "is-virtual-pressed"
+                : "is-virtual-hovered"
+              : ""
+          }`}
           onClick={() => runCustomCommand("pnpm dev")}
         >
           pnpm dev
         </button>
         <button
+          ref={commitChipRef}
           type="button"
-          className="terminal-quick-chip"
+          className={`terminal-quick-chip ${
+            virtualCursor.activeChip === "git commit"
+              ? virtualCursor.isClicking
+                ? "is-virtual-pressed"
+                : "is-virtual-hovered"
+              : ""
+          }`}
           onClick={() => runCustomCommand("git commit")}
         >
           git commit
         </button>
         <button
+          ref={deployChipRef}
           type="button"
-          className="terminal-quick-chip"
+          className={`terminal-quick-chip ${
+            virtualCursor.activeChip === "cloudlab deploy"
+              ? virtualCursor.isClicking
+                ? "is-virtual-pressed"
+                : "is-virtual-hovered"
+              : ""
+          }`}
           onClick={() => runCustomCommand("cloudlab deploy")}
         >
           cloudlab deploy
         </button>
         <button
+          ref={restartChipRef}
           type="button"
-          className="terminal-quick-chip"
+          className={`terminal-quick-chip ${
+            virtualCursor.activeChip === "restart"
+              ? virtualCursor.isClicking
+                ? "is-virtual-pressed"
+                : "is-virtual-hovered"
+              : ""
+          }`}
           onClick={() => {
             setIsInteractive(false);
             setLiveAnimationEnabled(true);
@@ -1031,15 +1305,27 @@ function WorkspaceTerminal() {
         >
           ↺ Restart loop
         </button>
-        <span className="terminal-key-hint"><kbd>↑</kbd><kbd>↓</kbd> history <kbd>←</kbd><kbd>→</kbd> cursor <kbd>Enter</kbd> run</span>
+        <span className="terminal-key-hint">
+          <kbd>↑</kbd>
+          <kbd>↓</kbd> history <kbd>←</kbd>
+          <kbd>→</kbd> cursor <kbd>Enter</kbd> run
+        </span>
       </div>
 
       <div className="terminal-view__command">
         <span className="terminal-view__command-prompt">$</span>
         <code>npx cloudlab dev</code>
-        <span className="terminal-view__command-state"><i /> ready</span>
-        <button type="button" onClick={copyCommand} aria-label="Copy CloudLab command">
-          {copied ? <Check size={14} /> : <Copy size={14} />}
+        <span className="terminal-view__command-state">
+          <i /> ready
+        </span>
+        <button
+          ref={copyBtnRef}
+          type="button"
+          className={virtualCursor.activeChip === "copy" ? "is-virtual-pressed" : ""}
+          onClick={copyCommand}
+          aria-label="Copy CloudLab command"
+        >
+          {copied ? <Check size={14} className="text-mint" /> : <Copy size={14} />}
         </button>
       </div>
     </div>
