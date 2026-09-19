@@ -743,17 +743,12 @@ function WorkspaceTerminal() {
   const [copied, setCopied] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [liveAnimationEnabled, setLiveAnimationEnabled] = useState(true);
-<<<<<<< Updated upstream
-=======
   const [autoCursorEnabled, setAutoCursorEnabled] = useState(true);
   const [isUserHovering, setIsUserHovering] = useState(false);
->>>>>>> Stashed changes
   const [isInteractive, setIsInteractive] = useState(false);
   const [commandDraft, setCommandDraft] = useState("");
   const [cursorPosition, setCursorPosition] = useState(0);
   const [commandHistoryIndex, setCommandHistoryIndex] = useState(-1);
-<<<<<<< Updated upstream
-=======
   const [virtualCursor, setVirtualCursor] = useState<{
     x: number;
     y: number;
@@ -770,8 +765,6 @@ function WorkspaceTerminal() {
     activeChip: null,
   });
   const [clickRipples, setClickRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
-
->>>>>>> Stashed changes
   const audioContextRef = useRef<AudioContext | null>(null);
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const pnpmChipRef = useRef<HTMLButtonElement | null>(null);
