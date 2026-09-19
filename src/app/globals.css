@@ -1231,6 +1231,8 @@ body {
   display: inline-flex;
   align-items: center;
 }
+.terminal-view:focus-visible { outline: 1px solid var(--home-mint); outline-offset: 4px; }
+.terminal-view.is-interactive .terminal-view__output { background: linear-gradient(90deg, rgba(200,255,85,0.07), transparent 26%); }
 .terminal-view__titlebar { gap: 13px; }
 .terminal-view__traffic { display: inline-flex; gap: 5px; }
 .terminal-view__traffic i { width: 8px; height: 8px; border-radius: 50%; background: #ff6b6b; box-shadow: 0 0 8px rgba(255, 107, 107, 0.4); }
@@ -1260,6 +1262,9 @@ body {
 .terminal-control-button:hover, .terminal-control-button[aria-pressed="true"] { border-color: rgba(200, 255, 85, 0.46); background: rgba(200, 255, 85, 0.08); color: var(--home-mint); }
 .terminal-view__connection { gap: 6px; color: #86efac; letter-spacing: 0.05em; }
 .terminal-view__connection b { color: var(--home-dim); font-weight: 500; }
+.terminal-command-input { white-space: pre; }
+.terminal-key-hint { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: #718077; font-size: 9px; }
+.terminal-key-hint kbd { min-width: 17px; padding: 2px 4px; border: 1px solid rgba(218, 255, 232, 0.16); border-bottom-color: rgba(200, 255, 85, 0.35); border-radius: 4px; background: rgba(255, 255, 255, 0.05); color: #c9d7ce; font: inherit; text-align: center; }
 
 .terminal-view__output {
   position: relative;
@@ -2861,4 +2866,8 @@ html[data-theme="light"] .tech-badge__name {
   .terminal-view__command-state i,
   .terminal-cursor,
   .terminal-output-line { animation: none; }
+}
+
+@media (max-width: 640px) {
+  .terminal-key-hint { display: none; }
 }

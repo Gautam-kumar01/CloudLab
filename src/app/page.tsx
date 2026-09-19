@@ -741,6 +741,10 @@ function WorkspaceTerminal() {
   const [copied, setCopied] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [liveAnimationEnabled, setLiveAnimationEnabled] = useState(true);
+  const [isInteractive, setIsInteractive] = useState(false);
+  const [commandDraft, setCommandDraft] = useState("");
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const [commandHistoryIndex, setCommandHistoryIndex] = useState(-1);
   const audioContextRef = useRef<AudioContext | null>(null);
 
   const currentStep = workspaceTerminalFrames[stepIndex];
@@ -767,7 +771,7 @@ function WorkspaceTerminal() {
   };
 
   useEffect(() => {
-    if (!liveAnimationEnabled) return;
+    if (!liveAnimationEnabled || isInteractive) return;
     if (typedChars < currentStep.command.length) {
       const timer = setTimeout(() => {
         setTypedChars((prev) => prev + 1);
@@ -814,7 +818,76 @@ function WorkspaceTerminal() {
     }, 1400);
 
     return () => clearTimeout(nextTimer);
-  }, [typedChars, visibleOutputsCount, stepIndex, currentStep, liveAnimationEnabled]);
+  }, [typedChars, visibleOutputsCount, stepIndex, currentStep, liveAnimationEnabled, isInteractive]);
+
+  const enterInteractiveMode = () => {
+    if (!isInteractive) {
+      setIsInteractive(true);
+      setLiveAnimationEnabled(false);
+      setCommandDraft("");
+      setCursorPosition(0);
+      setCommandHistoryIndex(-1);
+    }
+  };
+
+  const executeInteractiveCommand = () => {
+    const command = commandDraft.trim();
+    if (!command) return;
+    const matchingIdx = workspaceTerminalFrames.findIndex((frame) => frame.command === command || frame.command.includes(command));
+    if (matchingIdx !== -1) {
+      setStepIndex(matchingIdx);
+      setTypedChars(0);
+      setVisibleOutputsCount(0);
+      setIsInteractive(false);
+      setLiveAnimationEnabled(true);
+    } else {
+      setHistory((previous) => [
+        ...previous,
+        { prompt: "~/acme-dashboard", command, outputs: [{ text: `bash: ${command}: command not found`, type: "dim" as const }] },
+      ].slice(-2));
+      setCommandDraft("");
+      setCursorPosition(0);
+    }
+  };
+
+  const handleTerminalKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (["INPUT", "TEXTAREA", "BUTTON"].includes((event.target as HTMLElement).tagName)) return;
+    event.preventDefault();
+    enterInteractiveMode();
+    if (event.key === "ArrowUp") {
+      const nextIndex = Math.min(commandHistoryIndex + 1, workspaceTerminalFrames.length - 1);
+      const nextCommand = workspaceTerminalFrames[workspaceTerminalFrames.length - 1 - nextIndex]?.command || "";
+      setCommandHistoryIndex(nextIndex);
+      setCommandDraft(nextCommand);
+      setCursorPosition(nextCommand.length);
+    } else if (event.key === "ArrowDown") {
+      const nextIndex = Math.max(commandHistoryIndex - 1, -1);
+      const nextCommand = nextIndex === -1 ? "" : workspaceTerminalFrames[workspaceTerminalFrames.length - 1 - nextIndex]?.command || "";
+      setCommandHistoryIndex(nextIndex);
+      setCommandDraft(nextCommand);
+      setCursorPosition(nextCommand.length);
+    } else if (event.key === "ArrowLeft") {
+      setCursorPosition((position) => Math.max(0, position - 1));
+    } else if (event.key === "ArrowRight") {
+      setCursorPosition((position) => Math.min(commandDraft.length, position + 1));
+    } else if (event.key === "Home") {
+      setCursorPosition(0);
+    } else if (event.key === "End") {
+      setCursorPosition(commandDraft.length);
+    } else if (event.key === "Backspace") {
+      if (cursorPosition > 0) {
+        setCommandDraft((draft) => draft.slice(0, cursorPosition - 1) + draft.slice(cursorPosition));
+        setCursorPosition((position) => position - 1);
+      }
+    } else if (event.key === "Delete") {
+      setCommandDraft((draft) => draft.slice(0, cursorPosition) + draft.slice(cursorPosition + 1));
+    } else if (event.key === "Enter") {
+      executeInteractiveCommand();
+    } else if (event.key.length === 1 && !event.metaKey && !event.ctrlKey) {
+      setCommandDraft((draft) => draft.slice(0, cursorPosition) + event.key + draft.slice(cursorPosition));
+      setCursorPosition((position) => position + 1);
+    }
+  };
 
   const runCustomCommand = (cmd: string) => {
     const matchingIdx = workspaceTerminalFrames.findIndex((s) => s.command.includes(cmd));
@@ -844,7 +917,9 @@ function WorkspaceTerminal() {
   };
 
   return (
-    <div className="terminal-view" role="tabpanel">
+    <div className={`terminal-view ${isInteractive ? "is-interactive" : ""}`} role="tabpanel" tabIndex={0} onKeyDown={handleTerminalKeyDown} onClick={(event) => {
+      if (!(event.target as HTMLElement).closest("button")) enterInteractiveMode();
+    }}>
       <div className="terminal-view__header">
         <div className="terminal-view__titlebar">
           <span className="terminal-view__traffic" aria-hidden="true"><i /><i /><i /></span>
@@ -890,8 +965,18 @@ function WorkspaceTerminal() {
           <p>
             <span className="terminal-muted">{currentStep.prompt}</span>{" "}
             <span className="terminal-prompt">$</span>{" "}
-            <span className="terminal-command-text">{currentStep.command.slice(0, typedChars)}</span>
-            <span className="terminal-cursor" />
+            {isInteractive ? (
+              <span className="terminal-command-text terminal-command-input">
+                {commandDraft.slice(0, cursorPosition)}
+                <span className="terminal-cursor" />
+                {commandDraft.slice(cursorPosition)}
+              </span>
+            ) : (
+              <>
+                <span className="terminal-command-text">{currentStep.command.slice(0, typedChars)}</span>
+                <span className="terminal-cursor" />
+              </>
+            )}
           </p>
           {currentStep.outputs.slice(0, visibleOutputsCount).map((out, outIdx) => (
             <p
@@ -933,6 +1018,11 @@ function WorkspaceTerminal() {
           type="button"
           className="terminal-quick-chip"
           onClick={() => {
+            setIsInteractive(false);
+            setLiveAnimationEnabled(true);
+            setCommandDraft("");
+            setCursorPosition(0);
+            setCommandHistoryIndex(-1);
             setHistory([]);
             setStepIndex(0);
             setTypedChars(0);
@@ -941,6 +1031,7 @@ function WorkspaceTerminal() {
         >
           ↺ Restart loop
         </button>
+        <span className="terminal-key-hint"><kbd>↑</kbd><kbd>↓</kbd> history <kbd>←</kbd><kbd>→</kbd> cursor <kbd>Enter</kbd> run</span>
       </div>
 
       <div className="terminal-view__command">
