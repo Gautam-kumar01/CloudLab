@@ -3,7 +3,7 @@ FROM node:22-bookworm-slim AS base
 # Step 1: Dependencies with build tools for node-pty and native C++ modules
 FROM base AS deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 make g++ openssl ca-certificates \
+    python3 make g++ openssl ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
@@ -35,12 +35,16 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
+# Install git and essential runtime tools for workspace cloning and terminal execution
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl ca-certificates \
+    git openssl ca-certificates curl bash tar gzip \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
+
+# Prepare workspace directory with proper permissions
+RUN mkdir -p /app/workspaces && chown -R nextjs:nodejs /app/workspaces
 
 # Copy runtime assets
 COPY --from=builder /app/public ./public

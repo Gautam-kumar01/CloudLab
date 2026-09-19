@@ -1,117 +1,211 @@
 import Link from 'next/link';
 import { auth, signOut } from '@/auth';
 import { db } from '@/lib/db';
-import RepoCard from './RepoCard';
-import ImportButton from './ImportButton';
-import NewProjectButton from './NewProjectButton';
+import { Cloud, LogOut, Settings, ShieldCheck } from 'lucide-react';
+import DashboardClient from './DashboardClient';
 
 export default async function Dashboard() {
   const session = await auth();
-  
+
   let isAdmin = false;
   if (session?.user?.id) {
-    const dbUser = await db.user.findUnique({ where: { id: session.user.id }});
-    isAdmin = dbUser?.role === 'ADMIN';
-  }
-  
-  // Fetch GitHub repos
-  let repos: any[] = [];
-  if (session && (session as any).accessToken) {
     try {
-      const res = await fetch('https://api.github.com/user/repos?sort=updated&per_page=10', {
+      const dbUser = await db.user.findUnique({ where: { id: session.user.id } });
+      isAdmin = dbUser?.role === 'ADMIN';
+    } catch (e) {
+      console.warn('Could not check admin role:', e);
+    }
+  }
+
+  // 1. Fetch user's existing projects from database
+  let dbProjects: any[] = [];
+  if (session?.user?.id) {
+    try {
+      dbProjects = await db.project.findMany({
+        where: { ownerId: session.user.id },
+        orderBy: { updatedAt: 'desc' },
+      });
+    } catch (e) {
+      console.warn('Could not fetch DB projects:', e);
+    }
+  }
+
+  // 2. Fetch GitHub repos if GitHub OAuth access token is available
+  let repos: any[] = [];
+  const accessToken = (session as any)?.accessToken;
+  if (accessToken) {
+    try {
+      const res = await fetch('https://api.github.com/user/repos?sort=updated&per_page=30', {
         headers: {
-          Authorization: `Bearer ${(session as any).accessToken}`,
-          Accept: 'application/vnd.github.v3+json'
-        }
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+        next: { revalidate: 60 },
       });
       if (res.ok) {
         repos = await res.json();
       } else {
-        console.error("Failed to fetch repos", await res.text());
+        console.error('Failed to fetch repos from GitHub:', await res.text());
       }
     } catch (e) {
-      console.error(e);
+      console.error('GitHub API error:', e);
     }
   }
 
-  // Fallback dummy projects if we have no repos or just to show the UI
-  const projects = repos.length > 0 ? repos.map(r => ({
-    id: r.name,
-    name: r.name,
-    status: 'Sleeping', 
-    lastAccessed: new Date(r.updated_at).toLocaleDateString(),
-    language: r.language || 'Code',
-    cloneUrl: r.clone_url
-  })) : [
-    { id: '1', name: 'react-ecommerce', status: 'Sleeping', lastAccessed: '2 hours ago', language: 'TypeScript' },
-    { id: '2', name: 'python-data-api', status: 'Running', lastAccessed: 'Just now', language: 'Python' },
-    { id: '3', name: 'personal-blog', status: 'Stopped', lastAccessed: '3 days ago', language: 'JavaScript' },
-  ];
+  // 3. Merge GitHub repos and database projects
+  const repoMap = new Map<string, any>();
+
+  // Add DB projects first
+  dbProjects.forEach((p) => {
+    repoMap.set(p.name, {
+      id: p.id,
+      name: p.name,
+      description: p.description || '',
+      status: p.status === 'RUNNING' ? 'Running' : 'Ready',
+      lastAccessed: new Date(p.updatedAt).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      language: 'TypeScript',
+      isPrivate: false,
+    });
+  });
+
+  // Add/overlay GitHub repos
+  if (repos.length > 0) {
+    repos.forEach((r) => {
+      const existing = repoMap.get(r.name);
+      repoMap.set(r.name, {
+        id: existing?.id || r.name,
+        name: r.name,
+        description: r.description || existing?.description || '',
+        status: 'Ready',
+        lastAccessed: new Date(r.updated_at).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        }),
+        language: r.language || 'TypeScript',
+        cloneUrl: r.clone_url,
+        isPrivate: r.private,
+        stars: r.stargazers_count,
+        defaultBranch: r.default_branch,
+      });
+    });
+  }
+
+  // Fallback demo projects if new user with no repos
+  const initialProjects =
+    repoMap.size > 0
+      ? Array.from(repoMap.values())
+      : [
+          {
+            id: 'demo-nextjs',
+            name: 'nextjs-saas-starter',
+            description: 'Full-stack Next.js 15 app with TailwindCSS, authentication, and Postgres.',
+            status: 'Ready',
+            lastAccessed: 'Just now',
+            language: 'TypeScript',
+            isPrivate: false,
+          },
+          {
+            id: 'demo-fastapi',
+            name: 'python-ai-service',
+            description: 'FastAPI microservice with OpenAI and LangChain pipeline integration.',
+            status: 'Ready',
+            lastAccessed: 'Yesterday',
+            language: 'Python',
+            isPrivate: false,
+          },
+          {
+            id: 'demo-react',
+            name: 'vite-dashboard-app',
+            description: 'High-performance React frontend with Monaco editor and charts.',
+            status: 'Ready',
+            lastAccessed: '3 days ago',
+            language: 'JavaScript',
+            isPrivate: false,
+          },
+        ];
 
   return (
-    <div className="flex flex-col h-screen w-full" style={{ background: 'var(--bg-primary)' }}>
+    <div className="flex flex-col min-h-screen w-full bg-[#030712]">
       {/* Top Navbar */}
-      <nav className="flex justify-between items-center" style={{ padding: '16px 32px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
-        <div className="flex items-center" style={{ gap: '12px' }}>
-          <Link href="/" style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, var(--accent-orange), var(--accent-purple))', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', color: '#fff' }}>CL</Link>
-          <span style={{ fontSize: '1.25rem', fontWeight: 700, background: 'linear-gradient(to right, var(--accent-orange), var(--accent-purple))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Dashboard</span>
-        </div>
-        <div className="flex items-center" style={{ gap: '24px', fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 500 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-green)' }}></div>
-            <span>System Operational</span>
-          </div>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <Link href="/settings" style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', overflow: 'hidden' }}>
-              {session?.user?.image ? (
-                <img src={session.user.image} alt="Avatar" style={{ width: '100%', height: '100%' }} />
-              ) : (
-                session?.user?.name?.[0]?.toUpperCase() || 'U'
-              )}
+      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#030712]/80 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+          {/* Brand Logo */}
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-white/10 hover:border-emerald-500/40 transition-all duration-200 group"
+            >
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-black font-bold shadow-md shadow-emerald-500/20">
+                <Cloud size={16} strokeWidth={2.5} />
+              </div>
+              <span className="text-base font-bold tracking-tight text-white group-hover:text-emerald-400 transition-colors">
+                cloud<span className="text-emerald-400">lab</span>
+              </span>
             </Link>
-            <form action={async () => { "use server"; await signOut(); }}>
-              <button type="submit" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', background: 'transparent', border: 'none', cursor: 'pointer' }} className="hover:text-white">
-                Logout
-              </button>
-            </form>
+            <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-white/5 text-slate-400 border border-white/5">
+              Dashboard
+            </span>
+          </div>
+
+          {/* Operational Status Pill */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>NVMe Sandboxes Online</span>
+          </div>
+
+          {/* User Profile & Actions */}
+          <div className="flex items-center gap-3">
+            <Link
+              href="/settings"
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+              title="Settings"
+            >
+              <Settings size={18} />
+            </Link>
+
+            <div className="flex items-center gap-2.5 pl-2 border-l border-white/10">
+              <div className="w-8 h-8 rounded-full overflow-hidden border border-emerald-500/30 bg-slate-800 flex items-center justify-center text-xs font-bold text-emerald-300">
+                {session?.user?.image ? (
+                  <img src={session.user.image} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  session?.user?.name?.[0]?.toUpperCase() || 'U'
+                )}
+              </div>
+
+              <form
+                action={async () => {
+                  'use server';
+                  await signOut({ redirectTo: '/' });
+                }}
+              >
+                <button
+                  type="submit"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                  title="Sign out"
+                >
+                  <LogOut size={14} />
+                  <span className="hidden sm:inline">Logout</span>
+                </button>
+              </form>
+            </div>
           </div>
         </div>
-      </nav>
+      </header>
 
-      {/* Main Content Area */}
-      <main className="flex-col" style={{ display: 'flex', flex: 1, padding: '48px 32px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
-        
-        <div className="flex justify-between items-center" style={{ marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Your GitHub Repositories</h1>
-          <div className="flex" style={{ gap: '16px' }}>
-            {isAdmin && (
-              <Link href="/admin/workspaces" style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-                color: '#fff',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                textDecoration: 'none',
-                boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
-                transition: 'transform 0.2s',
-              }} className="hover:scale-105">
-                Admin Panel
-              </Link>
-            )}
-            <ImportButton />
-            <NewProjectButton />
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '24px' }}>
-          {projects.map((project) => (
-            <RepoCard key={project.id} project={project} />
-          ))}
-        </div>
-
-      </main>
+      {/* Main Interactive Dashboard */}
+      <DashboardClient
+        initialProjects={initialProjects}
+        user={session?.user || null}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }

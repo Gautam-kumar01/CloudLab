@@ -3,14 +3,14 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { builtInTemplates } from '@/lib/templates';
-import { Layout, Terminal, File, Coffee, Cpu, Loader2 } from 'lucide-react';
+import { Layout, Terminal, File, Coffee, Cpu, Loader2, Plus, X, Sparkles } from 'lucide-react';
 
 const icons: Record<string, React.ReactNode> = {
-  Layout: <Layout size={24} />,
-  Terminal: <Terminal size={24} />,
-  File: <File size={24} />,
-  Coffee: <Coffee size={24} />,
-  Cpu: <Cpu size={24} />,
+  Layout: <Layout size={20} />,
+  Terminal: <Terminal size={20} />,
+  File: <File size={20} />,
+  Coffee: <Coffee size={20} />,
+  Cpu: <Cpu size={20} />,
 };
 
 export default function NewProjectButton() {
@@ -18,170 +18,162 @@ export default function NewProjectButton() {
   const [name, setName] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<string>('blank');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const router = useRouter();
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name) return;
+    if (!name.trim()) return;
 
     setIsLoading(true);
+    setErrorMsg(null);
+
     try {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, template: selectedTemplate })
+        body: JSON.stringify({ name: name.trim(), template: selectedTemplate }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json();
+
+      if (res.ok && data.project?.id) {
         router.push(`/workspace?id=${encodeURIComponent(data.project.id)}`);
       } else {
-        alert('Failed to create project');
+        setErrorMsg(data.error || 'Failed to create project');
+        setIsLoading(false);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Error creating project');
-    } finally {
+      setErrorMsg('Error creating project workspace');
       setIsLoading(false);
     }
   };
 
   return (
     <>
-      <button 
-        onClick={() => setIsOpen(true)}
-        style={{
-          background: 'linear-gradient(135deg, var(--accent-orange), var(--accent-purple))',
-          color: '#fff',
-          border: 'none',
-          padding: '10px 20px',
-          borderRadius: '8px',
-          fontSize: '0.95rem',
-          fontWeight: 600,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          boxShadow: '0 4px 14px rgba(234, 88, 12, 0.25)',
-          transition: 'transform 0.2s ease',
+      <button
+        type="button"
+        onClick={() => {
+          setIsOpen(true);
+          setErrorMsg(null);
         }}
-        onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
-        onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold font-mono tracking-wide text-black bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-300 hover:brightness-110 transition-all duration-200 shadow-lg shadow-emerald-500/20 active:scale-95"
       >
-        <span style={{ fontSize: '1.2rem' }}>+</span> New Project
+        <Plus size={15} strokeWidth={2.5} />
+        <span>New Project</span>
       </button>
 
       {isOpen && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex', justifyContent: 'center', alignItems: 'center',
-          zIndex: 1000,
-          backdropFilter: 'blur(4px)'
-        }}>
-          <div style={{
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '12px',
-            width: '100%', maxWidth: '700px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            padding: '32px',
-            boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
-          }}>
-            <div className="flex justify-between items-center" style={{ marginBottom: '24px' }}>
-              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>Create New Project</h2>
-              <button 
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 sm:p-8 rounded-2xl bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-white/10 shadow-2xl"
+            style={{ boxShadow: '0 25px 70px rgba(0, 0, 0, 0.9), 0 0 50px rgba(16, 185, 129, 0.1)' }}
+          >
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 text-emerald-400">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Create New Workspace</h2>
+                  <p className="text-xs text-slate-400">Choose a high-performance cloud template or start from scratch.</p>
+                </div>
+              </div>
+              <button
+                type="button"
                 onClick={() => setIsOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1.2rem' }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
               >
-                ✕
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCreate}>
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Project Name</label>
-                <input 
-                  type="text" 
+            {errorMsg && (
+              <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                {errorMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleCreate} className="space-y-6">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-2 font-mono">
+                  Project Name <span className="text-emerald-400">*</span>
+                </label>
+                <input
+                  type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. my-awesome-app"
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-color)',
-                    background: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    fontSize: '1rem',
-                    outline: 'none',
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = 'var(--accent-orange)'}
-                  onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                  placeholder="e.g. saas-analytics-app"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-white/10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 font-mono transition-colors"
                 />
               </div>
 
-              <label style={{ display: 'block', marginBottom: '12px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Select a Template</label>
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
-                gap: '16px',
-                marginBottom: '32px'
-              }}>
-                {builtInTemplates.map(t => (
-                  <div 
-                    key={t.id}
-                    onClick={() => setSelectedTemplate(t.id)}
-                    style={{
-                      padding: '16px',
-                      borderRadius: '8px',
-                      border: `2px solid ${selectedTemplate === t.id ? 'var(--accent-orange)' : 'var(--border-color)'}`,
-                      background: selectedTemplate === t.id ? 'rgba(234, 88, 12, 0.05)' : 'var(--bg-primary)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <div style={{ color: selectedTemplate === t.id ? 'var(--accent-orange)' : 'var(--text-secondary)', marginBottom: '12px' }}>
-                      {icons[t.icon] || <File size={24} />}
-                    </div>
-                    <div style={{ fontWeight: 600, fontSize: '1.05rem', marginBottom: '4px' }}>{t.name}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t.description}</div>
-                  </div>
-                ))}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-2.5 font-mono">
+                  Select Starter Template
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {builtInTemplates.map((t) => {
+                    const isSelected = selectedTemplate === t.id;
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => setSelectedTemplate(t.id)}
+                        className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
+                          isSelected
+                            ? 'bg-emerald-500/10 border-emerald-500 shadow-md shadow-emerald-500/10'
+                            : 'bg-slate-950/60 border-white/5 hover:border-white/20 hover:bg-slate-950'
+                        }`}
+                      >
+                        <div
+                          className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${
+                            isSelected
+                              ? 'bg-emerald-500 text-black shadow-sm'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {icons[t.icon] || <File size={18} />}
+                        </div>
+                        <h4 className={`text-sm font-semibold mb-1 ${isSelected ? 'text-emerald-300' : 'text-white'}`}>
+                          {t.name}
+                        </h4>
+                        <p className="text-[11px] text-slate-400 leading-snug line-clamp-2">
+                          {t.description}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px' }}>
-                <button 
-                  type="button" 
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-white/10">
+                <button
+                  type="button"
                   onClick={() => setIsOpen(false)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '10px 20px', fontWeight: 500 }}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors"
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
-                  disabled={isLoading || !name}
-                  style={{
-                    background: 'var(--accent-purple)',
-                    color: '#fff',
-                    border: 'none',
-                    padding: '10px 24px',
-                    borderRadius: '8px',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    cursor: isLoading || !name ? 'not-allowed' : 'pointer',
-                    opacity: isLoading || !name ? 0.6 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
+                <button
+                  type="submit"
+                  disabled={isLoading || !name.trim()}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold font-mono text-black bg-emerald-400 hover:bg-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/20"
                 >
-                  {isLoading ? <Loader2 size={18} className="animate-spin" /> : null}
-                  {isLoading ? 'Creating...' : 'Create Workspace'}
+                  {isLoading ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Provisioning VM...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={14} />
+                      <span>Launch Workspace</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
