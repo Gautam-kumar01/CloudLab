@@ -8,7 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm install
+# Run with --ignore-scripts so postinstall doesn't fail before source files (prisma/scripts) are copied
+RUN npm install --ignore-scripts
 
 # Step 2: Build the Next.js application
 FROM base AS builder
@@ -21,6 +22,7 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+RUN node scripts/patch-y-monaco.js
 RUN npx prisma generate
 RUN npm run build
 
