@@ -2090,8 +2090,8 @@ export default function Workspace() {
 
             {/* Right Panel (AI/Chat) */}
             <Panel
-              defaultSize={20}
-              minSize={15}
+              defaultSize={22}
+              minSize={18}
               style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-tertiary)' }}
             >
               <AiChatPanel
