@@ -266,6 +266,7 @@ export default function Workspace() {
   const xtermInstances = useRef<
     Record<string, { term: any; fitAddon: any; container: HTMLDivElement }>
   >({});
+  const pendingTerminalData = useRef<Record<string, string[]>>({});
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const openFile = async (path: string, node: any) => {
@@ -604,9 +605,32 @@ export default function Workspace() {
     });
     socketRef.current = socket;
 
+    socket.on('connect', () => {
+      console.log('[Socket] Connected. Spawning terminals...');
+      terminals.forEach((term) => {
+        const inst = xtermInstances.current[term.id];
+        socket.emit('terminal.spawn', {
+          id: term.id,
+          shellType: term.shellType || 'default',
+          workspaceId,
+          cols: inst?.term?.cols || 80,
+          rows: inst?.term?.rows || 30,
+        });
+      });
+    });
+
+    socket.on('connect_error', (err) => {
+      console.warn('[Socket Connect Error]', err);
+    });
+
     socket.on('terminal.incData', ({ id, data }) => {
-      if (xtermInstances.current[id]) {
+      if (xtermInstances.current[id]?.term) {
         xtermInstances.current[id].term.write(data);
+      } else {
+        if (!pendingTerminalData.current[id]) {
+          pendingTerminalData.current[id] = [];
+        }
+        pendingTerminalData.current[id].push(data);
       }
     });
 
@@ -629,19 +653,7 @@ export default function Workspace() {
       socket.disconnect();
       window.removeEventListener('resize', handleResize);
     };
-  }, [activeBottomTab, activeTerminalId]);
-
-  // Spawn initial terminal
-  useEffect(() => {
-    if (socketRef.current) {
-      // Spawn term-1 if it's the first time
-      socketRef.current.emit('terminal.spawn', {
-        id: 'term-1',
-        shellType: 'default',
-        workspaceId,
-      });
-    }
-  }, [workspaceId]);
+  }, [activeBottomTab, activeTerminalId, workspaceId]);
 
   // Terminal DOM attachment via callback ref
   const terminalRef = (id: string) => (node: HTMLDivElement | null) => {
@@ -686,6 +698,14 @@ export default function Workspace() {
         term.loadAddon(fitAddon);
         term.open(node);
 
+        xtermInstances.current[id] = { term, fitAddon, container: node };
+
+        // Flush any pending data received before xterm finished loading
+        if (pendingTerminalData.current[id]) {
+          pendingTerminalData.current[id].forEach((chunk) => term.write(chunk));
+          delete pendingTerminalData.current[id];
+        }
+
         try {
           fitAddon.fit();
           socketRef.current?.emit('terminal.resize', {
@@ -695,6 +715,18 @@ export default function Workspace() {
           });
         } catch (e) {}
 
+        // Spawn terminal if socket is already connected
+        if (socketRef.current?.connected) {
+          const shellType = terminals.find((t) => t.id === id)?.shellType || 'default';
+          socketRef.current.emit('terminal.spawn', {
+            id,
+            shellType,
+            workspaceId,
+            cols: term.cols,
+            rows: term.rows,
+          });
+        }
+
         term.onData((data) => {
           socketRef.current?.emit('terminal.toTerm', { id, data });
         });
@@ -703,7 +735,13 @@ export default function Workspace() {
           socketRef.current?.emit('terminal.resize', { id, cols, rows });
         });
 
-        xtermInstances.current[id] = { term, fitAddon, container: node };
+        // Focus terminal for instant typing
+        setTimeout(() => {
+          try {
+            fitAddon.fit();
+            term.focus();
+          } catch (e) {}
+        }, 50);
       })();
     }
   };
@@ -715,6 +753,7 @@ export default function Workspace() {
         try {
           const inst = xtermInstances.current[activeTerminalId];
           inst.fitAddon.fit();
+          inst.term.focus();
           socketRef.current?.emit('terminal.resize', {
             id: activeTerminalId,
             cols: inst.term.cols,
@@ -731,7 +770,9 @@ export default function Workspace() {
     setTerminals((prev) => [...prev, { id, title: displayTitle, shellType }]);
     setActiveTerminalId(id);
     setActiveBottomTab('terminal');
-    socketRef.current?.emit('terminal.spawn', { id, shellType, workspaceId });
+    if (socketRef.current) {
+      socketRef.current.emit('terminal.spawn', { id, shellType, workspaceId, cols: 80, rows: 30 });
+    }
   };
 
   const handleKillTerminal = (id: string) => {
@@ -1828,9 +1869,12 @@ export default function Workspace() {
                         <div
                           key={term.id}
                           ref={terminalRef(term.id)}
+                          onClick={() => xtermInstances.current[term.id]?.term?.focus()}
                           style={{
                             width: '100%',
                             height: '100%',
+                            flex: 1,
+                            minHeight: 0,
                             display:
                               activeBottomTab === 'terminal' && activeTerminalId === term.id
                                 ? 'block'
