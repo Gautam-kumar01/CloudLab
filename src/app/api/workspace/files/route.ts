@@ -2,6 +2,8 @@ import { auth } from '@/auth';
 import { canEditWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
 import { apiResponse, apiError, apiValidationError } from '@/lib/api-utils';
 import { FileWriteSchema } from '@/lib/validations/api';
+import { db } from '@/lib/db';
+import { runCommand } from '@/lib/process';
 
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -49,21 +51,65 @@ export async function GET(request: Request) {
   const workspaceRoot = workspacePath(project.id);
 
   try {
-    // Check if workspace exists, if not, create it and populate with initial files
+    // Ensure workspace exists on disk
+    let rootFiles: string[] = [];
     try {
       await fs.access(workspaceRoot);
+      rootFiles = await fs.readdir(workspaceRoot);
     } catch {
       await fs.mkdir(workspaceRoot, { recursive: true });
-      for (const [filename, content] of Object.entries(initialFiles)) {
-        await fs.writeFile(path.join(workspaceRoot, filename), content, 'utf-8');
-      }
+      rootFiles = [];
     }
 
-    // If the directory was created by Docker mount, it might be empty
-    const rootFiles = await fs.readdir(workspaceRoot);
-    if (rootFiles.length === 0) {
-      for (const [filename, content] of Object.entries(initialFiles)) {
-        await fs.writeFile(path.join(workspaceRoot, filename), content, 'utf-8');
+    const meaningfulFiles = rootFiles.filter((f) => f !== '.git' && f !== '.prettierrc');
+
+    if (meaningfulFiles.length === 0) {
+      // Check if project was cloned from a GitHub repository
+      let repoUrl: string | null = null;
+      let accessToken: string | null = null;
+
+      try {
+        const projData = await db.project.findUnique({
+          where: { id: project.id },
+          include: { githubMetadata: true, owner: { include: { accounts: true } } },
+        });
+
+        repoUrl =
+          projData?.githubMetadata?.repositoryUrl ||
+          (projData?.description?.startsWith('Cloned from ')
+            ? projData.description.replace('Cloned from ', '').trim()
+            : null);
+
+        const ghAccount = projData?.owner?.accounts?.find((a: any) => a.provider === 'github');
+        accessToken = ghAccount?.access_token || null;
+      } catch (e) {
+        console.warn('Could not query github metadata for project:', e);
+      }
+
+      if (repoUrl && repoUrl.startsWith('https://github.com/')) {
+        console.log(`[Workspace Auto-Restore] Re-cloning ${repoUrl} into ${workspaceRoot}...`);
+        try {
+          let targetUrl = repoUrl;
+          if (accessToken) {
+            const parsed = new URL(repoUrl);
+            targetUrl = `https://x-access-token:${accessToken}@github.com/${parsed.pathname.replace(/^\//, '')}`;
+          }
+
+          try {
+            await fs.rm(workspaceRoot, { recursive: true, force: true });
+          } catch {}
+
+          await runCommand('git', ['clone', '--depth', '1', '--', targetUrl, workspaceRoot], {
+            timeout: 60 * 1000,
+          });
+          console.log(`[Workspace Auto-Restore] Successfully restored repository into ${workspaceRoot}`);
+        } catch (cloneErr) {
+          console.error('[Workspace Auto-Restore Error]', cloneErr);
+        }
+      } else if (rootFiles.length === 0) {
+        for (const [filename, content] of Object.entries(initialFiles)) {
+          await fs.writeFile(path.join(workspaceRoot, filename), content, 'utf-8');
+        }
       }
     }
 
