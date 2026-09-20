@@ -26,18 +26,16 @@ export async function GET(request: Request) {
     return apiError('Forbidden', 403);
   }
 
-  const workspaceRoot = workspacePath(project.id);
-  const filePath = workspaceFilePath(project.id, filename);
-
-  // Security check to prevent path traversal
-  if (!filePath.startsWith(`${workspaceRoot}${path.sep}`)) {
-    return apiError('Invalid file path: path traversal detected', 403);
-  }
-
   try {
+    const workspaceRoot = workspacePath(project.id);
+    const filePath = workspaceFilePath(project.id, filename);
+
     const content = await fs.readFile(filePath, 'utf-8');
-    return NextResponse.json({ content }); // Keep { content } format to match client expectations
+    return NextResponse.json({ content });
   } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      return NextResponse.json({ content: '', error: 'File not found' }, { status: 404 });
+    }
     console.error('Error reading file content:', error);
     return apiError('Failed to read file content', 500, error.message);
   }

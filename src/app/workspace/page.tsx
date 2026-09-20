@@ -296,36 +296,60 @@ export default function Workspace() {
       .catch(() => {});
   }, [workspaceId]);
 
-  const openFile = async (path: string, node: any) => {
-    if (files[path]) {
-      setActiveFile(path);
+  const openFile = async (filePath: string, node?: any) => {
+    const filename = node?.name || filePath.split('/').pop() || filePath;
+    const lang = node?.language || getLanguage(filePath);
+
+    if (files[filePath] && files[filePath].content !== '// Loading...' && files[filePath].content !== '// Failed to load file') {
+      setActiveFile(filePath);
       return;
     }
 
     // Immediately open tab with loading state
     setFiles((prev) => ({
       ...prev,
-      [path]: { name: node.name, language: node.language, content: '// Loading...' },
+      [filePath]: {
+        name: filename,
+        language: lang,
+        content: prev[filePath]?.content && prev[filePath].content !== '// Loading...' ? prev[filePath].content : '// Loading...',
+      },
     }));
-    setActiveFile(path);
+    setActiveFile(filePath);
 
     try {
       const res = await fetch(
-        `/api/workspace/file?id=${encodeURIComponent(workspaceId)}&filename=${encodeURIComponent(path)}`,
+        `/api/workspace/file?id=${encodeURIComponent(workspaceId)}&filename=${encodeURIComponent(filePath)}`,
       );
       const data = await res.json();
       if (data.content !== undefined) {
         setFiles((prev) => ({
           ...prev,
-          [path]: { name: node.name, language: node.language, content: data.content },
+          [filePath]: { name: filename, language: lang, content: data.content },
+        }));
+      } else {
+        setFiles((prev) => ({
+          ...prev,
+          [filePath]: { name: filename, language: lang, content: data.error ? `// ${data.error}` : '' },
         }));
       }
     } catch (e) {
-      console.error(e);
+      console.error('Failed to load file:', e);
       setFiles((prev) => ({
         ...prev,
-        [path]: { name: node.name, language: node.language, content: '// Failed to load file' },
+        [filePath]: { name: filename, language: lang, content: '// Failed to load file' },
       }));
+    }
+  };
+
+  const handleCloseTab = (filePath: string) => {
+    setFiles((prev) => {
+      const newFiles = { ...prev };
+      delete newFiles[filePath];
+      return newFiles;
+    });
+    if (activeFile === filePath) {
+      const remaining = Object.keys(files).filter((f) => f !== filePath);
+      setActiveFile(remaining.length > 0 ? remaining[remaining.length - 1] : '');
     }
   };
 
@@ -860,58 +884,77 @@ export default function Workspace() {
   const handleEditorDidMount = async (editor: any, monaco: any) => {
     editorRef.current = editor;
 
+    // Ensure model has current file content if available
+    if (activeFile && files[activeFile]?.content && files[activeFile].content !== '// Loading...') {
+      try {
+        const currentVal = editor.getValue();
+        if (!currentVal || currentVal === '// Loading...') {
+          editor.setValue(files[activeFile].content);
+        }
+      } catch (e) {}
+    }
+
     // Dynamically import y-monaco only on the client side
-    const { MonacoBinding } = await import('y-monaco');
+    try {
+      const { MonacoBinding } = await import('y-monaco');
 
-    // Cleanup previous Yjs state if any
-    if (bindingRef.current) {
-      bindingRef.current.destroy();
-      bindingRef.current = null;
-    }
-    if (providerRef.current) {
-      providerRef.current.destroy();
-      providerRef.current = null;
-    }
-    if (ydocRef.current) {
-      ydocRef.current.destroy();
-      ydocRef.current = null;
-    }
+      // Cleanup previous Yjs state if any
+      if (bindingRef.current) {
+        try { bindingRef.current.destroy(); } catch (e) {}
+        bindingRef.current = null;
+      }
+      if (providerRef.current) {
+        try { providerRef.current.destroy(); } catch (e) {}
+        providerRef.current = null;
+      }
+      if (ydocRef.current) {
+        try { ydocRef.current.destroy(); } catch (e) {}
+        ydocRef.current = null;
+      }
 
-    if (activeFile) {
-      const ydoc = new Y.Doc();
-      ydocRef.current = ydoc;
+      if (activeFile && typeof window !== 'undefined') {
+        const ydoc = new Y.Doc();
+        ydocRef.current = ydoc;
 
-      const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/collaboration`;
+        const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/collaboration`;
 
-      const provider = new WebsocketProvider(
-        wsUrl,
-        `workspace/${workspaceId}/file/${encodeURIComponent(activeFile)}`,
-        ydoc,
-        {
-          connect: true,
-          params: { workspaceId, file: activeFile },
-        },
-      );
-      providerRef.current = provider;
+        const provider = new WebsocketProvider(
+          wsUrl,
+          `workspace/${workspaceId}/file/${encodeURIComponent(activeFile)}`,
+          ydoc,
+          {
+            connect: true,
+            params: { workspaceId, file: activeFile },
+          },
+        );
+        providerRef.current = provider;
 
-      provider.awareness.setLocalStateField('user', {
-        name: sessionUser?.name || 'Anonymous',
-        color: '#' + Math.floor(Math.random() * 16777215).toString(16),
-      });
+        provider.awareness.setLocalStateField('user', {
+          name: sessionUser?.name || 'Anonymous',
+          color: '#' + Math.floor(Math.random() * 16777215).toString(16),
+        });
 
-      provider.awareness.on('change', () => {
-        const states = Array.from(provider.awareness.getStates().values());
-        setCollaborators(states.filter((state: any) => state.user));
-      });
+        provider.awareness.on('change', () => {
+          const states = Array.from(provider.awareness.getStates().values());
+          setCollaborators(states.filter((state: any) => state.user));
+        });
 
-      const ytext = ydoc.getText('monaco');
-      const binding = new MonacoBinding(
-        ytext,
-        editor.getModel(),
-        new Set([editor]),
-        provider.awareness,
-      );
-      bindingRef.current = binding;
+        const ytext = ydoc.getText('monaco');
+        // Seed Yjs text with file content if empty so Monaco editor is not blanked out
+        if (ytext.length === 0 && files[activeFile]?.content && files[activeFile].content !== '// Loading...') {
+          ytext.insert(0, files[activeFile].content);
+        }
+
+        const binding = new MonacoBinding(
+          ytext,
+          editor.getModel(),
+          new Set([editor]),
+          provider.awareness,
+        );
+        bindingRef.current = binding;
+      }
+    } catch (err) {
+      console.warn('[Collaboration] Monaco binding skipped:', err);
     }
 
     editor.addAction({
@@ -1666,12 +1709,12 @@ export default function Workspace() {
                             key={filename}
                             onClick={() => setActiveFile(filename)}
                             style={{
-                              padding: '8px 16px',
-                              fontSize: '0.85rem',
+                              padding: '6px 12px',
+                              fontSize: '0.82rem',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '8px',
+                              gap: '6px',
                               borderRight: '1px solid var(--border-color)',
                               background:
                                 activeFile === filename ? 'var(--bg-primary)' : 'transparent',
@@ -1684,6 +1727,7 @@ export default function Workspace() {
                                   ? '2px solid var(--accent-green)'
                                   : '2px solid transparent',
                               transition: 'background 0.2s',
+                              userSelect: 'none',
                             }}
                             onMouseOver={(e) => {
                               if (activeFile !== filename)
@@ -1695,7 +1739,24 @@ export default function Workspace() {
                             }}
                           >
                             {getFileIcon(filename)}
-                            {filename}
+                            <span>{filename.split('/').pop()}</span>
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCloseTab(filename);
+                              }}
+                              style={{
+                                marginLeft: '4px',
+                                padding: '0 4px',
+                                borderRadius: '3px',
+                                fontSize: '13px',
+                                opacity: 0.5,
+                              }}
+                              onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
+                              onMouseOut={(e) => (e.currentTarget.style.opacity = '0.5')}
+                            >
+                              ×
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -1708,18 +1769,20 @@ export default function Workspace() {
                             height="100%"
                             language={files[activeFile].language}
                             theme="vs-dark"
-                            defaultValue={files[activeFile].content}
+                            value={files[activeFile].content}
+                            onChange={handleEditorChange}
                             onMount={handleEditorDidMount}
                             options={{
                               minimap: { enabled: false },
-                              fontSize: 14,
-                              fontFamily: 'var(--font-mono)',
-                              padding: { top: 16 },
+                              fontSize: 13.5,
+                              fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+                              padding: { top: 12 },
                               scrollBeyondLastLine: false,
                               smoothScrolling: true,
                               cursorBlinking: 'smooth',
                               cursorSmoothCaretAnimation: 'on',
                               formatOnPaste: true,
+                              automaticLayout: true,
                             }}
                           />
                         ) : (
