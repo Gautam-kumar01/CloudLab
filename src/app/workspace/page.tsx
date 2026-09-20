@@ -261,7 +261,9 @@ export default function Workspace() {
     { id: 'term-1', title: 'terminal', shellType: 'default' },
   ]);
   const terminalsRef = useRef<TerminalState[]>(terminals);
-  terminalsRef.current = terminals;
+  useEffect(() => {
+    terminalsRef.current = terminals;
+  }, [terminals]);
   const [activeTerminalId, setActiveTerminalId] = useState('term-1');
 
   const socketRef = useRef<Socket | null>(null);
@@ -270,6 +272,16 @@ export default function Workspace() {
   >({});
   const pendingTerminalData = useRef<Record<string, string[]>>({});
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const getLanguage = (fname: string) => {
+    if (fname.endsWith('.ts') || fname.endsWith('.tsx')) return 'typescript';
+    if (fname.endsWith('.js') || fname.endsWith('.jsx')) return 'javascript';
+    if (fname.endsWith('.json')) return 'json';
+    if (fname.endsWith('.css')) return 'css';
+    if (fname.endsWith('.html')) return 'html';
+    if (fname.endsWith('.md')) return 'markdown';
+    return 'plaintext';
+  };
 
   useEffect(() => {
     fetch(`/api/workspace/access?id=${encodeURIComponent(workspaceId)}`)
@@ -383,16 +395,6 @@ export default function Workspace() {
     fetchWorkspace();
   }, [workspaceId]);
 
-  // Helper function to get language for new files
-  const getLanguage = (fname: string) => {
-    if (fname.endsWith('.ts') || fname.endsWith('.tsx')) return 'typescript';
-    if (fname.endsWith('.js') || fname.endsWith('.jsx')) return 'javascript';
-    if (fname.endsWith('.json')) return 'json';
-    if (fname.endsWith('.css')) return 'css';
-    if (fname.endsWith('.html')) return 'html';
-    if (fname.endsWith('.md')) return 'markdown';
-    return 'plaintext';
-  };
 
   const handleSave = async (specificFile?: string, specificContent?: string) => {
     const fileToSave = specificFile || activeFile;
