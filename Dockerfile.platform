@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-# Run with --ignore-scripts so postinstall doesn't fail before source files (prisma/scripts) are copied
-RUN npm install --ignore-scripts
+# Run with --ignore-scripts so postinstall doesn't fail before source files (prisma/scripts) are copied, then rebuild node-pty native addon
+RUN npm install --ignore-scripts && (npm rebuild node-pty || true)
 
 # Step 2: Build the Next.js application
 FROM base AS builder

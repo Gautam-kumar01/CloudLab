@@ -256,10 +256,18 @@ export default function Workspace() {
     return lastSlash >= 0 ? node.path.substring(0, lastSlash) : '';
   };
 
+  const [projectInfo, setProjectInfo] = useState<{
+    name: string;
+    githubRepo?: string;
+    branch?: string;
+  } | null>(null);
+
   type TerminalState = { id: string; title: string; shellType: string };
   const [terminals, setTerminals] = useState<TerminalState[]>([
     { id: 'term-1', title: 'terminal', shellType: 'default' },
   ]);
+  const terminalsRef = useRef<TerminalState[]>(terminals);
+  terminalsRef.current = terminals;
   const [activeTerminalId, setActiveTerminalId] = useState('term-1');
 
   const socketRef = useRef<Socket | null>(null);
@@ -268,6 +276,25 @@ export default function Workspace() {
   >({});
   const pendingTerminalData = useRef<Record<string, string[]>>({});
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/workspace/access?id=${encodeURIComponent(workspaceId)}`)
+      .then((r) => r.json())
+      .then((res) => {
+        const data = res.data || res;
+        if (data && data.projectName) {
+          setProjectInfo({
+            name: data.projectName,
+            githubRepo: data.githubRepo,
+            branch: data.branch || 'main',
+          });
+          if (typeof document !== 'undefined') {
+            document.title = `${data.projectName} — CloudLab Workspace`;
+          }
+        }
+      })
+      .catch(() => {});
+  }, [workspaceId]);
 
   const openFile = async (path: string, node: any) => {
     if (files[path]) {
@@ -607,7 +634,7 @@ export default function Workspace() {
 
     socket.on('connect', () => {
       console.log('[Socket] Connected. Spawning terminals...');
-      terminals.forEach((term) => {
+      (terminalsRef.current || []).forEach((term) => {
         const inst = xtermInstances.current[term.id];
         socket.emit('terminal.spawn', {
           id: term.id,
@@ -634,12 +661,19 @@ export default function Workspace() {
       }
     });
 
+    return () => {
+      socket.disconnect();
+    };
+  }, [workspaceId]);
+
+  // Handle window resizing and tab switching for terminal
+  useEffect(() => {
     const handleResize = () => {
       if (activeBottomTab === 'terminal' && xtermInstances.current[activeTerminalId]) {
         try {
           const inst = xtermInstances.current[activeTerminalId];
           inst.fitAddon.fit();
-          socket.emit('terminal.resize', {
+          socketRef.current?.emit('terminal.resize', {
             id: activeTerminalId,
             cols: inst.term.cols,
             rows: inst.term.rows,
@@ -648,12 +682,12 @@ export default function Workspace() {
       }
     };
     window.addEventListener('resize', handleResize);
-
+    const timeout = setTimeout(handleResize, 100);
     return () => {
-      socket.disconnect();
+      clearTimeout(timeout);
       window.removeEventListener('resize', handleResize);
     };
-  }, [activeBottomTab, activeTerminalId, workspaceId]);
+  }, [activeBottomTab, activeTerminalId]);
 
   // Terminal DOM attachment via callback ref
   const terminalRef = (id: string) => (node: HTMLDivElement | null) => {
@@ -1254,12 +1288,36 @@ export default function Workspace() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              color: 'var(--text-secondary)',
-              fontWeight: 500,
+              gap: '10px',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid var(--border-color)',
+              padding: '4px 14px',
+              borderRadius: '6px',
             }}
           >
-            {workspaceId}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fff', fontWeight: 600, fontSize: '0.85rem' }}>
+              <Folder size={14} color="#dcb67a" fill="#dcb67a" />
+              <span>{projectInfo?.name || workspaceId}</span>
+            </div>
+            {projectInfo?.branch && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.75rem',
+                  padding: '1px 6px',
+                  borderRadius: '4px',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  color: '#10b981',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  fontWeight: 500,
+                }}
+              >
+                <GitBranch size={11} />
+                {projectInfo.branch}
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

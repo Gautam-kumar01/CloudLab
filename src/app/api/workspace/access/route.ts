@@ -30,6 +30,7 @@ export async function GET(request: Request) {
       },
       include: {
         members: true,
+        githubMetadata: true,
       },
     });
 
@@ -45,6 +46,7 @@ export async function GET(request: Request) {
           user: session.user,
           projectId: workspaceId,
           projectName: workspaceId,
+          branch: 'main',
         });
       }
       console.log(`[AccessCheck] Local path does NOT exist.`);
@@ -55,10 +57,13 @@ export async function GET(request: Request) {
     if (project.ownerId === userId) {
       return apiResponse({
         success: true,
-          role: 'OWNER',
-          user: session.user,
-          projectId: project.id,
-          projectName: project.name,
+        role: 'OWNER',
+        user: session.user,
+        projectId: project.id,
+        projectName: project.name,
+        description: project.description,
+        githubRepo: project.githubMetadata?.repositoryUrl,
+        branch: project.githubMetadata?.branch || 'main',
       });
     }
 
@@ -67,10 +72,13 @@ export async function GET(request: Request) {
     if (member) {
       return apiResponse({
         success: true,
-          role: member.role,
-          user: session.user,
-          projectId: project.id,
-          projectName: project.name,
+        role: member.role,
+        user: session.user,
+        projectId: project.id,
+        projectName: project.name,
+        description: project.description,
+        githubRepo: project.githubMetadata?.repositoryUrl,
+        branch: project.githubMetadata?.branch || 'main',
       });
     }
 
