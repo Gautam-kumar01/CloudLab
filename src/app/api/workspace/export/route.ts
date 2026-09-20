@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const project = await getWorkspaceProject(session.user.id, workspaceId);
   if (!project) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const workspaceRoot = workspacePath(project.id);
+  const workspaceRoot = workspacePath(workspaceId);
 
   // Ensure workspace exists
   try {

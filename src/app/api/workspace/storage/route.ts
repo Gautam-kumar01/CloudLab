@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const workspaceRoot = workspacePath(project.id);
+  const workspaceRoot = workspacePath(workspaceId);
 
   try {
     await fs.access(workspaceRoot);

@@ -39,6 +39,27 @@ export async function getWorkspaceProject(userId: string, workspaceId: string) {
       return null;
     }
 
+    // Check if workspaceId is a Container ID
+    const container = await db.container.findFirst({
+      where: { id: workspaceId },
+      include: {
+        project: {
+          include: {
+            members: true,
+          },
+        },
+      },
+    });
+
+    if (container?.project) {
+      const proj = container.project;
+      if (proj.status === 'DISABLED') return null;
+      if (proj.ownerId === userId) return proj;
+      const isMember = proj.members.some((member: any) => member.userId === userId);
+      if (isMember) return proj;
+      return null;
+    }
+
     // Disk-based fallback: check if local workspace folder exists on disk
     try {
       const localPath = workspacePath(workspaceId);

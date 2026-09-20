@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     return apiError('Forbidden', 403);
   }
 
-  const workspaceRoot = workspacePath(project.id);
+  const workspaceRoot = workspacePath(workspaceId);
 
   try {
     // Ensure workspace exists on disk
@@ -61,55 +61,71 @@ export async function GET(request: Request) {
       rootFiles = [];
     }
 
+    const hasGit = rootFiles.includes('.git');
     const meaningfulFiles = rootFiles.filter((f) => f !== '.git' && f !== '.prettierrc');
 
-    if (meaningfulFiles.length === 0) {
-      // Check if project was cloned from a GitHub repository
-      let repoUrl: string | null = null;
-      let accessToken: string | null = null;
+    // Retrieve project data to check for GitHub repo
+    let repoUrl: string | null = null;
+    let accessToken: string | null = null;
 
-      try {
-        const projData = await db.project.findUnique({
-          where: { id: project.id },
+    try {
+      const projData =
+        (await db.project.findFirst({
+          where: {
+            OR: [{ id: project.id }, { id: workspaceId }, { name: workspaceId }],
+          },
           include: { githubMetadata: true, owner: { include: { accounts: true } } },
-        });
+        })) ||
+        (
+          await db.container.findFirst({
+            where: { id: workspaceId },
+            include: {
+              project: {
+                include: {
+                  githubMetadata: true,
+                  owner: { include: { accounts: true } },
+                },
+              },
+            },
+          })
+        )?.project;
 
-        repoUrl =
-          projData?.githubMetadata?.repositoryUrl ||
-          (projData?.description?.startsWith('Cloned from ')
-            ? projData.description.replace('Cloned from ', '').trim()
-            : null);
+      repoUrl =
+        projData?.githubMetadata?.repositoryUrl ||
+        (projData?.description?.startsWith('Cloned from ')
+          ? projData.description.replace('Cloned from ', '').trim()
+          : null);
 
-        const ghAccount = projData?.owner?.accounts?.find((a: any) => a.provider === 'github');
-        accessToken = ghAccount?.access_token || null;
-      } catch (e) {
-        console.warn('Could not query github metadata for project:', e);
-      }
+      const ghAccount = projData?.owner?.accounts?.find((a: any) => a.provider === 'github');
+      accessToken = ghAccount?.access_token || null;
+    } catch (e) {
+      console.warn('Could not query github metadata for project:', e);
+    }
 
-      if (repoUrl && repoUrl.startsWith('https://github.com/')) {
-        console.log(`[Workspace Auto-Restore] Re-cloning ${repoUrl} into ${workspaceRoot}...`);
+    // Auto-restore GitHub repository if this is a cloned project and .git directory is missing on disk
+    if (repoUrl && repoUrl.startsWith('https://github.com/') && !hasGit) {
+      console.log(`[Workspace Auto-Restore] Re-cloning ${repoUrl} into ${workspaceRoot}...`);
+      try {
+        let targetUrl = repoUrl;
+        if (accessToken) {
+          const parsed = new URL(repoUrl);
+          targetUrl = `https://x-access-token:${accessToken}@github.com/${parsed.pathname.replace(/^\//, '')}`;
+        }
+
         try {
-          let targetUrl = repoUrl;
-          if (accessToken) {
-            const parsed = new URL(repoUrl);
-            targetUrl = `https://x-access-token:${accessToken}@github.com/${parsed.pathname.replace(/^\//, '')}`;
-          }
+          await fs.rm(workspaceRoot, { recursive: true, force: true });
+        } catch {}
 
-          try {
-            await fs.rm(workspaceRoot, { recursive: true, force: true });
-          } catch {}
-
-          await runCommand('git', ['clone', '--depth', '1', '--', targetUrl, workspaceRoot], {
-            timeout: 60 * 1000,
-          });
-          console.log(`[Workspace Auto-Restore] Successfully restored repository into ${workspaceRoot}`);
-        } catch (cloneErr) {
-          console.error('[Workspace Auto-Restore Error]', cloneErr);
-        }
-      } else if (rootFiles.length === 0) {
-        for (const [filename, content] of Object.entries(initialFiles)) {
-          await fs.writeFile(path.join(workspaceRoot, filename), content, 'utf-8');
-        }
+        await runCommand('git', ['clone', '--depth', '1', '--', targetUrl, workspaceRoot], {
+          timeout: 60 * 1000,
+        });
+        console.log(`[Workspace Auto-Restore] Successfully restored repository into ${workspaceRoot}`);
+      } catch (cloneErr) {
+        console.error('[Workspace Auto-Restore Error]', cloneErr);
+      }
+    } else if (meaningfulFiles.length === 0 && !repoUrl) {
+      for (const [filename, content] of Object.entries(initialFiles)) {
+        await fs.writeFile(path.join(workspaceRoot, filename), content, 'utf-8');
       }
     }
 
@@ -144,7 +160,7 @@ export async function GET(request: Request) {
             name: entry.name,
             path: itemRelPath,
             language: getLanguageFromFilename(entry.name),
-            content: null, // Content is now lazy-loaded
+            content: null, // Content is lazy-loaded
           };
         }
       }
@@ -185,8 +201,8 @@ export async function POST(request: Request) {
       return apiError('Invalid file path: path traversal detected', 403);
     }
 
-    const workspaceRoot = workspacePath(project.id);
-    const filePath = workspaceFilePath(project.id, filename);
+    const workspaceRoot = workspacePath(workspaceId);
+    const filePath = workspaceFilePath(workspaceId, filename);
 
     // Security check to prevent path traversal
     if (!filePath.startsWith(`${workspaceRoot}${path.sep}`)) {
@@ -197,7 +213,7 @@ export async function POST(request: Request) {
     try {
       await fs.access(workspaceRoot);
     } catch {
-      return apiError('Workspace not found', 404);
+      await fs.mkdir(workspaceRoot, { recursive: true });
     }
     const dirPath = isDir ? filePath : path.dirname(filePath);
 
@@ -257,8 +273,8 @@ export async function DELETE(request: Request) {
     return apiError('Invalid file path: path traversal detected', 403);
   }
 
-  const workspaceRoot = workspacePath(project.id);
-  const filePath = workspaceFilePath(project.id, filename);
+  const workspaceRoot = workspacePath(workspaceId);
+  const filePath = workspaceFilePath(workspaceId, filename);
 
   // Security check to prevent path traversal
   if (!filePath.startsWith(`${workspaceRoot}${path.sep}`)) {

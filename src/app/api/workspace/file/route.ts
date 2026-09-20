@@ -27,8 +27,18 @@ export async function GET(request: Request) {
   }
 
   try {
-    const workspaceRoot = workspacePath(project.id);
-    const filePath = workspaceFilePath(project.id, filename);
+    let filePath = workspaceFilePath(workspaceId, filename);
+    try {
+      await fs.access(filePath);
+    } catch {
+      if (project?.id && project.id !== workspaceId) {
+        const altPath = workspaceFilePath(project.id, filename);
+        try {
+          await fs.access(altPath);
+          filePath = altPath;
+        } catch {}
+      }
+    }
 
     const content = await fs.readFile(filePath, 'utf-8');
     return NextResponse.json({ content });

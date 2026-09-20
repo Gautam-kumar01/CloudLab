@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const workspaceRoot = workspacePath(project.id);
+    const workspaceRoot = workspacePath(workspaceId);
 
     // Read multipart form data
     const formData = await request.formData();

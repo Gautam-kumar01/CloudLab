@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     return new NextResponse('Invalid file path: path traversal detected', { status: 403 });
   }
 
-  const workspaceRoot = workspacePath(project.id);
+  const workspaceRoot = workspacePath(workspaceId);
   const filePath = path.resolve(workspaceRoot, filename);
 
   // Security check to prevent path traversal

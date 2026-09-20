@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   try {
     // 1. Check if the workspace (project) exists
     console.log(`[AccessCheck] Checking workspace: ${workspaceId} for user ${userId}`);
-    const project = await db.project.findFirst({
+    let project = await db.project.findFirst({
       where: {
         OR: [{ id: workspaceId }, { name: workspaceId }],
       },
@@ -33,6 +33,23 @@ export async function GET(request: Request) {
         githubMetadata: true,
       },
     });
+
+    if (!project) {
+      const container = await db.container.findFirst({
+        where: { id: workspaceId },
+        include: {
+          project: {
+            include: {
+              members: true,
+              githubMetadata: true,
+            },
+          },
+        },
+      });
+      if (container?.project) {
+        project = container.project;
+      }
+    }
 
     if (!project) {
       const localPath = workspacePath(workspaceId);

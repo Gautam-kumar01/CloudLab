@@ -37,11 +37,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const workspaceRoot = workspacePath(project.id);
+    const workspaceRoot = workspacePath(workspaceId);
 
     // Resolve absolute paths
-    const absoluteOldPath = workspaceFilePath(project.id, oldPath);
-    const absoluteNewPath = workspaceFilePath(project.id, newPath);
+    const absoluteOldPath = workspaceFilePath(workspaceId, oldPath);
+    const absoluteNewPath = workspaceFilePath(workspaceId, newPath);
 
     // Security check to prevent path traversal
     if (!absoluteOldPath.startsWith(workspaceRoot) || !absoluteNewPath.startsWith(workspaceRoot)) {
