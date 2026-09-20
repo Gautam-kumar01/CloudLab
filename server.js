@@ -444,7 +444,7 @@ app.prepare().then(() => {
     process.exit(1);
   });
 
-  server.listen(port, () => {
-    console.log(`> Custom server ready on http://${hostname}:${port}`);
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`> Custom server ready on http://0.0.0.0:${port}`);
   });
 });
