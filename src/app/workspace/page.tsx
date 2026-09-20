@@ -48,6 +48,7 @@ import GitPanel from './GitPanel';
 import AiChatPanel from './AiChatPanel';
 import PreviewPanel from './PreviewPanel';
 import DeploymentPanel from './DeploymentPanel';
+import FileIcon from './FileIcon';
 const FileTreeNode = ({
   node,
   level,
@@ -68,14 +69,7 @@ const FileTreeNode = ({
     setExpandedFolders((prev: any) => ({ ...prev, [node.path]: !prev[node.path] }));
   };
 
-  const getFileIcon = (filename: string) => {
-    if (!filename) return <FileCode size={14} color="#888" />;
-    if (filename.endsWith('.ts') || filename.endsWith('.tsx'))
-      return <FileCode size={14} color="#61dafb" />;
-    if (filename.endsWith('.json')) return <FileJson size={14} color="#f1e05a" />;
-    if (filename.endsWith('.css')) return <FileType2 size={14} color="#563d7c" />;
-    return <FileCode size={14} color="#888" />;
-  };
+
 
   if (node.type === 'directory') {
     return (
@@ -105,7 +99,7 @@ const FileTreeNode = ({
           }}
         >
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          <Folder size={14} color="#dcb67a" fill="#dcb67a" />
+          <FileIcon filename={node.name} isDirectory={true} isOpen={isExpanded} size={15} />
           {node.name}
         </div>
         {isExpanded && node.children && (
@@ -171,7 +165,7 @@ const FileTreeNode = ({
         }
       }}
     >
-      {getFileIcon(node.name)}
+      <FileIcon filename={node.name} isDirectory={false} size={15} />
       {node.name}
     </div>
   );
@@ -874,11 +868,7 @@ export default function Workspace() {
   };
 
   const getFileIcon = (filename: string) => {
-    if (filename.endsWith('.ts') || filename.endsWith('.tsx'))
-      return <FileCode size={14} color="#61dafb" />;
-    if (filename.endsWith('.json')) return <FileJson size={14} color="#f1e05a" />;
-    if (filename.endsWith('.css')) return <FileType2 size={14} color="#563d7c" />;
-    return <FileCode size={14} color="#888" />;
+    return <FileIcon filename={filename} isDirectory={false} size={15} />;
   };
 
   const handleEditorDidMount = async (editor: any, monaco: any) => {

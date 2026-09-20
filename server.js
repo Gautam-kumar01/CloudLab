@@ -311,8 +311,14 @@ app.prepare().then(() => {
           TERM: 'xterm-256color',
           COLORTERM: 'truecolor',
           LANG: 'en_US.UTF-8',
-          HOME: process.env.HOME || workspacePath,
+          HOME: workspacePath,
           PWD: workspacePath,
+          USER: 'nextjs',
+          LOGNAME: 'nextjs',
+          GIT_AUTHOR_NAME: socket.user?.name || 'CloudLab Developer',
+          GIT_AUTHOR_EMAIL: socket.user?.email || 'developer@cloudlab.dev',
+          GIT_COMMITTER_NAME: socket.user?.name || 'CloudLab Developer',
+          GIT_COMMITTER_EMAIL: socket.user?.email || 'developer@cloudlab.dev',
           PS1: '\u001b[1;32mcloudlab@workspace\u001b[0m:\u001b[1;34m\\w\u001b[0m$ ',
         };
         

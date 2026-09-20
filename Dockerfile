@@ -34,6 +34,7 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOST=0.0.0.0
+ENV HOME=/app/workspaces
 
 # Install git and essential runtime tools for workspace cloning and terminal execution
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -41,7 +42,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+    adduser --system --uid 1001 --home /app/workspaces --shell /bin/bash nextjs
 
 # Prepare workspace directory with proper permissions
 RUN mkdir -p /app/workspaces && chown -R nextjs:nodejs /app/workspaces

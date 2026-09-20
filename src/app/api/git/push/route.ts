@@ -29,6 +29,14 @@ export async function POST(request: Request) {
 
     const cwd = workspacePath(workspaceId);
 
+    // Ensure git author is configured
+    try {
+      await runCommand('git', ['config', 'user.name'], { cwd });
+    } catch {
+      await runCommand('git', ['config', 'user.name', session.user.name || 'CloudLab Developer'], { cwd });
+      await runCommand('git', ['config', 'user.email', session.user.email || 'developer@cloudlab.dev'], { cwd });
+    }
+
     // Execute git add
     await runCommand('git', ['add', '--', '.'], { cwd });
 
