@@ -62,29 +62,55 @@ app.prepare().then(() => {
 
       // Authentication check via internal proxy
       try {
-        const response = await fetch(`http://localhost:${port}/api/auth/session`, {
-          headers: {
-            cookie: request.headers.cookie || '',
-            host: request.headers.host || `localhost:${port}`,
-          },
-        });
-        const session = await response.json();
+        let session = null;
+        try {
+          const response = await fetch(`http://127.0.0.1:${port}/api/auth/session`, {
+            headers: {
+              cookie: request.headers.cookie || '',
+              host: request.headers.host || `localhost:${port}`,
+            },
+          });
+          session = await response.json();
+        } catch (e1) {
+          const response = await fetch(`http://localhost:${port}/api/auth/session`, {
+            headers: {
+              cookie: request.headers.cookie || '',
+              host: request.headers.host || `localhost:${port}`,
+            },
+          });
+          session = await response.json();
+        }
+
         if (!session || !session.user) {
           logger.warn('Unauthorized WS connection attempt');
           socket.destroy();
           return;
         }
 
-        const accessRes = await fetch(
-          `http://localhost:${port}/api/workspace/access?workspaceId=${workspaceId}`,
-          {
-            headers: {
-              cookie: request.headers.cookie || '',
-              host: request.headers.host || `localhost:${port}`,
+        let access = null;
+        try {
+          const accessRes = await fetch(
+            `http://127.0.0.1:${port}/api/workspace/access?workspaceId=${encodeURIComponent(workspaceId)}`,
+            {
+              headers: {
+                cookie: request.headers.cookie || '',
+                host: request.headers.host || `localhost:${port}`,
+              },
             },
-          },
-        );
-        const access = await accessRes.json();
+          );
+          access = await accessRes.json();
+        } catch (e2) {
+          const accessRes = await fetch(
+            `http://localhost:${port}/api/workspace/access?workspaceId=${encodeURIComponent(workspaceId)}`,
+            {
+              headers: {
+                cookie: request.headers.cookie || '',
+                host: request.headers.host || `localhost:${port}`,
+              },
+            },
+          );
+          access = await accessRes.json();
+        }
 
         if (!access.data || !access.data.success) {
           console.log(`User ${session.user.id} denied access to workspace ${workspaceId}`);
@@ -149,13 +175,25 @@ app.prepare().then(() => {
   io.use(async (socket, next) => {
     try {
       const cookieHeader = socket.request.headers.cookie || '';
-      const response = await fetch(`http://localhost:${port}/api/auth/session`, {
-        headers: {
-          cookie: cookieHeader,
-          host: socket.request.headers.host || `localhost:${port}`,
-        },
-      });
-      const session = await response.json();
+      let session = null;
+      try {
+        const response = await fetch(`http://127.0.0.1:${port}/api/auth/session`, {
+          headers: {
+            cookie: cookieHeader,
+            host: socket.request.headers.host || `localhost:${port}`,
+          },
+        });
+        session = await response.json();
+      } catch (e1) {
+        const response = await fetch(`http://localhost:${port}/api/auth/session`, {
+          headers: {
+            cookie: cookieHeader,
+            host: socket.request.headers.host || `localhost:${port}`,
+          },
+        });
+        session = await response.json();
+      }
+
       if (!session || !session.user) {
         return next(new Error('Unauthorized'));
       }
@@ -188,7 +226,7 @@ app.prepare().then(() => {
     let messageCount = 0;
     let windowStart = Date.now();
 
-    socket.on('terminal.spawn', async ({ id, shellType, workspaceId }) => {
+    socket.on('terminal.spawn', async ({ id, shellType = 'default', workspaceId, cols = 80, rows = 30 }) => {
       let resolvedWorkspaceId = workspaceId;
 
       // Auth check for workspace
@@ -196,7 +234,7 @@ app.prepare().then(() => {
         try {
           const cookieHeader = socket.request.headers.cookie || '';
           const accessRes = await fetch(
-            `http://localhost:${port}/api/workspace/access?workspaceId=${workspaceId}`,
+            `http://127.0.0.1:${port}/api/workspace/access?workspaceId=${encodeURIComponent(workspaceId)}`,
             {
               headers: {
                 cookie: cookieHeader,
@@ -214,21 +252,39 @@ app.prepare().then(() => {
           }
           resolvedWorkspaceId = access.data.projectId || workspaceId;
         } catch (err) {
-          socket.emit('terminal.incData', {
-            id,
-            data: '\r\n\x1b[31m[Error: Failed to verify workspace access]\x1b[0m\r\n',
-          });
-          return;
+          // If 127.0.0.1 fetch fails, try localhost fallback
+          try {
+            const cookieHeader = socket.request.headers.cookie || '';
+            const fallbackRes = await fetch(
+              `http://localhost:${port}/api/workspace/access?workspaceId=${encodeURIComponent(workspaceId)}`,
+              {
+                headers: {
+                  cookie: cookieHeader,
+                  host: socket.request.headers.host || `localhost:${port}`,
+                },
+              },
+            );
+            const fallbackAccess = await fallbackRes.json();
+            if (fallbackAccess.data && fallbackAccess.data.success) {
+              resolvedWorkspaceId = fallbackAccess.data.projectId || workspaceId;
+            }
+          } catch (e2) {
+            console.warn('[Terminal] Workspace access check warning:', err.message);
+          }
         }
       }
 
       let shell = '';
       let args = [];
       const workspacePath = resolvedWorkspaceId
-        ? require('path').join(process.cwd(), 'workspaces', resolvedWorkspaceId)
+        ? path.join(process.cwd(), 'workspaces', resolvedWorkspaceId)
         : process.cwd();
-      require('fs').mkdirSync(workspacePath, { recursive: true });
+      
+      try {
+        fs.mkdirSync(workspacePath, { recursive: true });
+      } catch (e) {}
 
+      // Cross-platform shell resolution
       if (shellType === 'docker') {
         const { DockerManager } = require('./src/lib/docker-manager');
         
@@ -249,19 +305,32 @@ app.prepare().then(() => {
           });
           return;
         }
-      } else if (shellType === 'powershell') {
+      } else if (shellType === 'node') {
+        shell = 'node';
+        args = [];
+      } else if (shellType === 'cmd' && isWin) {
+        shell = 'cmd.exe';
+        args = [];
+      } else if (isWin) {
+        // Windows default to PowerShell
         shell = 'powershell.exe';
         args = [
           '-NoExit',
           '-Command',
           `function prompt { return 'cloudlab@workspace:~/workspace$ ' }`,
         ];
-      } else if (shellType === 'cmd') {
-        shell = 'cmd.exe';
-      } else if (shellType === 'node') {
-        shell = 'node';
       } else {
-        shell = isWin ? 'powershell.exe' : 'bash';
+        // Linux / macOS default to bash or sh
+        if (fs.existsSync('/bin/bash')) {
+          shell = '/bin/bash';
+          args = ['-l'];
+        } else if (fs.existsSync('/bin/sh')) {
+          shell = '/bin/sh';
+          args = [];
+        } else {
+          shell = process.env.SHELL || 'sh';
+          args = [];
+        }
       }
 
       try {
@@ -270,13 +339,24 @@ app.prepare().then(() => {
             terminals[id].kill();
           } catch (e) {}
         }
+
+        const ptyEnv = {
+          ...process.env,
+          TERM: 'xterm-256color',
+          COLORTERM: 'truecolor',
+          LANG: 'en_US.UTF-8',
+          PS1: '\u001b[1;32mcloudlab@workspace\u001b[0m:\u001b[1;34m\\w\u001b[0m$ ',
+        };
         
+        const initialCols = Math.max(parseInt(cols, 10) || 80, 20);
+        const initialRows = Math.max(parseInt(rows, 10) || 30, 5);
+
         const ptyProcess = pty.spawn(shell, args, {
-          name: 'xterm-color',
-          cols: 80,
-          rows: 30,
+          name: 'xterm-256color',
+          cols: initialCols,
+          rows: initialRows,
           cwd: workspacePath,
-          env: process.env,
+          env: ptyEnv,
         });
 
         terminals[id] = ptyProcess;
@@ -290,15 +370,27 @@ app.prepare().then(() => {
           delete terminals[id];
         });
 
+        const displayShell = isWin ? 'PowerShell' : (shell.includes('bash') ? 'bash' : 'sh');
         socket.emit('terminal.incData', {
           id,
-          data: `\x1b[34m[CloudLab] Started ${shellType}...\x1b[0m\r\n\r\n`,
+          data: `\x1b[38;2;16;185;129m[CloudLab IDE]\x1b[0m \x1b[90mConnected to ${displayShell} terminal\x1b[0m\r\n\r\n`,
         });
       } catch (e) {
+        console.error('[Terminal Spawn Error]', e);
         socket.emit('terminal.incData', {
           id,
           data: `\r\n\x1b[31m[Error spawning terminal: ${e.message}]\x1b[0m\r\n`,
         });
+      }
+    });
+
+    socket.on('terminal.resize', ({ id, cols, rows }) => {
+      if (terminals[id] && cols && rows && cols > 0 && rows > 0) {
+        try {
+          terminals[id].resize(Math.max(cols, 10), Math.max(rows, 5));
+        } catch (err) {
+          console.warn('[Terminal Resize Error]', err.message);
+        }
       }
     });
 
@@ -316,7 +408,11 @@ app.prepare().then(() => {
       }
 
       if (terminals[id]) {
-        terminals[id].write(data);
+        try {
+          terminals[id].write(data);
+        } catch (err) {
+          console.warn('[Terminal Write Error]', err.message);
+        }
       }
     });
 

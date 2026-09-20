@@ -8,7 +8,7 @@ import { workspacePath } from '@/lib/workspace-paths';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const workspaceId = searchParams.get('workspaceId');
+  const workspaceId = searchParams.get('workspaceId') || searchParams.get('id');
 
   if (!workspaceId) {
     return apiError('Missing workspaceId', 400);

@@ -258,7 +258,7 @@ export default function Workspace() {
 
   type TerminalState = { id: string; title: string; shellType: string };
   const [terminals, setTerminals] = useState<TerminalState[]>([
-    { id: 'term-1', title: 'powershell', shellType: 'powershell' },
+    { id: 'term-1', title: 'terminal', shellType: 'default' },
   ]);
   const [activeTerminalId, setActiveTerminalId] = useState('term-1');
 
@@ -612,7 +612,15 @@ export default function Workspace() {
 
     const handleResize = () => {
       if (activeBottomTab === 'terminal' && xtermInstances.current[activeTerminalId]) {
-        xtermInstances.current[activeTerminalId].fitAddon.fit();
+        try {
+          const inst = xtermInstances.current[activeTerminalId];
+          inst.fitAddon.fit();
+          socket.emit('terminal.resize', {
+            id: activeTerminalId,
+            cols: inst.term.cols,
+            rows: inst.term.rows,
+          });
+        } catch (e) {}
       }
     };
     window.addEventListener('resize', handleResize);
@@ -621,7 +629,7 @@ export default function Workspace() {
       socket.disconnect();
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [activeBottomTab, activeTerminalId]);
 
   // Spawn initial terminal
   useEffect(() => {
@@ -629,7 +637,7 @@ export default function Workspace() {
       // Spawn term-1 if it's the first time
       socketRef.current.emit('terminal.spawn', {
         id: 'term-1',
-        shellType: 'powershell',
+        shellType: 'default',
         workspaceId,
       });
     }
@@ -644,21 +652,55 @@ export default function Workspace() {
         
         const term = new XTerm({
           theme: {
-            background: '#111111',
-            foreground: '#e0e0e0',
-            cursor: '#00ff41',
+            background: '#090d16',
+            foreground: '#f1f5f9',
+            cursor: '#10b981',
+            cursorAccent: '#090d16',
+            selectionBackground: 'rgba(16, 185, 129, 0.3)',
+            black: '#1e293b',
+            red: '#f43f5e',
+            green: '#10b981',
+            yellow: '#f59e0b',
+            blue: '#3b82f6',
+            magenta: '#a855f7',
+            cyan: '#06b6d4',
+            white: '#f8fafc',
+            brightBlack: '#64748b',
+            brightRed: '#fb7185',
+            brightGreen: '#34d399',
+            brightYellow: '#fbbf24',
+            brightBlue: '#60a5fa',
+            brightMagenta: '#c084fc',
+            brightCyan: '#22d3ee',
+            brightWhite: '#ffffff',
           },
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
           fontSize: 13,
+          lineHeight: 1.25,
           cursorBlink: true,
+          cursorStyle: 'block',
+          allowTransparency: true,
+          scrollback: 5000,
         });
         const fitAddon = new FitAddon();
         term.loadAddon(fitAddon);
         term.open(node);
-        fitAddon.fit();
+
+        try {
+          fitAddon.fit();
+          socketRef.current?.emit('terminal.resize', {
+            id,
+            cols: term.cols,
+            rows: term.rows,
+          });
+        } catch (e) {}
 
         term.onData((data) => {
           socketRef.current?.emit('terminal.toTerm', { id, data });
+        });
+
+        term.onResize(({ cols, rows }) => {
+          socketRef.current?.emit('terminal.resize', { id, cols, rows });
         });
 
         xtermInstances.current[id] = { term, fitAddon, container: node };
@@ -670,14 +712,23 @@ export default function Workspace() {
   useEffect(() => {
     if (activeBottomTab === 'terminal' && xtermInstances.current[activeTerminalId]) {
       setTimeout(() => {
-        xtermInstances.current[activeTerminalId].fitAddon.fit();
-      }, 50);
+        try {
+          const inst = xtermInstances.current[activeTerminalId];
+          inst.fitAddon.fit();
+          socketRef.current?.emit('terminal.resize', {
+            id: activeTerminalId,
+            cols: inst.term.cols,
+            rows: inst.term.rows,
+          });
+        } catch (e) {}
+      }, 60);
     }
   }, [activeBottomTab, activeTerminalId]);
 
-  const handleNewTerminal = (shellType: string = 'powershell') => {
+  const handleNewTerminal = (shellType: string = 'default') => {
     const id = `term-${Date.now()}`;
-    setTerminals((prev) => [...prev, { id, title: shellType, shellType }]);
+    const displayTitle = shellType === 'default' ? 'terminal' : shellType;
+    setTerminals((prev) => [...prev, { id, title: displayTitle, shellType }]);
     setActiveTerminalId(id);
     setActiveBottomTab('terminal');
     socketRef.current?.emit('terminal.spawn', { id, shellType, workspaceId });
@@ -1706,14 +1757,18 @@ export default function Workspace() {
                         }}
                       >
                         <div
+                          title="New Terminal"
                           style={{
                             display: 'flex',
                             alignItems: 'center',
                             cursor: 'pointer',
                             gap: '2px',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: 'rgba(255, 255, 255, 0.05)',
                           }}
-                          onClick={() => handleNewTerminal('powershell')}
-                          onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+                          onClick={() => handleNewTerminal('default')}
+                          onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
                           onMouseOut={(e) =>
                             (e.currentTarget.style.color = 'var(--text-secondary)')
                           }
@@ -1721,23 +1776,28 @@ export default function Workspace() {
                           <Plus size={14} />
                           <ChevronDownIcon size={12} />
                         </div>
-                        <SplitSquareHorizontal
-                          size={14}
-                          style={{ cursor: 'pointer' }}
-                          onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+                        <span
+                          title="Split Terminal"
+                          style={{ display: 'flex', cursor: 'pointer' }}
+                          onClick={() => handleNewTerminal('default')}
+                          onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
                           onMouseOut={(e) =>
                             (e.currentTarget.style.color = 'var(--text-secondary)')
                           }
-                        />
-                        <Trash
-                          size={14}
-                          style={{ cursor: 'pointer' }}
+                        >
+                          <SplitSquareHorizontal size={14} />
+                        </span>
+                        <span
+                          title="Kill Terminal"
+                          style={{ display: 'flex', cursor: 'pointer' }}
                           onClick={() => handleKillTerminal(activeTerminalId)}
-                          onMouseOver={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+                          onMouseOver={(e) => (e.currentTarget.style.color = '#ef4444')}
                           onMouseOut={(e) =>
                             (e.currentTarget.style.color = 'var(--text-secondary)')
                           }
-                        />
+                        >
+                          <Trash size={14} />
+                        </span>
                       </div>
                     )}
                   </div>
@@ -1879,18 +1939,18 @@ export default function Workspace() {
         </div>
 
         {/* Status Bar */}
-
         <footer
           style={{
             height: '24px',
-            background: 'var(--accent-orange)',
-            color: '#fff',
+            background: '#090d16',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            color: '#94a3b8',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '0 16px',
             fontSize: '0.75rem',
-            fontWeight: 600,
+            fontWeight: 500,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -1901,23 +1961,24 @@ export default function Workspace() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
+                color: '#34d399',
               }}
-              onMouseOver={(e) => (e.currentTarget.style.color = 'var(--bg-primary)')}
-              onMouseOut={(e) => (e.currentTarget.style.color = '#fff')}
+              onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
+              onMouseOut={(e) => (e.currentTarget.style.color = '#34d399')}
             >
               <GitBranch size={12} /> main
             </span>
             <span
               style={{ cursor: 'pointer', transition: 'color 0.2s' }}
-              onMouseOver={(e) => (e.currentTarget.style.color = 'var(--bg-primary)')}
-              onMouseOut={(e) => (e.currentTarget.style.color = '#fff')}
+              onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
+              onMouseOut={(e) => (e.currentTarget.style.color = '#94a3b8')}
             >
               <RefreshCw size={12} style={{ display: 'inline', marginRight: '4px' }} /> 0 ↓ 0 ↑
             </span>
             <span
               style={{ cursor: 'pointer', transition: 'color 0.2s' }}
-              onMouseOver={(e) => (e.currentTarget.style.color = 'var(--bg-primary)')}
-              onMouseOut={(e) => (e.currentTarget.style.color = '#fff')}
+              onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
+              onMouseOut={(e) => (e.currentTarget.style.color = '#94a3b8')}
             >
               <AlertCircle size={12} style={{ display: 'inline', marginRight: '4px' }} /> 0
             </span>

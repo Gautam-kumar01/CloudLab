@@ -56,6 +56,16 @@
   --font-sans: var(--font-geist-sans), 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: var(--font-geist-mono), 'JetBrains Mono', monospace;
 
+  /* Workspace & IDE Legacy Variables */
+  --bg-primary: #030712;
+  --bg-secondary: #090d1a;
+  --bg-tertiary: #0f172a;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --accent-orange: #f59e0b;
+  --accent-green: #10b981;
+
   /* Container */
   --container-max: 1240px;
   --container-padding: 24px;
