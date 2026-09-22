@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
@@ -458,7 +459,7 @@ app.prepare().then(() => {
     process.exit(1);
   });
 
-  server.listen(port, '0.0.0.0', () => {
-    console.log(`> Custom server ready on http://0.0.0.0:${port}`);
+  server.listen(port, () => {
+    console.log(`> Custom server ready on http://localhost:${port} and http://127.0.0.1:${port}`);
   });
 });

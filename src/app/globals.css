@@ -3340,6 +3340,15 @@ html[data-theme="light"] .tech-badge__name {
   flex-shrink: 0;
 }
 
+@media (max-width: 768px) {
+  .dash-actions-group {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+}
+
 .dash-telemetry-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -3560,3 +3569,99 @@ html[data-theme="light"] .tech-badge__name {
   border-color: #10b981;
   box-shadow: 0 0 14px rgba(16, 185, 129, 0.35);
 }
+
+/* ============================================================
+   Enhanced Modal, Template Card & Dashboard Action Styles
+   ============================================================ */
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes pulseGlowSlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.25), 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(16, 185, 129, 0.45), 0 4px 25px rgba(0, 0, 0, 0.6);
+  }
+}
+
+@keyframes shimmerSweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.modal-animate-in {
+  animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.btn-cta-glow {
+  background: linear-gradient(135deg, #10b981 0%, #14b8a6 50%, #06b6d4 100%);
+  color: #020617;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.35), 0 4px 14px rgba(0, 0, 0, 0.4);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-cta-glow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.btn-cta-glow:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 36px rgba(16, 185, 129, 0.55), 0 8px 24px rgba(0, 0, 0, 0.5);
+  filter: brightness(1.08);
+}
+
+.btn-cta-glow:hover::after {
+  transform: translateX(100%);
+}
+
+.btn-cta-glow:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn-secondary-glow {
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-secondary-glow:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #ffffff;
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2), 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.btn-secondary-glow:active {
+  transform: translateY(0) scale(0.98);
+}
+
