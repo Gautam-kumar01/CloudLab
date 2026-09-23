@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
+import CinematicBackground from "@/components/CinematicBackground";
 import { useEffect, useRef, useState } from "react";
 import {
   Activity,
@@ -2470,6 +2471,9 @@ export default function Home() {
 
   return (
     <div className="cloudlab-home">
+      {/* 3D Cinematic Particle Canvas & Atmospheric Nebula Grid */}
+      <CinematicBackground />
+
       <header className="site-header">
         <div className="site-container site-header__inner">
           <Logo />
