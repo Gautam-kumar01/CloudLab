@@ -49,6 +49,18 @@ import AiChatPanel from './AiChatPanel';
 import PreviewPanel from './PreviewPanel';
 import DeploymentPanel from './DeploymentPanel';
 import FileIcon from './FileIcon';
+
+const COMMAND_ITEMS = [
+  { id: 'open-folder', label: 'File: Open Desktop Folder...', icon: '📁' },
+  { id: 'export-zip', label: 'File: Export Workspace as ZIP', icon: '📦' },
+  { id: 'save-file', label: 'File: Save Current File', icon: '💾' },
+  { id: 'new-file', label: 'File: New File', icon: '📄' },
+  { id: 'new-folder', label: 'File: New Folder', icon: '📂' },
+  { id: 'publish-github', label: 'Source Control: Publish to GitHub', icon: '🐙' },
+  { id: 'deploy-docker', label: 'Docker: Build & Deploy to Container', icon: '🐳' },
+  { id: 'toggle-preview', label: 'View: Toggle Live Web Preview', icon: '🌐' },
+  { id: 'refresh-files', label: 'Explorer: Refresh Workspace Files', icon: '🔄' },
+];
 const FileTreeNode = ({
   node,
   level,
@@ -223,42 +235,6 @@ export default function Workspace() {
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, []);
-
-  // Global Keyboard Shortcuts (VS Code shortcuts)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Quick Open Files: Ctrl+P or Cmd+P (without shift)
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p' && !e.shiftKey) {
-        e.preventDefault();
-        setPaletteMode('files');
-        setCommandQuery('');
-        setSelectedPaletteIndex(0);
-        setShowCommandPalette(true);
-      }
-      // Command Palette: Ctrl+Shift+P or Cmd+Shift+P or F1
-      else if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p' && e.shiftKey) || e.key === 'F1') {
-        e.preventDefault();
-        setPaletteMode('commands');
-        setCommandQuery('');
-        setSelectedPaletteIndex(0);
-        setShowCommandPalette(true);
-      }
-      // Save: Ctrl+S or Cmd+S
-      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        handleSave();
-      }
-      // Close on Escape
-      else if (e.key === 'Escape') {
-        setShowCommandPalette(false);
-        setActiveMenu(null);
-        setContextMenu(null);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [workspaceId, activeFile, files]);
 
   const handleContextMenu = (e: React.MouseEvent, node?: any) => {
     e.preventDefault();
@@ -460,7 +436,12 @@ export default function Workspace() {
   };
 
   const handleExportZip = () => {
-    window.location.href = `/api/workspace/export?workspaceId=${encodeURIComponent(workspaceId)}`;
+    const link = document.createElement('a');
+    link.href = `/api/workspace/export?workspaceId=${encodeURIComponent(workspaceId)}`;
+    link.download = `${workspaceId}-export.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     setActiveMenu(null);
   };
 
@@ -472,8 +453,7 @@ export default function Workspace() {
     }
 
     try {
-      // @ts-ignore
-      const dirHandle = await window.showDirectoryPicker();
+      const dirHandle = await (window as any).showDirectoryPicker();
       if (!dirHandle) return;
 
       const name = dirHandle.name;
@@ -578,6 +558,75 @@ export default function Workspace() {
       console.error(e);
     }
   };
+
+  const executePaletteCommand = (id: string) => {
+    setShowCommandPalette(false);
+    switch (id) {
+      case 'open-folder':
+        handleOpenDesktopFolder();
+        break;
+      case 'export-zip':
+        handleExportZip();
+        break;
+      case 'save-file':
+        handleSave();
+        break;
+      case 'new-file':
+        handleNewFile();
+        break;
+      case 'new-folder':
+        handleNewFolder();
+        break;
+      case 'publish-github':
+        setActiveSidebar('git');
+        break;
+      case 'deploy-docker':
+        setActiveSidebar('deploy');
+        break;
+      case 'toggle-preview':
+        setShowPreview((prev) => !prev);
+        break;
+      case 'refresh-files':
+        fetchWorkspace();
+        break;
+    }
+  };
+
+  // Global Keyboard Shortcuts (VS Code shortcuts)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Quick Open Files: Ctrl+P or Cmd+P (without shift)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p' && !e.shiftKey) {
+        e.preventDefault();
+        setPaletteMode('files');
+        setCommandQuery('');
+        setSelectedPaletteIndex(0);
+        setShowCommandPalette(true);
+      }
+      // Command Palette: Ctrl+Shift+P or Cmd+Shift+P or F1
+      else if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p' && e.shiftKey) || e.key === 'F1') {
+        e.preventDefault();
+        setPaletteMode('commands');
+        setCommandQuery('');
+        setSelectedPaletteIndex(0);
+        setShowCommandPalette(true);
+      }
+      // Save: Ctrl+S or Cmd+S
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+      // Close on Escape
+      else if (e.key === 'Escape') {
+        setShowCommandPalette(false);
+        setActiveMenu(null);
+        setContextMenu(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [workspaceId, activeFile, files]);
 
   const handleDeleteFile = async (targetPath?: string) => {
     const fileToDelete = targetPath || activeFile;
@@ -2549,26 +2598,12 @@ export default function Workspace() {
               <div className="flex-1 overflow-y-auto p-2 space-y-1 select-none scrollbar-thin scrollbar-thumb-slate-800">
                 {paletteMode === 'commands' ? (
                   /* Commands Mode */
-                  [
-                    { id: 'open-folder', label: 'File: Open Desktop Folder...', icon: '📁', action: () => handleOpenDesktopFolder() },
-                    { id: 'export-zip', label: 'File: Export Workspace as ZIP', icon: '📦', action: () => handleExportZip() },
-                    { id: 'save-file', label: 'File: Save Current File', icon: '💾', action: () => handleSave() },
-                    { id: 'new-file', label: 'File: New File', icon: '📄', action: () => handleNewFile() },
-                    { id: 'new-folder', label: 'File: New Folder', icon: '📂', action: () => handleNewFolder() },
-                    { id: 'publish-github', label: 'Source Control: Publish to GitHub', icon: '🐙', action: () => setActiveSidebar('git') },
-                    { id: 'deploy-docker', label: 'Docker: Build & Deploy to Container', icon: '🐳', action: () => setActiveSidebar('deploy') },
-                    { id: 'new-terminal', label: 'Terminal: Create New Terminal Tab', icon: '⚡', action: () => handleNewTerminal('default') },
-                    { id: 'toggle-preview', label: 'View: Toggle Live Web Preview', icon: '🌐', action: () => setShowPreview(!showPreview) },
-                    { id: 'refresh-files', label: 'Explorer: Refresh Workspace Files', icon: '🔄', action: () => fetchWorkspace() },
-                  ]
+                  COMMAND_ITEMS
                     .filter((cmd) => cmd.label.toLowerCase().includes(commandQuery.toLowerCase()))
                     .map((cmd, idx) => (
                       <div
                         key={cmd.id}
-                        onClick={() => {
-                          setShowCommandPalette(false);
-                          cmd.action();
-                        }}
+                        onClick={() => executePaletteCommand(cmd.id)}
                         className={`px-3 py-2 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
                           idx === selectedPaletteIndex
                             ? 'bg-emerald-500/15 text-white border border-emerald-500/30'

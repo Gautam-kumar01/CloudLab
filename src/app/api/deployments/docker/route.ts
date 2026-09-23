@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
       } catch {}
 
       // 4. Find host port (dynamic or assigned)
-      let hostPort = customPort || 3100 + (Math.abs(hashCode(workspaceId)) % 500);
+      const hostPort = customPort || 3100 + (Math.abs(hashCode(workspaceId)) % 500);
       workspacePorts.set(workspaceId, hostPort);
 
       // 5. Run new container

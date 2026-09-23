@@ -40,8 +40,7 @@ export default function OpenFolderButton() {
         return;
       }
 
-      // @ts-ignore
-      const dirHandle = await window.showDirectoryPicker();
+      const dirHandle = await (window as any).showDirectoryPicker();
       if (!dirHandle) return;
 
       const name = dirHandle.name;
@@ -202,9 +201,7 @@ export default function OpenFolderButton() {
       <input
         type="file"
         ref={fileInputRef}
-        // @ts-ignore
-        webkitdirectory="true"
-        directory="true"
+        {...({ webkitdirectory: '', directory: '' } as any)}
         multiple
         onChange={handleFileInputChange}
         className="hidden"
