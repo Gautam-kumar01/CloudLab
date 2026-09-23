@@ -45,3 +45,32 @@ export const FileWriteSchema = z.object({
   content: z.string().optional(),
   isDir: z.boolean().optional(),
 });
+
+// --- GitHub Publish Schema ---
+export const GithubPublishSchema = z.object({
+  workspaceId: z.string().min(1, 'Workspace ID is required'),
+  repoName: z.string().min(1, 'Repository name is required').max(100),
+  description: z.string().max(350).optional(),
+  isPrivate: z.boolean().default(false),
+  githubToken: z.string().optional(),
+});
+
+// --- Upload Folder Schema ---
+export const UploadFolderSchema = z.object({
+  folderName: z.string().min(1, 'Folder name is required').max(100),
+  files: z.array(
+    z.object({
+      path: z.string().min(1),
+      content: z.string(),
+      isBinary: z.boolean().optional(),
+    })
+  ).min(1, 'At least one file is required'),
+});
+
+// --- Docker Deploy Schema ---
+export const DockerDeploySchema = z.object({
+  workspaceId: z.string().min(1, 'Workspace ID is required'),
+  action: z.enum(['build', 'start', 'stop', 'restart', 'status', 'logs', 'detect-stack']).default('start'),
+  port: z.number().int().min(1).max(65535).optional(),
+  customDockerfile: z.string().optional(),
+});

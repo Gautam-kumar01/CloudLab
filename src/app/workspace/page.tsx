@@ -185,6 +185,9 @@ export default function Workspace() {
   const [selectedNodePath, setSelectedNodePath] = useState<string | null>(null);
   const [activeFile, setActiveFile] = useState('');
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [paletteMode, setPaletteMode] = useState<'commands' | 'files'>('commands');
+  const [commandQuery, setCommandQuery] = useState('');
+  const [selectedPaletteIndex, setSelectedPaletteIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState('terminal');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -220,6 +223,42 @@ export default function Workspace() {
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, []);
+
+  // Global Keyboard Shortcuts (VS Code shortcuts)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Quick Open Files: Ctrl+P or Cmd+P (without shift)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p' && !e.shiftKey) {
+        e.preventDefault();
+        setPaletteMode('files');
+        setCommandQuery('');
+        setSelectedPaletteIndex(0);
+        setShowCommandPalette(true);
+      }
+      // Command Palette: Ctrl+Shift+P or Cmd+Shift+P or F1
+      else if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p' && e.shiftKey) || e.key === 'F1') {
+        e.preventDefault();
+        setPaletteMode('commands');
+        setCommandQuery('');
+        setSelectedPaletteIndex(0);
+        setShowCommandPalette(true);
+      }
+      // Save: Ctrl+S or Cmd+S
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+      // Close on Escape
+      else if (e.key === 'Escape') {
+        setShowCommandPalette(false);
+        setActiveMenu(null);
+        setContextMenu(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [workspaceId, activeFile, files]);
 
   const handleContextMenu = (e: React.MouseEvent, node?: any) => {
     e.preventDefault();
@@ -417,6 +456,77 @@ export default function Workspace() {
       console.error('Save failed:', err);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleExportZip = () => {
+    window.location.href = `/api/workspace/export?workspaceId=${encodeURIComponent(workspaceId)}`;
+    setActiveMenu(null);
+  };
+
+  const handleOpenDesktopFolder = async () => {
+    setActiveMenu(null);
+    if (!('showDirectoryPicker' in window)) {
+      alert('Your browser does not support the Directory Picker API. Please use Chrome or Edge to open desktop folders.');
+      return;
+    }
+
+    try {
+      // @ts-ignore
+      const dirHandle = await window.showDirectoryPicker();
+      if (!dirHandle) return;
+
+      const name = dirHandle.name;
+      const uploadedFiles: { path: string; content: string; isBinary?: boolean }[] = [];
+
+      async function scanDirectory(handle: any, currentPath = '') {
+        for await (const entry of handle.values()) {
+          const entryPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+          if (['.git', 'node_modules', '.next', 'dist', '.turbo', '__pycache__'].includes(entry.name)) continue;
+
+          if (entry.kind === 'file') {
+            const file = await entry.getFile();
+            if (file.size < 5 * 1024 * 1024) {
+              const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+              const isBinary = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.pdf', '.zip'].includes(ext);
+              if (isBinary) {
+                const arrayBuffer = await file.arrayBuffer();
+                const base64 = btoa(new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+                uploadedFiles.push({ path: entryPath, content: base64, isBinary: true });
+              } else {
+                const text = await file.text();
+                uploadedFiles.push({ path: entryPath, content: text });
+              }
+            }
+          } else if (entry.kind === 'directory') {
+            await scanDirectory(entry, entryPath);
+          }
+        }
+      }
+
+      await scanDirectory(dirHandle);
+
+      if (uploadedFiles.length === 0) {
+        alert('Selected folder is empty or has no readable files.');
+        return;
+      }
+
+      const res = await fetch('/api/workspace/upload-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderName: name, files: uploadedFiles }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.project?.id) {
+        router.push(`/workspace?id=${encodeURIComponent(data.project.id)}`);
+      } else {
+        alert(data.error || 'Failed to import folder');
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        alert('Error opening folder: ' + err.message);
+      }
     }
   };
 
@@ -1119,46 +1229,43 @@ export default function Workspace() {
                       background: 'var(--bg-tertiary)',
                       border: '1px solid var(--border-color)',
                       borderRadius: '6px',
-                      minWidth: '150px',
+                      minWidth: '200px',
                       zIndex: 10,
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
                     }}
                   >
                     <div
                       onClick={() => handleNewFile()}
                       style={{ padding: '8px 16px', cursor: 'pointer' }}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.background = 'var(--bg-secondary)')
-                      }
+                      onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
                       onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
                       New File
                     </div>
                     <div
+                      onClick={handleOpenDesktopFolder}
+                      style={{ padding: '8px 16px', cursor: 'pointer', color: 'var(--accent-green)', fontWeight: 600 }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
+                      onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      Open Folder (Desktop)...
+                    </div>
+                    <div
                       onClick={() => handleSave()}
                       style={{ padding: '8px 16px', cursor: 'pointer' }}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.background = 'var(--bg-secondary)')
-                      }
+                      onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
                       onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
-                      Save
+                      Save (Ctrl+S)
                     </div>
-                    <a
-                      href={`/api/workspace/export?id=${encodeURIComponent(workspaceId)}`}
-                      style={{
-                        textDecoration: 'none',
-                        color: 'inherit',
-                        display: 'block',
-                        padding: '8px 16px',
-                        cursor: 'pointer',
-                      }}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.background = 'var(--bg-secondary)')
-                      }
+                    <div
+                      onClick={handleExportZip}
+                      style={{ padding: '8px 16px', cursor: 'pointer' }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
                       onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
-                      Download Workspace (ZIP)
-                    </a>
+                      Export as ZIP
+                    </div>
                     <div
                       onClick={() => handleDeleteFile()}
                       style={{
@@ -1215,7 +1322,7 @@ export default function Workspace() {
                       }
                       onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
-                      Undo
+                      Undo (Ctrl+Z)
                     </div>
                     <div
                       style={{ padding: '8px 16px', cursor: 'pointer' }}
@@ -1224,7 +1331,7 @@ export default function Workspace() {
                       }
                       onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
-                      Redo
+                      Redo (Ctrl+Y)
                     </div>
                   </div>
                 )}
@@ -1256,19 +1363,47 @@ export default function Workspace() {
                       background: 'var(--bg-tertiary)',
                       border: '1px solid var(--border-color)',
                       borderRadius: '6px',
-                      minWidth: '150px',
+                      minWidth: '220px',
                       zIndex: 10,
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
                     }}
                   >
                     <div
                       style={{ padding: '8px 16px', cursor: 'pointer' }}
-                      onClick={() => setShowCommandPalette(true)}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.background = 'var(--bg-secondary)')
-                      }
+                      onClick={() => {
+                        setPaletteMode('commands');
+                        setCommandQuery('');
+                        setShowCommandPalette(true);
+                        setActiveMenu(null);
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
                       onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
-                      Command Palette
+                      Command Palette (Ctrl+Shift+P)
+                    </div>
+                    <div
+                      style={{ padding: '8px 16px', cursor: 'pointer' }}
+                      onClick={() => {
+                        setPaletteMode('files');
+                        setCommandQuery('');
+                        setShowCommandPalette(true);
+                        setActiveMenu(null);
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
+                      onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      Quick Open Files (Ctrl+P)
+                    </div>
+                    <div
+                      style={{ padding: '8px 16px', cursor: 'pointer' }}
+                      onClick={() => {
+                        setShowPreview(!showPreview);
+                        setActiveMenu(null);
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
+                      onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      Toggle Live Preview
                     </div>
                   </div>
                 )}
@@ -1299,10 +1434,22 @@ export default function Workspace() {
                       background: 'var(--bg-tertiary)',
                       border: '1px solid var(--border-color)',
                       borderRadius: '6px',
-                      minWidth: '150px',
+                      minWidth: '200px',
                       zIndex: 10,
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
                     }}
                   >
+                    <div
+                      onClick={() => {
+                        setActiveSidebar('git');
+                        setActiveMenu(null);
+                      }}
+                      style={{ padding: '8px 16px', cursor: 'pointer' }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
+                      onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      Open Git Panel
+                    </div>
                     <div
                       onClick={handleGitPush}
                       style={{ padding: '8px 16px', cursor: 'pointer' }}
@@ -2355,100 +2502,140 @@ export default function Workspace() {
         {showCommandPalette && (
           <div
             onClick={() => setShowCommandPalette(false)}
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0,0,0,0.5)',
-              display: 'flex',
-              justifyContent: 'center',
-              paddingTop: '96px',
-              zIndex: 50,
-            }}
+            className="fixed inset-0 z-50 flex justify-center pt-16 sm:pt-24 px-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150"
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '600px',
-                height: '300px',
-                background: 'var(--bg-secondary)',
-                borderRadius: '8px',
-                border: '1px solid var(--border-color)',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-              }}
+              className="modal-animate-in w-full max-w-xl max-h-[460px] bg-[#090d1a] rounded-2xl border border-white/15 shadow-[0_25px_80px_rgba(0,0,0,0.95),0_0_50px_rgba(16,185,129,0.15)] flex flex-col overflow-hidden"
             >
-              <input
-                type="text"
-                placeholder="> Type a command..."
-                autoFocus
-                style={{
-                  padding: '16px',
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)',
-                  outline: 'none',
-                  fontSize: '1rem',
-                  width: '100%',
-                }}
-              />
-              <div style={{ padding: '8px', flex: 1, overflowY: 'auto' }}>
-                <div
-                  style={{
-                    padding: '8px 16px',
-                    fontSize: '0.75rem',
-                    color: 'var(--text-secondary)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    fontWeight: 600,
-                  }}
-                >
-                  recently used
+              {/* Top Accent Strip */}
+              <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500" />
+
+              {/* Search Bar */}
+              <div className="p-3 bg-[#0c1426] border-b border-white/10 flex items-center gap-3">
+                <div className="text-emerald-400 font-mono text-sm pl-1">
+                  {paletteMode === 'commands' ? '>' : '📁'}
                 </div>
-                <div
-                  style={{
-                    padding: '10px 16px',
-                    background: 'var(--bg-tertiary)',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    color: '#fff',
+                <input
+                  type="text"
+                  value={commandQuery}
+                  onChange={(e) => {
+                    setCommandQuery(e.target.value);
+                    setSelectedPaletteIndex(0);
                   }}
-                >
-                  <span style={{ fontSize: '0.85rem' }}>Format Document</span>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
-                    Shift+Alt+F
+                  placeholder={
+                    paletteMode === 'commands'
+                      ? 'Type a command (e.g. Open Folder, Deploy, Git, Terminal)...'
+                      : 'Search files by name (e.g. page.tsx, index.js)...'
+                  }
+                  autoFocus
+                  className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none font-sans"
+                />
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPaletteMode(paletteMode === 'commands' ? 'files' : 'commands')}
+                    className="px-2 py-0.5 rounded-md text-[10.5px] font-mono font-semibold bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors"
+                  >
+                    {paletteMode === 'commands' ? 'Switch to Files' : 'Switch to Commands'}
+                  </button>
+                  <span className="text-[10px] font-mono text-slate-500 px-1.5 py-0.5 rounded bg-white/5">
+                    ESC
                   </span>
                 </div>
-                <div
-                  style={{
-                    padding: '10px 16px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginTop: '4px',
-                    color: 'var(--text-secondary)',
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = 'var(--bg-tertiary)';
-                    e.currentTarget.style.color = '#fff';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = 'var(--text-secondary)';
-                  }}
-                >
-                  <span style={{ fontSize: '0.85rem' }}>Terminal: Create New Terminal</span>
-                  <span style={{ fontSize: '0.75rem' }}>Ctrl+Shift+`</span>
-                </div>
+              </div>
+
+              {/* Items List */}
+              <div className="flex-1 overflow-y-auto p-2 space-y-1 select-none scrollbar-thin scrollbar-thumb-slate-800">
+                {paletteMode === 'commands' ? (
+                  /* Commands Mode */
+                  [
+                    { id: 'open-folder', label: 'File: Open Desktop Folder...', icon: '📁', action: () => handleOpenDesktopFolder() },
+                    { id: 'export-zip', label: 'File: Export Workspace as ZIP', icon: '📦', action: () => handleExportZip() },
+                    { id: 'save-file', label: 'File: Save Current File', icon: '💾', action: () => handleSave() },
+                    { id: 'new-file', label: 'File: New File', icon: '📄', action: () => handleNewFile() },
+                    { id: 'new-folder', label: 'File: New Folder', icon: '📂', action: () => handleNewFolder() },
+                    { id: 'publish-github', label: 'Source Control: Publish to GitHub', icon: '🐙', action: () => setActiveSidebar('git') },
+                    { id: 'deploy-docker', label: 'Docker: Build & Deploy to Container', icon: '🐳', action: () => setActiveSidebar('deploy') },
+                    { id: 'new-terminal', label: 'Terminal: Create New Terminal Tab', icon: '⚡', action: () => handleNewTerminal('default') },
+                    { id: 'toggle-preview', label: 'View: Toggle Live Web Preview', icon: '🌐', action: () => setShowPreview(!showPreview) },
+                    { id: 'refresh-files', label: 'Explorer: Refresh Workspace Files', icon: '🔄', action: () => fetchWorkspace() },
+                  ]
+                    .filter((cmd) => cmd.label.toLowerCase().includes(commandQuery.toLowerCase()))
+                    .map((cmd, idx) => (
+                      <div
+                        key={cmd.id}
+                        onClick={() => {
+                          setShowCommandPalette(false);
+                          cmd.action();
+                        }}
+                        className={`px-3 py-2 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
+                          idx === selectedPaletteIndex
+                            ? 'bg-emerald-500/15 text-white border border-emerald-500/30'
+                            : 'text-slate-300 hover:bg-slate-900 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 text-xs font-medium">
+                          <span>{cmd.icon}</span>
+                          <span>{cmd.label}</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-500">Run</span>
+                      </div>
+                    ))
+                ) : (
+                  /* Quick Open Files Mode */
+                  (() => {
+                    const fileList: { path: string; name: string }[] = [];
+                    function collectFiles(nodeMap: any) {
+                      if (!nodeMap) return;
+                      Object.values(nodeMap).forEach((node: any) => {
+                        if (node.type === 'file') {
+                          fileList.push({ path: node.path, name: node.name || node.path });
+                        }
+                        if (node.children) collectFiles(node.children);
+                      });
+                    }
+                    collectFiles(fileTree);
+
+                    const filtered = fileList.filter(
+                      (f) =>
+                        f.path.toLowerCase().includes(commandQuery.toLowerCase()) ||
+                        f.name.toLowerCase().includes(commandQuery.toLowerCase())
+                    );
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="p-6 text-center text-xs text-slate-500">
+                          No matching files found for &quot;{commandQuery}&quot;
+                        </div>
+                      );
+                    }
+
+                    return filtered.map((f, idx) => (
+                      <div
+                        key={f.path}
+                        onClick={() => {
+                          setShowCommandPalette(false);
+                          openFile(f.path);
+                        }}
+                        className={`px-3 py-2 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
+                          idx === selectedPaletteIndex
+                            ? 'bg-emerald-500/15 text-white border border-emerald-500/30'
+                            : 'text-slate-300 hover:bg-slate-900 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 text-xs font-mono">
+                          <FileCode size={14} className="text-emerald-400 shrink-0" />
+                          <span className="font-semibold text-white">{f.name}</span>
+                          <span className="text-[11px] text-slate-500 truncate max-w-[280px]">
+                            {f.path}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-500">Jump</span>
+                      </div>
+                    ));
+                  })()
+                )}
               </div>
             </div>
           </div>

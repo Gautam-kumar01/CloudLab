@@ -16,6 +16,7 @@ import {
 import RepoCard from './RepoCard';
 import ImportButton from './ImportButton';
 import NewProjectButton from './NewProjectButton';
+import OpenFolderButton from './OpenFolderButton';
 
 interface ProjectItem {
   id: string;
@@ -97,6 +98,7 @@ export default function DashboardClient({
               <span>Admin Panel</span>
             </Link>
           )}
+          <OpenFolderButton />
           <ImportButton />
           <NewProjectButton />
         </div>

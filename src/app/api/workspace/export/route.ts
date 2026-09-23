@@ -1,58 +1,77 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getWorkspaceProject } from '@/lib/workspace-auth';
-const archiver = require('archiver');
-
-
-
-import { promises as fs } from 'fs';
+import { canEditWorkspace } from '@/lib/workspace-auth';
 import { workspacePath } from '@/lib/workspace-paths';
+import { promises as fs } from 'fs';
+import path from 'path';
+const archiver = require('archiver');
+import { PassThrough } from 'stream';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const workspaceId = searchParams.get('id');
-
-  if (!workspaceId) {
-    return NextResponse.json({ error: 'Missing workspace id' }, { status: 400 });
-  }
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const project = await getWorkspaceProject(session.user.id, workspaceId);
-  if (!project) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
-  const workspaceRoot = workspacePath(workspaceId);
-
-  // Ensure workspace exists
+export async function GET(req: NextRequest) {
   try {
-    await fs.access(workspaceRoot);
-  } catch {
-    return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
+    const { searchParams } = new URL(req.url);
+    const workspaceId = searchParams.get('workspaceId');
+
+    if (!workspaceId) {
+      return NextResponse.json({ error: 'Workspace ID is required' }, { status: 400 });
+    }
+
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const hasAccess = await canEditWorkspace(session.user.id, workspaceId);
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const root = workspacePath(workspaceId);
+    try {
+      await fs.access(root);
+    } catch {
+      return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
+    }
+
+    const passThrough = new PassThrough();
+    const archive = archiver('zip', { zlib: { level: 9 } });
+
+    archive.on('error', (err: any) => {
+      console.error('Archive error:', err);
+      passThrough.destroy(err);
+    });
+
+    archive.pipe(passThrough);
+
+    // Append files, ignoring .git and heavy node_modules
+    archive.glob('**/*', {
+      cwd: root,
+      ignore: ['.git/**', 'node_modules/**', '.next/**', 'dist/**'],
+      dot: true,
+    });
+
+    archive.finalize();
+
+    // Convert PassThrough to web ReadableStream
+    const readableStream = new ReadableStream({
+      start(controller) {
+        passThrough.on('data', (chunk) => controller.enqueue(chunk));
+        passThrough.on('end', () => controller.close());
+        passThrough.on('error', (err) => controller.error(err));
+      },
+      cancel() {
+        passThrough.destroy();
+      },
+    });
+
+    return new Response(readableStream, {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${workspaceId}-export.zip"`,
+      },
+    });
+  } catch (error: any) {
+    console.error('Export workspace error:', error);
+    return NextResponse.json({ error: 'Failed to export workspace' }, { status: 500 });
   }
-
-  // Create an Archiver instance
-  const archive = archiver('zip', {
-    zlib: { level: 9 }, // Sets the compression level
-  });
-
-  // Create a Transform stream so we can stream the response directly
-  const stream = new ReadableStream({
-    start(controller) {
-      archive.on('data', (chunk: any) => controller.enqueue(chunk));
-      archive.on('end', () => controller.close());
-      archive.on('error', (err: any) => controller.error(err));
-
-      // Append files from the workspace directory, putting them in the root of the archive
-      archive.directory(workspaceRoot, false);
-
-      // Finalize the archive (we are done appending files)
-      archive.finalize();
-    },
-  });
-
-  return new NextResponse(stream as any, {
-    headers: {
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${workspaceId}-export.zip"`,
-    },
-  });
 }
