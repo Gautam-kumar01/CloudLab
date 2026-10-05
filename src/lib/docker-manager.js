@@ -25,7 +25,7 @@ const DockerManager = {
   async startWorkspace(workspaceId, workspacePath) {
     assertWorkspaceId(workspaceId);
     const name = containerName(workspaceId);
-    const root = path.resolve(workspacePath || path.join(WORKSPACES_ROOT, workspaceId));
+    const root = path.resolve(/* turbopackIgnore: true */ workspacePath || path.join(WORKSPACES_ROOT, workspaceId));
     if (root !== WORKSPACES_ROOT && !root.startsWith(`${WORKSPACES_ROOT}${path.sep}`)) {
       throw new Error('Workspace path is outside the workspace root');
     }

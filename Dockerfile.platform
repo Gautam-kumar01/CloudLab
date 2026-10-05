@@ -3,13 +3,13 @@ FROM node:22-bookworm-slim AS base
 # Step 1: Dependencies with build tools for node-pty and native C++ modules
 FROM base AS deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 make g++ openssl ca-certificates git \
+    python3 python3-setuptools make g++ build-essential openssl ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 # Run with --ignore-scripts so postinstall doesn't fail before source files (prisma/scripts) are copied, then rebuild node-pty native addon
-RUN npm install --ignore-scripts && (npm rebuild node-pty || true)
+RUN npm install --ignore-scripts && npm rebuild node-pty
 
 # Step 2: Build the Next.js application
 FROM base AS builder
@@ -36,9 +36,9 @@ ENV PORT=3000
 ENV HOST=0.0.0.0
 ENV HOME=/app/workspaces
 
-# Install git and essential runtime tools for workspace cloning and terminal execution
+# Install git, python3, and essential runtime tools for workspace cloning and terminal execution
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git openssl ca-certificates curl bash tar gzip \
+    git openssl ca-certificates curl bash tar gzip python3 procps \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system --gid 1001 nodejs && \

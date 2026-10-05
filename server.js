@@ -282,15 +282,42 @@ app.prepare().then(() => {
       } else if (isWin) {
         shell = 'powershell.exe';
         args = [
+          '-NoLogo',
           '-NoExit',
           '-ExecutionPolicy', 'Bypass',
           '-Command',
-          `Set-Location '${workspacePath}'; function prompt { return "PS ${workspacePath}> " }`,
+          `Set-Location '${workspacePath.replace(/'/g, "''")}'; function prompt { return "PS $($executionContext.SessionState.Path.CurrentLocation)> " }`,
         ];
       } else {
+        // Prepare custom bashrc for colorized prompt, git branch indicator and helpful aliases
+        const rcFilePath = path.join(workspacePath, '.cloudlab_bashrc');
+        try {
+          const bashrcContent = `# CloudLab Terminal Profile
+if [ -f /etc/bash.bashrc ]; then
+  . /etc/bash.bashrc
+fi
+
+export TERM=xterm-256color
+export COLORTERM=truecolor
+export LANG=en_US.UTF-8
+
+parse_git_branch() {
+  git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \\(.*\\)/ (\\1)/'
+}
+
+export PS1='\\[\\033[1;32m\\]cloudlab@workspace\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[1;33m\\]\\$(parse_git_branch)\\[\\033[0m\\]\\$ '
+
+alias ll='ls -la'
+alias la='ls -A'
+alias l='ls -CF'
+alias cls='clear'
+`;
+          fs.writeFileSync(rcFilePath, bashrcContent, 'utf-8');
+        } catch (rcErr) {}
+
         if (fs.existsSync('/bin/bash')) {
           shell = '/bin/bash';
-          args = ['-i'];
+          args = ['--rcfile', rcFilePath, '-i'];
         } else if (fs.existsSync('/bin/sh')) {
           shell = '/bin/sh';
           args = ['-i'];
@@ -305,6 +332,7 @@ app.prepare().then(() => {
           try {
             terminals[id].kill();
           } catch (e) {}
+          delete terminals[id];
         }
 
         const ptyEnv = {
@@ -320,14 +348,22 @@ app.prepare().then(() => {
           GIT_AUTHOR_EMAIL: socket.user?.email || 'developer@cloudlab.dev',
           GIT_COMMITTER_NAME: socket.user?.name || 'CloudLab Developer',
           GIT_COMMITTER_EMAIL: socket.user?.email || 'developer@cloudlab.dev',
-          PS1: '\u001b[1;32mcloudlab@workspace\u001b[0m:\u001b[1;34m\\w\u001b[0m$ ',
+          PS1: '\\[\\033[1;32m\\]cloudlab@workspace\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[0m\\]$ ',
         };
         
         const initialCols = Math.max(parseInt(cols, 10) || 80, 20);
         const initialRows = Math.max(parseInt(rows, 10) || 30, 5);
 
+        // Emit banner first
+        const displayShell = isWin ? 'PowerShell' : (shell.includes('bash') ? 'bash' : 'sh');
+        socket.emit('terminal.incData', {
+          id,
+          data: `\r\n\x1b[1;36m====================================================\x1b[0m\r\n\x1b[1;32m  ☁ CloudLab Terminal\x1b[0m  \x1b[90m|  ${displayShell}\x1b[0m\r\n\x1b[90m  📁 Workspace Directory:\x1b[0m \x1b[1;33m${workspacePath}\x1b[0m\r\n\x1b[1;36m====================================================\x1b[0m\r\n\r\n`,
+        });
+
         let ptyProcess = null;
 
+        // 1. Try native node-pty
         if (nodePty) {
           try {
             ptyProcess = nodePty.spawn(shell, args, {
@@ -347,12 +383,61 @@ app.prepare().then(() => {
               delete terminals[id];
             });
           } catch (ptyErr) {
-            console.warn('[Terminal] node-pty spawn failed, falling back to child_process:', ptyErr.message);
+            console.warn('[Terminal] node-pty spawn failed, falling back to python/child_process:', ptyErr.message);
             ptyProcess = null;
           }
         }
 
-        // Child process fallback if node-pty is unavailable or failed
+        // 2. Try Python PTY bridge fallback on Linux/Unix
+        if (!ptyProcess && !isWin) {
+          const ptyBridgePath = path.join(__dirname, 'scripts', 'pty-bridge.py');
+          if (fs.existsSync(ptyBridgePath)) {
+            try {
+              const pythonExe = fs.existsSync('/usr/bin/python3') ? '/usr/bin/python3' : 'python3';
+              const bridgeChild = spawn(pythonExe, [ptyBridgePath, String(initialCols), String(initialRows), workspacePath, shell, ...args], {
+                cwd: workspacePath,
+                env: ptyEnv,
+              });
+
+              bridgeChild.stdout?.on('data', (d) => {
+                socket.emit('terminal.incData', { id, data: d.toString() });
+              });
+
+              bridgeChild.stderr?.on('data', (d) => {
+                socket.emit('terminal.incData', { id, data: d.toString() });
+              });
+
+              bridgeChild.on('close', () => {
+                socket.emit('terminal.incData', { id, data: '\r\n\x1b[31m[Process exited]\x1b[0m\r\n' });
+                delete terminals[id];
+              });
+
+              bridgeChild.on('error', (err) => {
+                socket.emit('terminal.incData', { id, data: `\r\n\x1b[31m[Process error: ${err.message}]\x1b[0m\r\n` });
+                delete terminals[id];
+              });
+
+              ptyProcess = {
+                write: (d) => {
+                  if (bridgeChild.stdin && !bridgeChild.stdin.destroyed) {
+                    bridgeChild.stdin.write(d);
+                  }
+                },
+                resize: () => {},
+                kill: () => {
+                  try {
+                    bridgeChild.kill('SIGTERM');
+                  } catch (e) {}
+                },
+              };
+            } catch (bridgeErr) {
+              console.warn('[Terminal] python pty bridge fallback failed:', bridgeErr.message);
+              ptyProcess = null;
+            }
+          }
+        }
+
+        // 3. Child process pipe fallback
         if (!ptyProcess) {
           const child = spawn(shell, args, {
             cwd: workspacePath,
@@ -381,6 +466,8 @@ app.prepare().then(() => {
           ptyProcess = {
             write: (d) => {
               if (child.stdin && !child.stdin.destroyed) {
+                // Echo typed characters to terminal if non-interactive pipe
+                socket.emit('terminal.incData', { id, data: d });
                 child.stdin.write(d);
               }
             },
@@ -395,11 +482,14 @@ app.prepare().then(() => {
 
         terminals[id] = ptyProcess;
 
-        const displayShell = isWin ? 'PowerShell' : (shell.includes('bash') ? 'bash' : 'sh');
-        socket.emit('terminal.incData', {
-          id,
-          data: `\r\n\x1b[1;36m====================================================\x1b[0m\r\n\x1b[1;32m  ☁ CloudLab Terminal\x1b[0m  \x1b[90m|  ${displayShell}\x1b[0m\r\n\x1b[90m  📁 Workspace Directory:\x1b[0m \x1b[1;33m${workspacePath}\x1b[0m\r\n\x1b[1;36m====================================================\x1b[0m\r\n\r\n`,
-        });
+        // Force initial prompt draw beneath the banner
+        setTimeout(() => {
+          if (terminals[id] && typeof terminals[id].write === 'function') {
+            try {
+              terminals[id].write('\r');
+            } catch (e) {}
+          }
+        }, 120);
       } catch (e) {
         console.error('[Terminal Spawn Error]', e);
         socket.emit('terminal.incData', {
