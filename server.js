@@ -242,6 +242,11 @@ app.prepare().then(() => {
     const terminals = {};
 
     socket.on('terminal.spawn', async ({ id, shellType = 'default', workspaceId, cols = 80, rows = 30 }) => {
+      // If this terminal is already active and healthy, don't kill or re-spawn it
+      if (terminals[id] && !terminals[id].hasExited) {
+        return;
+      }
+
       let resolvedWorkspaceId = workspaceId || 'default';
 
       let shell = '';
@@ -289,35 +294,9 @@ app.prepare().then(() => {
           `Set-Location '${workspacePath.replace(/'/g, "''")}'; function prompt { return "PS $($executionContext.SessionState.Path.CurrentLocation)> " }`,
         ];
       } else {
-        // Prepare custom bashrc for colorized prompt, git branch indicator and helpful aliases
-        const rcFilePath = path.join(workspacePath, '.cloudlab_bashrc');
-        try {
-          const bashrcContent = `# CloudLab Terminal Profile
-if [ -f /etc/bash.bashrc ]; then
-  . /etc/bash.bashrc
-fi
-
-export TERM=xterm-256color
-export COLORTERM=truecolor
-export LANG=en_US.UTF-8
-
-parse_git_branch() {
-  git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \\(.*\\)/ (\\1)/'
-}
-
-export PS1='\\[\\033[1;32m\\]cloudlab@workspace\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[1;33m\\]\\$(parse_git_branch)\\[\\033[0m\\]\\$ '
-
-alias ll='ls -la'
-alias la='ls -A'
-alias l='ls -CF'
-alias cls='clear'
-`;
-          fs.writeFileSync(rcFilePath, bashrcContent, 'utf-8');
-        } catch (rcErr) {}
-
         if (fs.existsSync('/bin/bash')) {
           shell = '/bin/bash';
-          args = ['--rcfile', rcFilePath, '-i'];
+          args = ['-i'];
         } else if (fs.existsSync('/bin/sh')) {
           shell = '/bin/sh';
           args = ['-i'];
@@ -328,13 +307,6 @@ alias cls='clear'
       }
 
       try {
-        if (terminals[id]) {
-          try {
-            terminals[id].kill();
-          } catch (e) {}
-          delete terminals[id];
-        }
-
         const ptyEnv = {
           ...process.env,
           TERM: 'xterm-256color',
@@ -342,24 +314,13 @@ alias cls='clear'
           LANG: 'en_US.UTF-8',
           HOME: workspacePath,
           PWD: workspacePath,
-          USER: 'nextjs',
-          LOGNAME: 'nextjs',
-          GIT_AUTHOR_NAME: socket.user?.name || 'CloudLab Developer',
-          GIT_AUTHOR_EMAIL: socket.user?.email || 'developer@cloudlab.dev',
-          GIT_COMMITTER_NAME: socket.user?.name || 'CloudLab Developer',
-          GIT_COMMITTER_EMAIL: socket.user?.email || 'developer@cloudlab.dev',
-          PS1: '\\[\\033[1;32m\\]cloudlab@workspace\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[0m\\]$ ',
+          USER: 'cloudlab',
+          LOGNAME: 'cloudlab',
+          PROMPT_COMMAND: 'PS1="\\[\\033[1;32m\\]cloudlab@workspace\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[0m\\]\\$ "',
         };
         
         const initialCols = Math.max(parseInt(cols, 10) || 80, 20);
         const initialRows = Math.max(parseInt(rows, 10) || 30, 5);
-
-        // Emit banner first
-        const displayShell = isWin ? 'PowerShell' : (shell.includes('bash') ? 'bash' : 'sh');
-        socket.emit('terminal.incData', {
-          id,
-          data: `\r\n\x1b[1;36m====================================================\x1b[0m\r\n\x1b[1;32m  ☁ CloudLab Terminal\x1b[0m  \x1b[90m|  ${displayShell}\x1b[0m\r\n\x1b[90m  📁 Workspace Directory:\x1b[0m \x1b[1;33m${workspacePath}\x1b[0m\r\n\x1b[1;36m====================================================\x1b[0m\r\n\r\n`,
-        });
 
         let ptyProcess = null;
 
@@ -374,70 +335,30 @@ alias cls='clear'
               env: ptyEnv,
             });
 
+            ptyProcess.hasExited = false;
+
             ptyProcess.onData((data) => {
               socket.emit('terminal.incData', { id, data });
             });
 
-            ptyProcess.onExit(() => {
-              socket.emit('terminal.incData', { id, data: '\r\n\x1b[31m[Process exited]\x1b[0m\r\n' });
-              delete terminals[id];
+            ptyProcess.onExit((event) => {
+              ptyProcess.hasExited = true;
+              if (terminals[id] === ptyProcess) {
+                delete terminals[id];
+                const code = typeof event === 'object' ? event?.exitCode : event;
+                socket.emit('terminal.incData', {
+                  id,
+                  data: `\r\n\x1b[90m[Process completed with exit code ${code ?? 0}]\x1b[0m\r\n`,
+                });
+              }
             });
           } catch (ptyErr) {
-            console.warn('[Terminal] node-pty spawn failed, falling back to python/child_process:', ptyErr.message);
+            console.warn('[Terminal] node-pty spawn failed, falling back to child_process:', ptyErr.message);
             ptyProcess = null;
           }
         }
 
-        // 2. Try Python PTY bridge fallback on Linux/Unix
-        if (!ptyProcess && !isWin) {
-          const ptyBridgePath = path.join(__dirname, 'scripts', 'pty-bridge.py');
-          if (fs.existsSync(ptyBridgePath)) {
-            try {
-              const pythonExe = fs.existsSync('/usr/bin/python3') ? '/usr/bin/python3' : 'python3';
-              const bridgeChild = spawn(pythonExe, [ptyBridgePath, String(initialCols), String(initialRows), workspacePath, shell, ...args], {
-                cwd: workspacePath,
-                env: ptyEnv,
-              });
-
-              bridgeChild.stdout?.on('data', (d) => {
-                socket.emit('terminal.incData', { id, data: d.toString() });
-              });
-
-              bridgeChild.stderr?.on('data', (d) => {
-                socket.emit('terminal.incData', { id, data: d.toString() });
-              });
-
-              bridgeChild.on('close', () => {
-                socket.emit('terminal.incData', { id, data: '\r\n\x1b[31m[Process exited]\x1b[0m\r\n' });
-                delete terminals[id];
-              });
-
-              bridgeChild.on('error', (err) => {
-                socket.emit('terminal.incData', { id, data: `\r\n\x1b[31m[Process error: ${err.message}]\x1b[0m\r\n` });
-                delete terminals[id];
-              });
-
-              ptyProcess = {
-                write: (d) => {
-                  if (bridgeChild.stdin && !bridgeChild.stdin.destroyed) {
-                    bridgeChild.stdin.write(d);
-                  }
-                },
-                resize: () => {},
-                kill: () => {
-                  try {
-                    bridgeChild.kill('SIGTERM');
-                  } catch (e) {}
-                },
-              };
-            } catch (bridgeErr) {
-              console.warn('[Terminal] python pty bridge fallback failed:', bridgeErr.message);
-              ptyProcess = null;
-            }
-          }
-        }
-
-        // 3. Child process pipe fallback
+        // 2. Child process fallback
         if (!ptyProcess) {
           const child = spawn(shell, args, {
             cwd: workspacePath,
@@ -453,43 +374,36 @@ alias cls='clear'
             socket.emit('terminal.incData', { id, data: d.toString() });
           });
 
-          child.on('close', () => {
-            socket.emit('terminal.incData', { id, data: '\r\n\x1b[31m[Process exited]\x1b[0m\r\n' });
-            delete terminals[id];
-          });
-
-          child.on('error', (err) => {
-            socket.emit('terminal.incData', { id, data: `\r\n\x1b[31m[Process error: ${err.message}]\x1b[0m\r\n` });
-            delete terminals[id];
-          });
-
           ptyProcess = {
+            hasExited: false,
             write: (d) => {
               if (child.stdin && !child.stdin.destroyed) {
-                // Echo typed characters to terminal if non-interactive pipe
                 socket.emit('terminal.incData', { id, data: d });
                 child.stdin.write(d);
               }
             },
             resize: () => {},
             kill: () => {
+              ptyProcess.hasExited = true;
               try {
                 child.kill();
               } catch (e) {}
             },
           };
+
+          child.on('close', (code) => {
+            ptyProcess.hasExited = true;
+            if (terminals[id] === ptyProcess) {
+              delete terminals[id];
+              socket.emit('terminal.incData', {
+                id,
+                data: `\r\n\x1b[90m[Process completed with exit code ${code ?? 0}]\x1b[0m\r\n`,
+              });
+            }
+          });
         }
 
         terminals[id] = ptyProcess;
-
-        // Force initial prompt draw beneath the banner
-        setTimeout(() => {
-          if (terminals[id] && typeof terminals[id].write === 'function') {
-            try {
-              terminals[id].write('\r');
-            } catch (e) {}
-          }
-        }, 120);
       } catch (e) {
         console.error('[Terminal Spawn Error]', e);
         socket.emit('terminal.incData', {
@@ -512,9 +426,10 @@ alias cls='clear'
     });
 
     socket.on('terminal.toTerm', ({ id, data }) => {
-      if (terminals[id] && typeof terminals[id].write === 'function') {
+      const term = terminals[id];
+      if (term && typeof term.write === 'function' && !term.hasExited) {
         try {
-          terminals[id].write(data);
+          term.write(data);
         } catch (err) {
           console.warn('[Terminal Write Error]', err.message);
         }
@@ -522,9 +437,11 @@ alias cls='clear'
     });
 
     socket.on('terminal.kill', ({ id }) => {
-      if (terminals[id]) {
+      const term = terminals[id];
+      if (term) {
+        term.hasExited = true;
         try {
-          terminals[id].kill();
+          term.kill();
         } catch (e) {}
         delete terminals[id];
       }
@@ -538,8 +455,10 @@ alias cls='clear'
       }
       for (const id in terminals) {
         try {
+          terminals[id].hasExited = true;
           terminals[id].kill();
         } catch (e) {}
+        delete terminals[id];
       }
     });
   });

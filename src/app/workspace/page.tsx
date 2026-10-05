@@ -273,13 +273,20 @@ export default function Workspace() {
 
   type TerminalState = { id: string; title: string; shellType: string };
   const [terminals, setTerminals] = useState<TerminalState[]>([
-    { id: 'term-1', title: 'terminal', shellType: 'default' },
+    { id: 'term-1', title: 'bash', shellType: 'default' },
   ]);
   const terminalsRef = useRef<TerminalState[]>(terminals);
   useEffect(() => {
     terminalsRef.current = terminals;
   }, [terminals]);
   const [activeTerminalId, setActiveTerminalId] = useState('term-1');
+
+  const workspaceIdRef = useRef(workspaceId);
+  useEffect(() => {
+    workspaceIdRef.current = workspaceId;
+  }, [workspaceId]);
+
+  const spawnedTerminals = useRef<Set<string>>(new Set());
 
   const socketRef = useRef<Socket | null>(null);
   const xtermInstances = useRef<
@@ -812,16 +819,19 @@ export default function Workspace() {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log('[Socket] Connected. Spawning terminals...');
+      console.log('[Socket] Connected. Syncing terminals...');
       (terminalsRef.current || []).forEach((term) => {
-        const inst = xtermInstances.current[term.id];
-        socket.emit('terminal.spawn', {
-          id: term.id,
-          shellType: term.shellType || 'default',
-          workspaceId,
-          cols: inst?.term?.cols || 80,
-          rows: inst?.term?.rows || 30,
-        });
+        if (!spawnedTerminals.current.has(term.id)) {
+          spawnedTerminals.current.add(term.id);
+          const inst = xtermInstances.current[term.id];
+          socket.emit('terminal.spawn', {
+            id: term.id,
+            shellType: term.shellType || 'default',
+            workspaceId: workspaceIdRef.current,
+            cols: inst?.term?.cols || 80,
+            rows: inst?.term?.rows || 30,
+          });
+        }
       });
     });
 
@@ -843,7 +853,7 @@ export default function Workspace() {
     return () => {
       socket.disconnect();
     };
-  }, [workspaceId]);
+  }, []);
 
   // Handle window resizing and tab switching for terminal
   useEffect(() => {
@@ -928,13 +938,14 @@ export default function Workspace() {
           });
         } catch (e) {}
 
-        // Spawn terminal if socket is already connected
-        if (socketRef.current?.connected) {
-          const shellType = terminals.find((t) => t.id === id)?.shellType || 'default';
+        // Spawn terminal if socket is already connected and not yet spawned
+        if (socketRef.current?.connected && !spawnedTerminals.current.has(id)) {
+          spawnedTerminals.current.add(id);
+          const shellType = terminalsRef.current.find((t) => t.id === id)?.shellType || 'default';
           socketRef.current.emit('terminal.spawn', {
             id,
             shellType,
-            workspaceId,
+            workspaceId: workspaceIdRef.current,
             cols: term.cols,
             rows: term.rows,
           });
@@ -979,17 +990,15 @@ export default function Workspace() {
 
   const handleNewTerminal = (shellType: string = 'default') => {
     const id = `term-${Date.now()}`;
-    const displayTitle = shellType === 'default' ? 'terminal' : shellType;
+    const displayTitle = shellType === 'default' ? 'bash' : shellType;
     setTerminals((prev) => [...prev, { id, title: displayTitle, shellType }]);
     setActiveTerminalId(id);
     setActiveBottomTab('terminal');
-    if (socketRef.current) {
-      socketRef.current.emit('terminal.spawn', { id, shellType, workspaceId, cols: 80, rows: 30 });
-    }
   };
 
   const handleKillTerminal = (id: string) => {
     socketRef.current?.emit('terminal.kill', { id });
+    spawnedTerminals.current.delete(id);
     setTerminals((prev) => {
       const newTerms = prev.filter((t) => t.id !== id);
       if (newTerms.length > 0 && activeTerminalId === id) {
