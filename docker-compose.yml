@@ -45,8 +45,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # Using npx tsx since the worker is in TS, or node if worker is JS
-    command: ["npx", "tsx", "worker.ts"]
+    # Using node worker.js for reliable production background job execution
+    command: ["node", "worker.js"]
 
 volumes:
   postgres_data:
