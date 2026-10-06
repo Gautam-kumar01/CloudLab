@@ -263,7 +263,7 @@ export async function POST(request: Request) {
       return apiError(`Invalid regex: ${regexErr.message}`, 400);
     }
 
-    let modifiedFiles: string[] = [];
+    const modifiedFiles: string[] = [];
     let replacedCount = 0;
 
     if (replaceMode === 'file' && targetFile) {
