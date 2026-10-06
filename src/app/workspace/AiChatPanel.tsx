@@ -116,22 +116,22 @@ export default function AiChatPanel({
   const activeFileName = activeFile ? activeFile.split('/').pop() || activeFile : '';
 
   return (
-    <div className="flex flex-col h-full bg-[#070b14] text-slate-100 border-l border-white/[0.08] select-text font-sans">
+    <div className="flex flex-col h-full bg-[#070b14] text-slate-100 border-l border-white/[0.08] select-text cloudlab-panel">
       {/* Header Bar */}
-      <div className="px-4 py-3 bg-[#0a0f1d]/95 backdrop-blur-md border-b border-white/[0.08] flex items-center justify-between shrink-0 gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500/20 via-teal-500/15 to-transparent border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-sm shadow-emerald-500/10">
-            <Bot size={16} strokeWidth={2.2} />
+      <div className="px-4 py-3.5 bg-[#0a0f1d]/95 backdrop-blur-md border-b border-white/[0.08] flex items-center justify-between shrink-0 gap-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 via-teal-500/15 to-transparent border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-sm shadow-emerald-500/10">
+            <Bot size={17} strokeWidth={2.2} />
           </div>
-          <div className="min-w-0">
-            <div className="text-xs font-bold text-white flex items-center gap-2">
-              <span className="truncate">CloudLab Copilot</span>
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-sans font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-white tracking-wide">CloudLab Copilot</span>
+              <span className="inline-flex items-center gap-1.5 text-[10.5px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 Online
               </span>
             </div>
-            <div className="text-[11px] text-slate-400 font-sans tracking-normal mt-0.5 truncate">
+            <div className="text-[11.5px] text-slate-400 mt-0.5 whitespace-normal leading-normal">
               AI Pair Programmer & Assistant
             </div>
           </div>
@@ -144,7 +144,7 @@ export default function AiChatPanel({
             onClick={() => {
               if (confirm('Clear entire chat conversation?')) setMessages([]);
             }}
-            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer shrink-0"
+            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer shrink-0"
           >
             <Trash2 size={14} />
           </button>
@@ -157,26 +157,28 @@ export default function AiChatPanel({
           <div className="space-y-4 pt-1">
             {/* Welcome Banner Card */}
             <div className="relative overflow-hidden bg-gradient-to-b from-[#0f1d38] via-[#0d1629] to-[#090e1b] p-4 rounded-2xl border border-emerald-500/20 shadow-xl space-y-3">
-              <div className="flex items-center gap-2.5 text-emerald-400 font-bold text-xs">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
                 <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center">
                   <Sparkles size={13} />
                 </div>
-                <span>Your AI Pair Programmer</span>
+                <span className="text-emerald-300">Your AI Pair Programmer</span>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed whitespace-normal break-words">
                 Ask code questions, generate components, explain logic, diagnose errors, or run terminal tasks with AI.
               </p>
               {activeFileName && (
-                <div className="flex items-center gap-2 p-2 rounded-xl bg-black/40 border border-white/[0.06] text-xs">
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-black/40 border border-white/[0.06] text-xs flex-wrap">
                   <FileCode size={13} className="text-emerald-400 shrink-0" />
-                  <span className="text-slate-400 text-[11px]">Active File:</span>
-                  <span className="font-bold text-emerald-300 font-mono text-[11px] truncate">{activeFileName}</span>
+                  <span className="text-slate-400 text-xs">Active File:</span>
+                  <span className="font-bold text-emerald-300 cloudlab-mono text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 break-all whitespace-normal">
+                    {activeFileName}
+                  </span>
                 </div>
               )}
             </div>
 
             {/* Suggested Actions Grid */}
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase px-1 flex items-center gap-1.5">
                 <Lightbulb size={13} className="text-amber-400" />
                 <span>Quick Actions</span>
@@ -188,64 +190,70 @@ export default function AiChatPanel({
                     <button
                       type="button"
                       onClick={() => handleQuickPrompt(`Please explain the architecture, functions, and key logic of ${activeFileName}`)}
-                      className="w-full text-left p-3 rounded-xl bg-[#0c1426] hover:bg-[#13203c] border border-white/[0.08] hover:border-emerald-500/40 text-slate-200 hover:text-white transition-all group cursor-pointer flex items-center justify-between gap-3 shadow-sm"
+                      className="w-full text-left p-3.5 rounded-2xl bg-[#0c1426] hover:bg-[#121f3a] border border-white/[0.08] hover:border-emerald-500/40 text-slate-200 hover:text-white transition-all group cursor-pointer flex flex-col gap-1.5 shadow-sm"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shrink-0 group-hover:bg-emerald-500 group-hover:text-black transition-all">
-                          <Code2 size={15} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-slate-200 group-hover:text-emerald-300 transition-colors truncate">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shrink-0 group-hover:bg-emerald-500 group-hover:text-black transition-all">
+                            <Code2 size={14} />
+                          </div>
+                          <span className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors whitespace-normal break-words">
                             Explain {activeFileName}
-                          </div>
-                          <div className="text-[10.5px] text-slate-400 group-hover:text-slate-300 truncate">
-                            Break down architecture & logic
-                          </div>
+                          </span>
                         </div>
+                        <span className="text-[10.5px] px-2 py-0.5 rounded bg-white/5 group-hover:bg-emerald-500/20 text-slate-400 group-hover:text-emerald-300 cloudlab-mono shrink-0 font-medium">
+                          Run
+                        </span>
                       </div>
-                      <span className="text-[10px] text-slate-500 group-hover:text-emerald-300 font-mono shrink-0 font-medium">↵ Run</span>
+                      <p className="text-[11px] text-slate-400 group-hover:text-slate-300 leading-relaxed whitespace-normal break-words pl-0.5">
+                        Break down architecture, functions, and core logic.
+                      </p>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleQuickPrompt(`Inspect ${activeFileName} and find any potential bugs, edge cases, memory leaks, or syntax errors.`)}
-                      className="w-full text-left p-3 rounded-xl bg-[#0c1426] hover:bg-[#13203c] border border-white/[0.08] hover:border-teal-500/40 text-slate-200 hover:text-white transition-all group cursor-pointer flex items-center justify-between gap-3 shadow-sm"
+                      className="w-full text-left p-3.5 rounded-2xl bg-[#0c1426] hover:bg-[#121f3a] border border-white/[0.08] hover:border-teal-500/40 text-slate-200 hover:text-white transition-all group cursor-pointer flex flex-col gap-1.5 shadow-sm"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center text-teal-400 shrink-0 group-hover:bg-teal-500 group-hover:text-black transition-all">
-                          <Bug size={15} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-slate-200 group-hover:text-teal-300 transition-colors truncate">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center text-teal-400 shrink-0 group-hover:bg-teal-500 group-hover:text-black transition-all">
+                            <Bug size={14} />
+                          </div>
+                          <span className="text-xs font-bold text-white group-hover:text-teal-300 transition-colors whitespace-normal break-words">
                             Find Bugs & Optimize
-                          </div>
-                          <div className="text-[10.5px] text-slate-400 group-hover:text-slate-300 truncate">
-                            Catch edge cases & potential bugs
-                          </div>
+                          </span>
                         </div>
+                        <span className="text-[10.5px] px-2 py-0.5 rounded bg-white/5 group-hover:bg-teal-500/20 text-slate-400 group-hover:text-teal-300 cloudlab-mono shrink-0 font-medium">
+                          Run
+                        </span>
                       </div>
-                      <span className="text-[10px] text-slate-500 group-hover:text-teal-300 font-mono shrink-0 font-medium">↵ Run</span>
+                      <p className="text-[11px] text-slate-400 group-hover:text-slate-300 leading-relaxed whitespace-normal break-words pl-0.5">
+                        Detect syntax flaws, edge cases, and performance leaks.
+                      </p>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleQuickPrompt(`Generate comprehensive unit tests for ${activeFileName} with full edge-case coverage.`)}
-                      className="w-full text-left p-3 rounded-xl bg-[#0c1426] hover:bg-[#13203c] border border-white/[0.08] hover:border-cyan-500/40 text-slate-200 hover:text-white transition-all group cursor-pointer flex items-center justify-between gap-3 shadow-sm"
+                      className="w-full text-left p-3.5 rounded-2xl bg-[#0c1426] hover:bg-[#121f3a] border border-white/[0.08] hover:border-cyan-500/40 text-slate-200 hover:text-white transition-all group cursor-pointer flex flex-col gap-1.5 shadow-sm"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center text-cyan-400 shrink-0 group-hover:bg-cyan-500 group-hover:text-black transition-all">
-                          <TestTube size={15} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-slate-200 group-hover:text-cyan-300 transition-colors truncate">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center text-cyan-400 shrink-0 group-hover:bg-cyan-500 group-hover:text-black transition-all">
+                            <TestTube size={14} />
+                          </div>
+                          <span className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors whitespace-normal break-words">
                             Generate Unit Tests
-                          </div>
-                          <div className="text-[10.5px] text-slate-400 group-hover:text-slate-300 truncate">
-                            Edge cases & test suite coverage
-                          </div>
+                          </span>
                         </div>
+                        <span className="text-[10.5px] px-2 py-0.5 rounded bg-white/5 group-hover:bg-cyan-500/20 text-slate-400 group-hover:text-cyan-300 cloudlab-mono shrink-0 font-medium">
+                          Run
+                        </span>
                       </div>
-                      <span className="text-[10px] text-slate-500 group-hover:text-cyan-300 font-mono shrink-0 font-medium">↵ Run</span>
+                      <p className="text-[11px] text-slate-400 group-hover:text-slate-300 leading-relaxed whitespace-normal break-words pl-0.5">
+                        Create full test suites with positive and negative test cases.
+                      </p>
                     </button>
                   </>
                 )}
@@ -253,22 +261,24 @@ export default function AiChatPanel({
                 <button
                   type="button"
                   onClick={() => handleQuickPrompt('List all files in the current workspace and provide a structured project summary.')}
-                  className="w-full text-left p-3 rounded-xl bg-[#0c1426] hover:bg-[#13203c] border border-white/[0.08] hover:border-blue-500/40 text-slate-200 hover:text-white transition-all group cursor-pointer flex items-center justify-between gap-3 shadow-sm"
+                  className="w-full text-left p-3.5 rounded-2xl bg-[#0c1426] hover:bg-[#121f3a] border border-white/[0.08] hover:border-blue-500/40 text-slate-200 hover:text-white transition-all group cursor-pointer flex flex-col gap-1.5 shadow-sm"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0 group-hover:bg-blue-500 group-hover:text-black transition-all">
-                      <Terminal size={15} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold text-slate-200 group-hover:text-blue-300 transition-colors truncate">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0 group-hover:bg-blue-500 group-hover:text-black transition-all">
+                        <Terminal size={14} />
+                      </div>
+                      <span className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors whitespace-normal break-words">
                         Workspace Summary
-                      </div>
-                      <div className="text-[10.5px] text-slate-400 group-hover:text-slate-300 truncate">
-                        Full workspace file overview
-                      </div>
+                      </span>
                     </div>
+                    <span className="text-[10.5px] px-2 py-0.5 rounded bg-white/5 group-hover:bg-blue-500/20 text-slate-400 group-hover:text-blue-300 cloudlab-mono shrink-0 font-medium">
+                      Run
+                    </span>
                   </div>
-                  <span className="text-[10px] text-slate-500 group-hover:text-blue-300 font-mono shrink-0 font-medium">↵ Run</span>
+                  <p className="text-[11px] text-slate-400 group-hover:text-slate-300 leading-relaxed whitespace-normal break-words pl-0.5">
+                    Inspect directory hierarchy and high-level component flow.
+                  </p>
                 </button>
               </div>
             </div>
@@ -504,21 +514,21 @@ export default function AiChatPanel({
       </div>
 
       {/* High-Contrast Luxury Input Box Footer */}
-      <div className="p-3.5 sm:p-4 bg-[#080d1a]/95 backdrop-blur-md border-t border-white/[0.08] shadow-2xl shrink-0">
-        <div className="bg-[#0e162a] border border-slate-700/80 focus-within:border-emerald-400/80 focus-within:ring-2 focus-within:ring-emerald-500/20 rounded-2xl p-3 transition-all shadow-xl flex flex-col gap-2.5">
+      <div className="p-4 bg-[#080d1a]/95 backdrop-blur-md border-t border-white/[0.08] shadow-2xl shrink-0">
+        <div className="bg-[#0e162a] border border-slate-700/80 focus-within:border-emerald-400/80 focus-within:ring-2 focus-within:ring-emerald-500/20 rounded-2xl p-3.5 transition-all shadow-xl flex flex-col gap-2.5">
           {/* Active Context Chip */}
           {activeFileName && includeContext && (
-            <div className="flex items-center justify-between bg-slate-950/90 border border-emerald-500/25 px-2.5 py-1.5 rounded-lg text-xs text-slate-300">
-              <div className="flex items-center gap-2 truncate">
+            <div className="flex items-center justify-between bg-slate-950/90 border border-emerald-500/25 px-3 py-1.5 rounded-xl text-xs text-slate-300 gap-2 flex-wrap">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 <FileCode size={13} className="text-emerald-400 shrink-0" />
-                <span className="text-slate-400 text-[11px]">Context:</span>
-                <span className="text-emerald-300 font-semibold font-mono text-[11px] truncate">{activeFileName}</span>
+                <span className="text-slate-400 text-xs shrink-0">Context:</span>
+                <span className="text-emerald-300 font-bold cloudlab-mono text-xs break-all whitespace-normal">{activeFileName}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setIncludeContext(false)}
                 title="Remove file context"
-                className="hover:text-rose-400 text-slate-400 transition-colors p-0.5 rounded hover:bg-white/5 cursor-pointer ml-1"
+                className="hover:text-rose-400 text-slate-400 transition-colors p-1 rounded hover:bg-white/5 cursor-pointer shrink-0"
               >
                 <X size={13} />
               </button>
@@ -542,24 +552,24 @@ export default function AiChatPanel({
                 : 'Ask CloudLab Copilot anything...'
             }
             disabled={isLoading}
-            className="w-full bg-transparent px-1 py-1 text-xs text-white placeholder-slate-400 outline-none resize-none scrollbar-thin scrollbar-thumb-slate-800 disabled:opacity-50 leading-relaxed font-sans"
+            className="w-full bg-transparent px-1 py-1 text-xs text-white placeholder-slate-400 outline-none resize-none scrollbar-thin scrollbar-thumb-slate-800 disabled:opacity-50 leading-relaxed cloudlab-panel"
           />
 
           {/* Bottom Action Bar */}
-          <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] gap-2">
-            <span className="text-[11px] text-slate-400 font-medium truncate flex items-center gap-1.5 min-w-0">
-              <CornerDownLeft size={11} className="shrink-0 text-slate-500" />
-              <span className="truncate">Enter ↵ to send</span>
+          <div className="flex items-center justify-between pt-2.5 border-t border-white/[0.06] gap-2 flex-wrap">
+            <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5 min-w-0">
+              <CornerDownLeft size={12} className="shrink-0 text-slate-500" />
+              <span>Enter ↵ to send</span>
             </span>
 
             <button
               type="button"
               onClick={handleSendMessage}
               disabled={isLoading || !(input || '').trim()}
-              className="btn-cta-glow flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none shrink-0"
+              className="btn-cta-glow flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none shrink-0"
             >
               <span>Send</span>
-              <Send size={11} strokeWidth={2.5} />
+              <Send size={12} strokeWidth={2.5} />
             </button>
           </div>
         </div>

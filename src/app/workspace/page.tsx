@@ -1699,8 +1699,8 @@ export default function Workspace() {
           <PanelGroup orientation="horizontal" style={{ flex: 1 }}>
             {/* Sidebar (Explorer / Git / Deploy) */}
             <Panel
-              defaultSize={24}
-              minSize={18}
+              defaultSize={26}
+              minSize={20}
               style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-tertiary)' }}
             >
               {activeSidebar === 'explorer' && (
@@ -1874,7 +1874,7 @@ export default function Workspace() {
 
             {/* Center Area (Editor + Terminal) */}
             <Panel
-              defaultSize={50}
+              defaultSize={46}
               minSize={30}
               style={{ display: 'flex', flexDirection: 'column' }}
             >
@@ -2288,7 +2288,7 @@ export default function Workspace() {
 
             {/* Right Panel (AI/Chat) */}
             <Panel
-              defaultSize={26}
+              defaultSize={28}
               minSize={20}
               style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-tertiary)' }}
             >
