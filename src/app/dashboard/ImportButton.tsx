@@ -16,6 +16,7 @@ import {
   Globe,
   CheckCircle2,
 } from 'lucide-react';
+import { getErrorMessage } from '@/lib/error-utils';
 
 const popularQuickPicks = [
   { name: 'Next.js SaaS', url: 'https://github.com/vercel/next.js', icon: '▲' },
@@ -57,7 +58,7 @@ export default function ImportButton() {
         const targetId = data.projectId || finalName;
         router.push(`/workspace?id=${encodeURIComponent(targetId)}`);
       } else {
-        setErrorMsg(data.error || 'Failed to import repository');
+        setErrorMsg(getErrorMessage(data, 'Failed to import repository'));
         setIsImporting(false);
       }
     } catch (err: any) {

@@ -22,7 +22,9 @@ import {
   FileCode,
   ShieldCheck,
   AlertTriangle,
+  X,
 } from 'lucide-react';
+import { getErrorMessage } from '@/lib/error-utils';
 
 interface DeploymentPanelProps {
   workspaceId: string;
@@ -33,6 +35,9 @@ interface StackDetection {
   defaultPort: number;
   dockerfile: string;
   isGenerated: boolean;
+  runCommand?: string;
+  dockerAvailable?: boolean;
+  dockerReason?: string;
 }
 
 export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
@@ -47,6 +52,9 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
   const [isDeploying, setIsDeploying] = useState(false);
   const [copiedLogs, setCopiedLogs] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [dockerAvailable, setDockerAvailable] = useState<boolean | null>(null);
+  const [dockerReason, setDockerReason] = useState<string | null>(null);
+  const [runCommand, setRunCommand] = useState<string>('npm run dev');
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +71,12 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
         setContainerName(data.data.containerName || '');
         if (data.data.hostPort) setHostPort(data.data.hostPort);
         setUrl(data.data.url || null);
+        if (typeof data.data.dockerAvailable === 'boolean') {
+          setDockerAvailable(data.data.dockerAvailable);
+        }
+        if (data.data.dockerReason) {
+          setDockerReason(data.data.dockerReason);
+        }
       }
     } catch (e) {
       console.error('Failed to fetch docker status:', e);
@@ -80,6 +94,15 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
       if (res.ok && data.data) {
         setDetection(data.data);
         setCustomDockerfile(data.data.dockerfile);
+        if (typeof data.data.dockerAvailable === 'boolean') {
+          setDockerAvailable(data.data.dockerAvailable);
+        }
+        if (data.data.dockerReason) {
+          setDockerReason(data.data.dockerReason);
+        }
+        if (data.data.runCommand) {
+          setRunCommand(data.data.runCommand);
+        }
       }
     } catch (e) {
       console.error('Stack detection failed:', e);
@@ -136,10 +159,11 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
         setUrl(data.data.url || null);
         await fetchLogs();
       } else {
-        setErrorMsg(data.error || 'Operation failed. Ensure Docker Desktop is running.');
+        const errorText = getErrorMessage(data, 'Operation failed. Ensure Docker Desktop is running.');
+        setErrorMsg(errorText);
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Network error while contacting Docker API');
+      setErrorMsg(getErrorMessage(err, 'Network error while contacting Docker API'));
     } finally {
       setIsDeploying(false);
       await fetchStatus();
@@ -165,14 +189,22 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
               <span>Docker Deployment</span>
               <span
                 className={`text-[9.5px] font-mono px-2 py-0.5 rounded-full border ${
-                  status === 'running'
+                  dockerAvailable === false
+                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    : status === 'running'
                     ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                     : status === 'building' || isDeploying
                     ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
                     : 'bg-slate-800 text-slate-400 border-white/10'
                 }`}
               >
-                {status === 'running' ? '● Live Running' : isDeploying ? 'Building Image...' : 'Stopped'}
+                {dockerAvailable === false
+                  ? 'Daemon Offline'
+                  : status === 'running'
+                  ? '● Live Running'
+                  : isDeploying
+                  ? 'Building Image...'
+                  : 'Stopped'}
               </span>
             </div>
             <div className="text-[10.5px] text-slate-400 font-mono">
@@ -200,7 +232,35 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
         {errorMsg && (
           <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-start gap-2.5">
             <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red-400" />
-            <span className="leading-relaxed font-medium">{errorMsg}</span>
+            <div className="flex-1 space-y-1">
+              <span className="font-semibold block text-red-300">Deployment Error</span>
+              <p className="leading-relaxed font-mono text-[11px] text-red-200/90 whitespace-pre-wrap break-words">{errorMsg}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setErrorMsg(null)}
+              className="p-1 hover:bg-red-500/20 rounded text-red-400 hover:text-red-200 transition-colors cursor-pointer"
+              title="Dismiss"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        {/* Docker Offline Notice / Alternative Command */}
+        {dockerAvailable === false && !errorMsg && (
+          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300/90 text-xs space-y-2">
+            <div className="flex items-center gap-2 font-semibold text-amber-300">
+              <AlertTriangle size={15} className="text-amber-400 shrink-0" />
+              <span>Docker Desktop Daemon is Offline</span>
+            </div>
+            <p className="text-[11.5px] leading-relaxed text-amber-200/80">
+              Docker Desktop is not currently running. To build and run isolated container sandboxes, start Docker Desktop. You can also run your project directly via the integrated <strong>Terminal</strong> below.
+            </p>
+            <div className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-amber-500/20 font-mono text-[11px]">
+              <span className="text-slate-300">Command: <span className="text-emerald-400 font-bold">{runCommand}</span></span>
+              <span className="text-[10px] text-slate-400">Terminal ready</span>
+            </div>
           </div>
         )}
 

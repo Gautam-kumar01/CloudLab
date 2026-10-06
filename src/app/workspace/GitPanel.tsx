@@ -21,6 +21,7 @@ import {
   FileCode,
   Layers,
 } from 'lucide-react';
+import { getErrorMessage } from '@/lib/error-utils';
 
 interface GitPanelProps {
   workspaceId: string;
@@ -80,13 +81,13 @@ export default function GitPanel({ workspaceId }: GitPanelProps) {
       });
       const data = await res.json();
       if (data.error) {
-        alert(`Git ${action} failed: ` + data.error);
+        alert(`Git ${action} failed: ` + getErrorMessage(data, 'Unknown error'));
       } else {
         if (action === 'commit') setCommitMessage('');
         await fetchStatus();
       }
     } catch (e: any) {
-      alert(`Git error: ` + e.message);
+      alert(`Git error: ` + getErrorMessage(e, 'Network error'));
     } finally {
       setIsLoading(false);
     }
@@ -115,10 +116,10 @@ export default function GitPanel({ workspaceId }: GitPanelProps) {
         setRemoteUrl(data.cloneUrl);
         await fetchStatus();
       } else {
-        setPublishError(data.error || 'Failed to publish to GitHub');
+        setPublishError(getErrorMessage(data, 'Failed to publish to GitHub'));
       }
     } catch (err: any) {
-      setPublishError(err.message || 'Error communicating with GitHub');
+      setPublishError(getErrorMessage(err, 'Error communicating with GitHub'));
     } finally {
       setIsPublishing(false);
     }

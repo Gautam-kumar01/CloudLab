@@ -14,6 +14,7 @@ import {
   HardDrive,
   FileCode,
 } from 'lucide-react';
+import { getErrorMessage } from '@/lib/error-utils';
 
 interface UploadProgress {
   total: number;
@@ -112,7 +113,7 @@ export default function OpenFolderButton() {
         setProgress({ total: files.length, current: files.length, stage: 'done' });
         router.push(`/workspace?id=${encodeURIComponent(data.project.id)}`);
       } else {
-        setErrorMsg(data.error || 'Failed to import folder to workspace');
+        setErrorMsg(getErrorMessage(data, 'Failed to import folder to workspace'));
         setIsProcessing(false);
       }
     } catch (err: any) {
@@ -185,7 +186,7 @@ export default function OpenFolderButton() {
       if (res.ok && data.project?.id) {
         router.push(`/workspace?id=${encodeURIComponent(data.project.id)}`);
       } else {
-        setErrorMsg(data.error || 'Failed to upload folder');
+        setErrorMsg(getErrorMessage(data, 'Failed to upload folder'));
         setIsProcessing(false);
       }
     } catch (err: any) {

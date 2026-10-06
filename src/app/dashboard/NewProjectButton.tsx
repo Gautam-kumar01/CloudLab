@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { builtInTemplates } from '@/lib/templates';
+import { getErrorMessage } from '@/lib/error-utils';
 import {
   Layout,
   Terminal,
@@ -148,7 +149,7 @@ export default function NewProjectButton() {
       if (res.ok && data.project?.id) {
         router.push(`/workspace?id=${encodeURIComponent(data.project.id)}`);
       } else {
-        setErrorMsg(data.error || 'Failed to create project');
+        setErrorMsg(getErrorMessage(data, 'Failed to create project'));
         setIsLoading(false);
       }
     } catch (err: any) {

@@ -4,6 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
+import { getErrorMessage } from '@/lib/error-utils';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -357,7 +358,7 @@ export default function Workspace() {
       } else {
         setFiles((prev) => ({
           ...prev,
-          [filePath]: { name: filename, language: lang, content: data.error ? `// ${data.error}` : '' },
+          [filePath]: { name: filename, language: lang, content: data.error ? `// ${getErrorMessage(data, 'Failed to load file')}` : '' },
         }));
       }
     } catch (e) {
@@ -508,7 +509,7 @@ export default function Workspace() {
       if (res.ok && data.project?.id) {
         router.push(`/workspace?id=${encodeURIComponent(data.project.id)}`);
       } else {
-        alert(data.error || 'Failed to import folder');
+        alert(getErrorMessage(data, 'Failed to import folder'));
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
@@ -733,7 +734,7 @@ export default function Workspace() {
       .then((res) => res.json())
       .then((data) => {
         if (data.error) {
-          alert('Upload failed: ' + data.error);
+          alert('Upload failed: ' + getErrorMessage(data, 'Upload error'));
         } else {
           fetchWorkspace();
         }
@@ -768,7 +769,7 @@ export default function Workspace() {
       });
       const data = await res.json();
       if (data.error) {
-        alert('Git push failed: ' + data.error);
+        alert('Git push failed: ' + getErrorMessage(data, 'Git push error'));
       } else {
         alert('Successfully pushed to GitHub!\n' + (data.message || ''));
       }

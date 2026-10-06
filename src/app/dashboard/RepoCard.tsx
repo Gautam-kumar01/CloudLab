@@ -10,6 +10,7 @@ import {
   Calendar,
   Code2,
 } from 'lucide-react';
+import { getErrorMessage } from '@/lib/error-utils';
 
 interface ProjectData {
   id: string;
@@ -68,7 +69,7 @@ export default function RepoCard({ project }: { project: ProjectData }) {
           const targetId = data.projectId || project.id || project.name;
           router.push(`/workspace?id=${encodeURIComponent(targetId)}`);
         } else {
-          setErrorMsg(data.error || 'Failed to clone repository');
+          setErrorMsg(getErrorMessage(data, 'Failed to clone repository'));
           setIsCloning(false);
         }
       } catch (err: any) {

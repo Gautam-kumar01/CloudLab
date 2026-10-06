@@ -20,6 +20,25 @@ async function runDocker(args: string[], cwd?: string, timeout = 120000) {
   }
 }
 
+async function checkDockerAvailability(): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    await execFileAsync('docker', ['info'], { timeout: 6000, windowsHide: true });
+    return { ok: true };
+  } catch (err: any) {
+    const text = (err.stderr || err.stdout || err.message || '').toLowerCase();
+    if (err.code === 'ENOENT' || text.includes('not recognized') || text.includes('not found')) {
+      return {
+        ok: false,
+        reason: 'Docker CLI is not installed or not present in system PATH.',
+      };
+    }
+    return {
+      ok: false,
+      reason: 'Docker Desktop / Docker daemon is not running. Please start Docker Desktop to enable container sandboxing, or run your project directly using the terminal.',
+    };
+  }
+}
+
 // In-memory deployment logs & ports tracker
 const deploymentLogs = new Map<string, string[]>();
 const workspacePorts = new Map<string, number>();
@@ -39,6 +58,7 @@ async function detectStackAndGenerateDockerfile(root: string): Promise<{
   defaultPort: number;
   dockerfile: string;
   isGenerated: boolean;
+  runCommand: string;
 }> {
   const dockerfilePath = path.join(root, 'Dockerfile');
   try {
@@ -46,7 +66,7 @@ async function detectStackAndGenerateDockerfile(root: string): Promise<{
     // Extract port from EXPOSE if present
     const exposeMatch = existing.match(/EXPOSE\s+(\d+)/i);
     const port = exposeMatch ? parseInt(exposeMatch[1], 10) : 3000;
-    return { stack: 'Custom Dockerfile', defaultPort: port, dockerfile: existing, isGenerated: false };
+    return { stack: 'Custom Dockerfile', defaultPort: port, dockerfile: existing, isGenerated: false, runCommand: 'npm start' };
   } catch {}
 
   // Check package.json
@@ -59,6 +79,7 @@ async function detectStackAndGenerateDockerfile(root: string): Promise<{
         stack: 'Next.js Application',
         defaultPort: 3000,
         isGenerated: true,
+        runCommand: 'npm run dev',
         dockerfile: `FROM node:20-alpine AS runner
 WORKDIR /app
 COPY package*.json ./
@@ -76,6 +97,7 @@ CMD ["npm", "run", "start"]
         stack: 'React + Vite Web App',
         defaultPort: 5173,
         isGenerated: true,
+        runCommand: 'npm run dev',
         dockerfile: `FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
@@ -91,6 +113,7 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
       stack: 'Node.js Application',
       defaultPort: 3000,
       isGenerated: true,
+      runCommand: 'npm start',
       dockerfile: `FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
@@ -113,6 +136,7 @@ CMD ["npm", "start"]
         stack: 'Python Service',
         defaultPort: 8000,
         isGenerated: true,
+        runCommand: 'python main.py',
         dockerfile: `FROM python:3.12-slim
 WORKDIR /app
 COPY requirements.txt* ./
@@ -133,6 +157,7 @@ CMD ["python", "main.py"]
         stack: 'Go Microservice',
         defaultPort: 8080,
         isGenerated: true,
+        runCommand: 'go run .',
         dockerfile: `FROM golang:1.22-alpine
 WORKDIR /app
 COPY . .
@@ -149,6 +174,7 @@ CMD ["./main"]
     stack: 'Static Web / Universal',
     defaultPort: 80,
     isGenerated: true,
+    runCommand: 'npx serve .',
     dockerfile: `FROM nginx:alpine
 COPY . /usr/share/nginx/html
 EXPOSE 80
@@ -185,8 +211,15 @@ export async function POST(req: NextRequest) {
 
     // Action: detect-stack
     if (action === 'detect-stack') {
-      const detection = await detectStackAndGenerateDockerfile(root);
-      return apiResponse(detection);
+      const [detection, dockerCheck] = await Promise.all([
+        detectStackAndGenerateDockerfile(root),
+        checkDockerAvailability(),
+      ]);
+      return apiResponse({
+        ...detection,
+        dockerAvailable: dockerCheck.ok,
+        dockerReason: dockerCheck.reason,
+      });
     }
 
     // Action: logs
@@ -203,6 +236,16 @@ export async function POST(req: NextRequest) {
 
     // Action: status
     if (action === 'status') {
+      const dockerCheck = await checkDockerAvailability();
+      if (!dockerCheck.ok) {
+        return apiResponse({
+          status: 'stopped',
+          containerName,
+          dockerAvailable: false,
+          dockerReason: dockerCheck.reason,
+        });
+      }
+
       try {
         const { stdout } = await runDocker(['inspect', '--format={{.State.Status}}', containerName]);
         const status = stdout.trim();
@@ -211,10 +254,11 @@ export async function POST(req: NextRequest) {
           status,
           containerName,
           hostPort,
+          dockerAvailable: true,
           url: status === 'running' ? `http://localhost:${hostPort}` : null,
         });
       } catch {
-        return apiResponse({ status: 'not_found', containerName });
+        return apiResponse({ status: 'not_found', containerName, dockerAvailable: true });
       }
     }
 
@@ -231,6 +275,14 @@ export async function POST(req: NextRequest) {
 
     // Action: start / build / restart
     if (action === 'start' || action === 'build' || action === 'restart') {
+      // 0. Check Docker daemon availability first
+      const dockerCheck = await checkDockerAvailability();
+      if (!dockerCheck.ok) {
+        const msg = dockerCheck.reason || 'Docker Desktop is not running. Please start Docker Desktop to use containers.';
+        appendLog(workspaceId, `[Docker Error] ${msg}`);
+        return apiError(msg, 503);
+      }
+
       // 1. Prepare Dockerfile
       const detection = await detectStackAndGenerateDockerfile(root);
       const dockerfileContent = customDockerfile || detection.dockerfile;
@@ -248,8 +300,9 @@ export async function POST(req: NextRequest) {
         const buildRes = await runDocker(['build', '-t', imageName, '.'], root);
         appendLog(workspaceId, buildRes.stdout || buildRes.stderr || 'Build finished successfully.');
       } catch (buildErr: any) {
-        appendLog(workspaceId, `[Build Error] ${buildErr.message}`);
-        return apiError(`Docker build failed: ${buildErr.message}`, 500);
+        const msg = buildErr.message || 'Docker build failed';
+        appendLog(workspaceId, `[Build Error] ${msg}`);
+        return apiError(`Docker build failed: ${msg}`, 500);
       }
 
       // 3. Stop existing container if running
@@ -273,8 +326,9 @@ export async function POST(req: NextRequest) {
         ]);
         appendLog(workspaceId, `[Docker] Container started successfully on http://localhost:${hostPort}`);
       } catch (runErr: any) {
-        appendLog(workspaceId, `[Run Error] ${runErr.message}`);
-        return apiError(`Failed to run Docker container: ${runErr.message}`, 500);
+        const msg = runErr.message || 'Failed to start container';
+        appendLog(workspaceId, `[Run Error] ${msg}`);
+        return apiError(`Failed to run Docker container: ${msg}`, 500);
       }
 
       return apiResponse({
@@ -290,7 +344,7 @@ export async function POST(req: NextRequest) {
     return apiError('Unknown action', 400);
   } catch (error: any) {
     console.error('Docker deployment API error:', error);
-    return apiError('Docker operation failed. Ensure Docker Desktop is running.', 500, error.message);
+    return apiError(error.message || 'Docker operation failed. Ensure Docker Desktop is running.', 500);
   }
 }
 
