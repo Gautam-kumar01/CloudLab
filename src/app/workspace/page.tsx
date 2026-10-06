@@ -10,6 +10,10 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
   loading: () => <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#888' }}>Loading Editor...</div>
 });
+const DiffEditor = dynamic(() => import('@monaco-editor/react').then((m) => m.DiffEditor), {
+  ssr: false,
+  loading: () => <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#888' }}>Loading Diff Editor...</div>
+});
 import {
   Folder,
   FileCode,
@@ -38,6 +42,12 @@ import {
   Rocket,
   Upload,
   Download,
+  Search as SearchIcon,
+  AlertTriangle,
+  XCircle,
+  Info,
+  Edit2,
+  Package,
 } from 'lucide-react';
 
 import { io, Socket } from 'socket.io-client';
@@ -49,6 +59,8 @@ import GitPanel from './GitPanel';
 import AiChatPanel from './AiChatPanel';
 import PreviewPanel from './PreviewPanel';
 import DeploymentPanel from './DeploymentPanel';
+import SearchPanel from './SearchPanel';
+import NpmScriptsPanel from './NpmScriptsPanel';
 import FileIcon from './FileIcon';
 
 const COMMAND_ITEMS = [
@@ -57,6 +69,13 @@ const COMMAND_ITEMS = [
   { id: 'save-file', label: 'File: Save Current File', icon: '💾' },
   { id: 'new-file', label: 'File: New File', icon: '📄' },
   { id: 'new-folder', label: 'File: New Folder', icon: '📂' },
+  { id: 'search-workspace', label: 'View: Find in Files (Global Search)', icon: '🔍' },
+  { id: 'toggle-split', label: 'View: Toggle Side-by-Side Split Editor (Ctrl+\\)', icon: '◫' },
+  { id: 'split-terminal', label: 'Terminal: Toggle Split Terminal (Side-by-Side)', icon: '◫' },
+  { id: 'toggle-wrap', label: 'View: Toggle Word Wrap (Alt+Z)', icon: '↩' },
+  { id: 'toggle-minimap', label: 'View: Toggle Editor Minimap', icon: '🗺️' },
+  { id: 'toggle-problems', label: 'View: Show Problems & Diagnostics', icon: '⚠️' },
+  { id: 'run-active-file', label: 'Run: Execute Active File', icon: '▶️' },
   { id: 'publish-github', label: 'Source Control: Publish to GitHub', icon: '🐙' },
   { id: 'deploy-docker', label: 'Docker: Build & Deploy to Container', icon: '🐳' },
   { id: 'toggle-preview', label: 'View: Toggle Live Web Preview', icon: '🌐' },
@@ -204,7 +223,20 @@ export default function Workspace() {
   const [isSaving, setIsSaving] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState('terminal');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [activeSidebar, setActiveSidebar] = useState<'explorer' | 'git' | 'deploy'>('explorer');
+  const [activeSidebar, setActiveSidebar] = useState<'explorer' | 'search' | 'git' | 'deploy'>('explorer');
+  const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
+  const monacoRef = useRef<any>(null);
+  const [markers, setMarkers] = useState<Array<{
+    owner: string;
+    resource: string;
+    severity: number;
+    message: string;
+    startLineNumber: number;
+    startColumn: number;
+    endLineNumber: number;
+    endColumn: number;
+    code?: string;
+  }>>([]);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -216,6 +248,63 @@ export default function Workspace() {
   const [storageUsage, setStorageUsage] = useState({ usedBytes: 0, quotaBytes: 500 * 1024 * 1024 });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadTargetFolder, setUploadTargetFolder] = useState<string>('');
+
+  // Phase 2: Diff Editor, Split Editor & Quick Settings State
+  const [diffState, setDiffState] = useState<{
+    filePath: string;
+    original: string;
+    modified: string;
+    language: string;
+  } | null>(null);
+  const diffStateRef = useRef(diffState);
+  useEffect(() => {
+    diffStateRef.current = diffState;
+  }, [diffState]);
+
+  const [isSplitEditor, setIsSplitEditor] = useState(false);
+  const [activeFilePane2, setActiveFilePane2] = useState<string | null>(null);
+  const [activePane, setActivePane] = useState<1 | 2>(1);
+  const [editorMinimap, setEditorMinimap] = useState(false);
+  const [editorWordWrap, setEditorWordWrap] = useState<'on' | 'off'>('on');
+  const [editorFontSize, setEditorFontSize] = useState(13.5);
+  const [editorTabSize, setEditorTabSize] = useState(2);
+
+  const handleOpenFileDiff = async (filePath: string) => {
+    try {
+      if (isSplitEditor) setIsSplitEditor(false);
+      const res = await fetch(`/api/git/diff?id=${encodeURIComponent(workspaceId)}&file=${encodeURIComponent(filePath)}`);
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        alert('Failed to load git diff: ' + (data.error?.message || data.error || 'Unknown error'));
+        return;
+      }
+      const originalContent = data.data?.original ?? '';
+      const modifiedContent = files[filePath]?.content ?? data.data?.modified ?? '';
+      const lang = getLanguage(filePath);
+
+      setDiffState({
+        filePath,
+        original: originalContent,
+        modified: modifiedContent,
+        language: lang,
+      });
+    } catch (e: any) {
+      alert('Error loading git diff: ' + e.message);
+    }
+  };
+
+  const handleToggleSplitEditor = () => {
+    if (!isSplitEditor) {
+      if (diffState) setDiffState(null);
+      const otherFiles = Object.keys(files).filter((f) => f !== activeFile);
+      setActiveFilePane2(otherFiles.length > 0 ? otherFiles[0] : activeFile);
+      setIsSplitEditor(true);
+      setActivePane(2);
+    } else {
+      setIsSplitEditor(false);
+      setActivePane(1);
+    }
+  };
 
   // Yjs Refs
   const ydocRef = useRef<Y.Doc | null>(null);
@@ -281,6 +370,10 @@ export default function Workspace() {
     terminalsRef.current = terminals;
   }, [terminals]);
   const [activeTerminalId, setActiveTerminalId] = useState('term-1');
+  const [isTerminalSplit, setIsTerminalSplit] = useState(false);
+  const [splitTerminalId, setSplitTerminalId] = useState<string | null>(null);
+  const [editingTerminalId, setEditingTerminalId] = useState<string | null>(null);
+  const [editingTerminalTitle, setEditingTerminalTitle] = useState('');
 
   const workspaceIdRef = useRef(workspaceId);
   useEffect(() => {
@@ -326,11 +419,16 @@ export default function Workspace() {
   }, [workspaceId]);
 
   const openFile = async (filePath: string, node?: any) => {
+    if (diffState) setDiffState(null);
     const filename = node?.name || filePath.split('/').pop() || filePath;
     const lang = node?.language || getLanguage(filePath);
 
     if (files[filePath] && files[filePath].content !== '// Loading...' && files[filePath].content !== '// Failed to load file') {
-      setActiveFile(filePath);
+      if (isSplitEditor && activePane === 2) {
+        setActiveFilePane2(filePath);
+      } else {
+        setActiveFile(filePath);
+      }
       return;
     }
 
@@ -343,7 +441,11 @@ export default function Workspace() {
         content: prev[filePath]?.content && prev[filePath].content !== '// Loading...' ? prev[filePath].content : '// Loading...',
       },
     }));
-    setActiveFile(filePath);
+    if (isSplitEditor && activePane === 2) {
+      setActiveFilePane2(filePath);
+    } else {
+      setActiveFile(filePath);
+    }
 
     try {
       const res = await fetch(
@@ -379,6 +481,10 @@ export default function Workspace() {
     if (activeFile === filePath) {
       const remaining = Object.keys(files).filter((f) => f !== filePath);
       setActiveFile(remaining.length > 0 ? remaining[remaining.length - 1] : '');
+    }
+    if (activeFilePane2 === filePath) {
+      const remaining = Object.keys(files).filter((f) => f !== filePath);
+      setActiveFilePane2(remaining.length > 0 ? remaining[remaining.length - 1] : null);
     }
   };
 
@@ -585,6 +691,27 @@ export default function Workspace() {
       case 'new-folder':
         handleNewFolder();
         break;
+      case 'search-workspace':
+        setActiveSidebar('search');
+        break;
+      case 'toggle-problems':
+        setActiveBottomTab('problems');
+        break;
+      case 'toggle-split':
+        handleToggleSplitEditor();
+        break;
+      case 'split-terminal':
+        handleToggleSplitTerminal();
+        break;
+      case 'toggle-wrap':
+        setEditorWordWrap((prev) => (prev === 'on' ? 'off' : 'on'));
+        break;
+      case 'toggle-minimap':
+        setEditorMinimap((prev) => !prev);
+        break;
+      case 'run-active-file':
+        handleRunCommand();
+        break;
       case 'publish-github':
         setActiveSidebar('git');
         break;
@@ -618,6 +745,41 @@ export default function Workspace() {
         setCommandQuery('');
         setSelectedPaletteIndex(0);
         setShowCommandPalette(true);
+      }
+      // Global Search: Ctrl+Shift+F or Cmd+Shift+F
+      else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setActiveSidebar('search');
+      }
+      // Explorer: Ctrl+Shift+E or Cmd+Shift+E
+      else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        setActiveSidebar('explorer');
+      }
+      // Source Control (Git): Ctrl+Shift+G or Cmd+Shift+G
+      else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        setActiveSidebar('git');
+      }
+      // Toggle Terminal Panel: Ctrl+` or Cmd+`
+      else if ((e.ctrlKey || e.metaKey) && e.key === '`') {
+        e.preventDefault();
+        setActiveBottomTab((prev) => (prev === 'terminal' ? '' : 'terminal'));
+      }
+      // Toggle Split Editor: Ctrl+\ or Cmd+\
+      else if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+        e.preventDefault();
+        handleToggleSplitEditor();
+      }
+      // Toggle Word Wrap: Alt+Z
+      else if (e.altKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        setEditorWordWrap((prev) => (prev === 'on' ? 'off' : 'on'));
+      }
+      // Run Active File: F5
+      else if (e.key === 'F5') {
+        e.preventDefault();
+        handleRunCommand();
       }
       // Save: Ctrl+S or Cmd+S
       else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -1000,6 +1162,10 @@ export default function Workspace() {
   const handleKillTerminal = (id: string) => {
     socketRef.current?.emit('terminal.kill', { id });
     spawnedTerminals.current.delete(id);
+    if (splitTerminalId === id) {
+      setIsTerminalSplit(false);
+      setSplitTerminalId(null);
+    }
     setTerminals((prev) => {
       const newTerms = prev.filter((t) => t.id !== id);
       if (newTerms.length > 0 && activeTerminalId === id) {
@@ -1010,6 +1176,55 @@ export default function Workspace() {
     if (xtermInstances.current[id]) {
       xtermInstances.current[id].term.dispose();
       delete xtermInstances.current[id];
+    }
+  };
+
+  const handleToggleSplitTerminal = () => {
+    if (!isTerminalSplit) {
+      const otherTerm = terminals.find((t) => t.id !== activeTerminalId);
+      if (otherTerm) {
+        setSplitTerminalId(otherTerm.id);
+      } else {
+        const newId = `term-${Date.now()}`;
+        setTerminals((prev) => [...prev, { id: newId, title: 'bash (split)', shellType: 'default' }]);
+        setSplitTerminalId(newId);
+      }
+      setIsTerminalSplit(true);
+      setActiveBottomTab('terminal');
+    } else {
+      setIsTerminalSplit(false);
+      setSplitTerminalId(null);
+    }
+    setTimeout(() => {
+      try {
+        if (xtermInstances.current[activeTerminalId]) {
+          xtermInstances.current[activeTerminalId].fitAddon.fit();
+        }
+      } catch (e) {}
+    }, 120);
+  };
+
+  const handleRenameTerminal = (id: string, newTitle: string) => {
+    const trimmed = newTitle.trim();
+    if (!trimmed) return;
+    setTerminals((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, title: trimmed } : t))
+    );
+    setEditingTerminalId(null);
+  };
+
+  const handleRunNpmScript = (scriptName: string, command: string) => {
+    setActiveBottomTab('terminal');
+    if (socketRef.current) {
+      socketRef.current.emit('terminal.data', {
+        id: activeTerminalId,
+        data: `${command}\r`,
+      });
+      setTimeout(() => {
+        try {
+          xtermInstances.current[activeTerminalId]?.term?.focus();
+        } catch (e) {}
+      }, 80);
     }
   };
 
@@ -1025,16 +1240,44 @@ export default function Workspace() {
     }
   };
 
+  const handleNavigateToFileAndPosition = async (filePath: string, line: number, column: number) => {
+    if (activeFile !== filePath) {
+      await openFile(filePath);
+    }
+    setTimeout(() => {
+      if (editorRef.current) {
+        try {
+          editorRef.current.revealLineInCenter(line);
+          editorRef.current.setPosition({ lineNumber: line, column: column || 1 });
+          editorRef.current.focus();
+        } catch (e) {}
+      }
+    }, 120);
+  };
+
   const handleRunCommand = () => {
     setActiveBottomTab('terminal');
     if (socketRef.current && activeFile) {
-      if (activeFile.endsWith('.ts') || activeFile.endsWith('.js')) {
-        socketRef.current.emit('terminal.toTerm', `node ${activeFile}\r`);
+      let cmd = '';
+      if (activeFile.endsWith('.ts') || activeFile.endsWith('.tsx')) {
+        cmd = `npx tsx "${activeFile}"\r`;
+      } else if (activeFile.endsWith('.js') || activeFile.endsWith('.mjs')) {
+        cmd = `node "${activeFile}"\r`;
       } else if (activeFile.endsWith('.py')) {
-        socketRef.current.emit('terminal.toTerm', `python3 ${activeFile}\r`);
+        cmd = `python3 "${activeFile}"\r`;
+      } else if (activeFile.endsWith('.sh')) {
+        cmd = `bash "${activeFile}"\r`;
+      } else if (activeFile.endsWith('.html')) {
+        setShowPreview(true);
+        return;
       } else {
-        socketRef.current.emit('terminal.toTerm', `cat ${activeFile}\r`);
+        cmd = `cat "${activeFile}"\r`;
       }
+
+      socketRef.current.emit('terminal.toTerm', {
+        id: activeTerminalId,
+        data: cmd,
+      });
     }
   };
 
@@ -1044,6 +1287,47 @@ export default function Workspace() {
 
   const handleEditorDidMount = async (editor: any, monaco: any) => {
     editorRef.current = editor;
+    if (monaco) {
+      monacoRef.current = monaco;
+    }
+    const effectiveMonaco = monaco || monacoRef.current;
+
+    // Track active cursor position
+    try {
+      editor.onDidChangeCursorPosition((e: any) => {
+        if (e && e.position) {
+          setCursorPos({ line: e.position.lineNumber, col: e.position.column });
+        }
+      });
+    } catch (e) {}
+
+    // Subscribe to Monaco compiler markers for live Diagnostics / Problems panel
+    if (effectiveMonaco?.editor?.onDidChangeMarkers) {
+      const updateMarkers = () => {
+        try {
+          const all = effectiveMonaco.editor.getModelMarkers({});
+          const formatted = all.map((m: any) => {
+            let resPath = m.resource?.path || '';
+            if (resPath.startsWith('/')) resPath = resPath.substring(1);
+            return {
+              owner: m.owner || 'compiler',
+              resource: resPath,
+              severity: m.severity, // 8 = Error, 4 = Warning, 2 = Info, 1 = Hint
+              message: m.message,
+              startLineNumber: m.startLineNumber,
+              startColumn: m.startColumn,
+              endLineNumber: m.endLineNumber,
+              endColumn: m.endColumn,
+              code: typeof m.code === 'string' ? m.code : m.code?.value,
+            };
+          });
+          setMarkers(formatted);
+        } catch (e) {}
+      };
+
+      effectiveMonaco.editor.onDidChangeMarkers(updateMarkers);
+      updateMarkers();
+    }
 
     // Ensure model has current file content if available
     if (activeFile && files[activeFile]?.content && files[activeFile].content !== '// Loading...') {
@@ -1669,31 +1953,64 @@ export default function Workspace() {
               gap: '16px',
             }}
           >
-            <Files
-              size={24}
+            <div
+              title="Explorer (Ctrl+Shift+E)"
+              onClick={() => setActiveSidebar('explorer')}
               style={{
                 cursor: 'pointer',
                 color:
                   activeSidebar === 'explorer' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                transition: 'color 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
-              onClick={() => setActiveSidebar('explorer')}
-            />
-            <GitBranch
-              size={24}
+            >
+              <Files size={22} />
+            </div>
+            <div
+              title="Search (Ctrl+Shift+F)"
+              onClick={() => setActiveSidebar('search')}
+              style={{
+                cursor: 'pointer',
+                color:
+                  activeSidebar === 'search' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                transition: 'color 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <SearchIcon size={22} />
+            </div>
+            <div
+              title="Source Control (Ctrl+Shift+G)"
+              onClick={() => setActiveSidebar('git')}
               style={{
                 cursor: 'pointer',
                 color: activeSidebar === 'git' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                transition: 'color 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
-              onClick={() => setActiveSidebar('git')}
-            />
-            <Rocket
-              size={24}
+            >
+              <GitBranch size={22} />
+            </div>
+            <div
+              title="Deployments & Containers"
+              onClick={() => setActiveSidebar('deploy')}
               style={{
                 cursor: 'pointer',
                 color: activeSidebar === 'deploy' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                transition: 'color 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
-              onClick={() => setActiveSidebar('deploy')}
-            />
+            >
+              <Rocket size={22} />
+            </div>
           </div>
 
           <PanelGroup orientation="horizontal" style={{ flex: 1 }}>
@@ -1831,7 +2148,24 @@ export default function Workspace() {
                       </div>
                     )}
                   </div>
+
+                  {/* NPM Scripts Explorer */}
+                  <NpmScriptsPanel
+                    workspaceId={workspaceId}
+                    onRunScript={handleRunNpmScript}
+                    onOpenFile={openFile}
+                  />
                 </>
+              )}
+
+              {activeSidebar === 'search' && (
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  <SearchPanel
+                    workspaceId={workspaceId}
+                    onNavigateToFile={handleNavigateToFileAndPosition}
+                    onRefreshFiles={fetchWorkspace}
+                  />
+                </div>
               )}
 
               {activeSidebar === 'git' && (
@@ -1855,7 +2189,10 @@ export default function Workspace() {
                     </div>
                   </div>
                   <div style={{ flex: 1, overflowY: 'auto' }}>
-                    <GitPanel workspaceId={workspaceId} />
+                    <GitPanel
+                      workspaceId={workspaceId}
+                      onOpenFileDiff={handleOpenFileDiff}
+                    />
                   </div>
                 </>
               )}
@@ -1893,110 +2230,453 @@ export default function Workspace() {
                       defaultSize={showPreview ? 50 : 100}
                       style={{ display: 'flex', flexDirection: 'column' }}
                     >
-                      {/* Editor Tabs */}
+                      {/* Editor Tabs & Quick Action Toolbar */}
                       <div
                         style={{
                           display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
                           background: 'var(--bg-secondary)',
                           borderBottom: '1px solid var(--border-color)',
-                          overflowX: 'auto',
+                          minHeight: '35px',
                         }}
                       >
-                        {Object.keys(files).map((filename) => (
-                          <div
-                            key={filename}
-                            onClick={() => setActiveFile(filename)}
+                        {/* Tabs List */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            overflowX: 'auto',
+                            flex: 1,
+                            scrollbarWidth: 'none',
+                          }}
+                        >
+                          {Object.keys(files).map((filename) => (
+                            <div
+                              key={filename}
+                              onClick={() => {
+                                if (diffState) setDiffState(null);
+                                if (activePane === 2) {
+                                  setActiveFilePane2(filename);
+                                } else {
+                                  setActiveFile(filename);
+                                }
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '0.82rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                borderRight: '1px solid var(--border-color)',
+                                background:
+                                  !diffState && (activePane === 2 ? activeFilePane2 === filename : activeFile === filename)
+                                    ? 'var(--bg-primary)'
+                                    : 'transparent',
+                                color:
+                                  !diffState && (activePane === 2 ? activeFilePane2 === filename : activeFile === filename)
+                                    ? 'var(--text-primary)'
+                                    : 'var(--text-secondary)',
+                                borderTop:
+                                  !diffState && (activePane === 2 ? activeFilePane2 === filename : activeFile === filename)
+                                    ? '2px solid var(--accent-green)'
+                                    : '2px solid transparent',
+                                transition: 'background 0.2s',
+                                userSelect: 'none',
+                              }}
+                              onMouseOver={(e) => {
+                                if (activeFile !== filename)
+                                  e.currentTarget.style.background = 'var(--bg-tertiary)';
+                              }}
+                              onMouseOut={(e) => {
+                                if (activeFile !== filename)
+                                  e.currentTarget.style.background = 'transparent';
+                              }}
+                            >
+                              {getFileIcon(filename)}
+                              <span>{filename.split('/').pop()}</span>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCloseTab(filename);
+                                }}
+                                style={{
+                                  marginLeft: '4px',
+                                  padding: '0 4px',
+                                  borderRadius: '3px',
+                                  fontSize: '13px',
+                                  opacity: 0.5,
+                                }}
+                                onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
+                                onMouseOut={(e) => (e.currentTarget.style.opacity = '0.5')}
+                              >
+                                ×
+                              </span>
+                            </div>
+                          ))}
+
+                          {/* Active Diff Tab */}
+                          {diffState && (
+                            <div
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '0.82rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                borderRight: '1px solid var(--border-color)',
+                                background: 'var(--bg-primary)',
+                                color: '#06b6d4',
+                                borderTop: '2px solid #06b6d4',
+                                userSelect: 'none',
+                              }}
+                            >
+                              <FileCode size={13} style={{ color: '#06b6d4' }} />
+                              <span>{diffState.filePath.split('/').pop()} (Diff: HEAD ↔ Working)</span>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDiffState(null);
+                                }}
+                                style={{
+                                  marginLeft: '6px',
+                                  padding: '0 4px',
+                                  borderRadius: '3px',
+                                  fontSize: '13px',
+                                  opacity: 0.7,
+                                  color: '#fff',
+                                }}
+                                title="Close Diff"
+                              >
+                                ×
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Editor Quick Action Toolbar */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            paddingRight: '10px',
+                            paddingLeft: '6px',
+                            borderLeft: '1px solid var(--border-color)',
+                          }}
+                        >
+                          {diffState && (
+                            <button
+                              type="button"
+                              onClick={() => setDiffState(null)}
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.72rem',
+                                background: 'rgba(239, 68, 68, 0.2)',
+                                color: '#f87171',
+                                border: '1px solid rgba(239, 68, 68, 0.4)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                              title="Close Git Diff Editor"
+                            >
+                              Close Diff
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setEditorWordWrap((prev) => (prev === 'on' ? 'off' : 'on'))}
                             style={{
-                              padding: '6px 12px',
-                              fontSize: '0.82rem',
+                              padding: '3px 7px',
+                              borderRadius: '4px',
+                              fontSize: '0.72rem',
+                              background: editorWordWrap === 'on' ? 'rgba(6, 182, 212, 0.2)' : 'transparent',
+                              color: editorWordWrap === 'on' ? '#22d3ee' : 'var(--text-secondary)',
+                              border: '1px solid',
+                              borderColor: editorWordWrap === 'on' ? 'rgba(6, 182, 212, 0.4)' : 'transparent',
+                              cursor: 'pointer',
+                            }}
+                            title="Toggle Word Wrap (Alt+Z)"
+                          >
+                            Wrap
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setEditorMinimap((prev) => !prev)}
+                            style={{
+                              padding: '3px 7px',
+                              borderRadius: '4px',
+                              fontSize: '0.72rem',
+                              background: editorMinimap ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                              color: editorMinimap ? '#34d399' : 'var(--text-secondary)',
+                              border: '1px solid',
+                              borderColor: editorMinimap ? 'rgba(16, 185, 129, 0.4)' : 'transparent',
+                              cursor: 'pointer',
+                            }}
+                            title="Toggle Minimap"
+                          >
+                            Map
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleToggleSplitEditor}
+                            style={{
+                              padding: '3px 6px',
+                              borderRadius: '4px',
+                              fontSize: '0.72rem',
+                              background: isSplitEditor ? 'rgba(168, 85, 247, 0.2)' : 'transparent',
+                              color: isSplitEditor ? '#c084fc' : 'var(--text-secondary)',
+                              border: '1px solid',
+                              borderColor: isSplitEditor ? 'rgba(168, 85, 247, 0.4)' : 'transparent',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '6px',
-                              borderRight: '1px solid var(--border-color)',
-                              background:
-                                activeFile === filename ? 'var(--bg-primary)' : 'transparent',
-                              color:
-                                activeFile === filename
-                                  ? 'var(--text-primary)'
-                                  : 'var(--text-secondary)',
-                              borderTop:
-                                activeFile === filename
-                                  ? '2px solid var(--accent-green)'
-                                  : '2px solid transparent',
-                              transition: 'background 0.2s',
-                              userSelect: 'none',
                             }}
-                            onMouseOver={(e) => {
-                              if (activeFile !== filename)
-                                e.currentTarget.style.background = 'var(--bg-tertiary)';
-                            }}
-                            onMouseOut={(e) => {
-                              if (activeFile !== filename)
-                                e.currentTarget.style.background = 'transparent';
-                            }}
+                            title="Split Editor Right (Ctrl+\\)"
                           >
-                            {getFileIcon(filename)}
-                            <span>{filename.split('/').pop()}</span>
-                            <span
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCloseTab(filename);
-                              }}
-                              style={{
-                                marginLeft: '4px',
-                                padding: '0 4px',
-                                borderRadius: '3px',
-                                fontSize: '13px',
-                                opacity: 0.5,
-                              }}
-                              onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
-                              onMouseOut={(e) => (e.currentTarget.style.opacity = '0.5')}
-                            >
-                              ×
-                            </span>
-                          </div>
-                        ))}
+                            <SplitSquareHorizontal size={14} />
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Monaco Editor */}
-                      <div style={{ flex: 1, position: 'relative' }}>
-                        {activeFile && files[activeFile] ? (
-                          <Editor
-                            path={activeFile}
+                      {/* Editor Canvas: Diff / Split / Single */}
+                      {diffState ? (
+                        <div style={{ flex: 1, position: 'relative' }}>
+                          <DiffEditor
                             height="100%"
-                            language={files[activeFile].language}
+                            language={diffState.language}
                             theme="vs-dark"
-                            value={files[activeFile].content}
-                            onChange={handleEditorChange}
-                            onMount={handleEditorDidMount}
+                            original={diffState.original}
+                            modified={diffState.modified}
+                            onMount={(diffEditor) => {
+                              try {
+                                const modifiedEditor = diffEditor.getModifiedEditor();
+                                if (modifiedEditor) {
+                                  modifiedEditor.onDidChangeModelContent(() => {
+                                    const currentDiff = diffStateRef.current;
+                                    if (currentDiff?.filePath) {
+                                      const val = modifiedEditor.getValue();
+                                      setFiles((prev) => ({
+                                        ...prev,
+                                        [currentDiff.filePath]: {
+                                          ...prev[currentDiff.filePath],
+                                          content: val,
+                                        },
+                                      }));
+                                    }
+                                  });
+                                }
+                              } catch (e) {
+                                console.error('DiffEditor listener error:', e);
+                              }
+                            }}
                             options={{
-                              minimap: { enabled: false },
-                              fontSize: 13.5,
+                              renderSideBySide: true,
+                              minimap: { enabled: editorMinimap },
+                              fontSize: editorFontSize,
+                              wordWrap: editorWordWrap,
                               fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-                              padding: { top: 12 },
-                              scrollBeyondLastLine: false,
-                              smoothScrolling: true,
-                              cursorBlinking: 'smooth',
-                              cursorSmoothCaretAnimation: 'on',
-                              formatOnPaste: true,
+                              readOnly: false,
+                              originalEditable: false,
                               automaticLayout: true,
                             }}
                           />
-                        ) : (
-                          <div
+                        </div>
+                      ) : isSplitEditor ? (
+                        <PanelGroup orientation="horizontal" style={{ flex: 1 }}>
+                          {/* Pane 1 */}
+                          <Panel
+                            defaultSize={50}
+                            minSize={25}
+                            onClick={() => setActivePane(1)}
                             style={{
                               display: 'flex',
-                              height: '100%',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'var(--text-secondary)',
+                              flexDirection: 'column',
+                              position: 'relative',
+                              outline: activePane === 1 ? '1px solid rgba(6, 182, 212, 0.3)' : 'none',
                             }}
                           >
-                            Loading workspace...
-                          </div>
-                        )}
-                      </div>
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '3px 8px',
+                                background: 'rgba(0,0,0,0.25)',
+                                fontSize: '0.72rem',
+                                color: activePane === 1 ? '#22d3ee' : 'var(--text-secondary)',
+                                borderBottom: '1px solid var(--border-color)',
+                              }}
+                            >
+                              <span>Pane 1: {activeFile ? activeFile.split('/').pop() : 'Empty'}</span>
+                            </div>
+                            <div style={{ flex: 1, position: 'relative' }}>
+                              {activeFile && files[activeFile] ? (
+                                <Editor
+                                  path={activeFile}
+                                  height="100%"
+                                  language={files[activeFile].language}
+                                  theme="vs-dark"
+                                  value={files[activeFile].content}
+                                  onChange={handleEditorChange}
+                                  onMount={handleEditorDidMount}
+                                  options={{
+                                    minimap: { enabled: editorMinimap },
+                                    fontSize: editorFontSize,
+                                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+                                    padding: { top: 8 },
+                                    scrollBeyondLastLine: false,
+                                    smoothScrolling: true,
+                                    cursorBlinking: 'smooth',
+                                    cursorSmoothCaretAnimation: 'on',
+                                    formatOnPaste: true,
+                                    automaticLayout: true,
+                                    wordWrap: editorWordWrap,
+                                    tabSize: editorTabSize,
+                                  }}
+                                />
+                              ) : (
+                                <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+                                  No file open in Pane 1
+                                </div>
+                              )}
+                            </div>
+                          </Panel>
+
+                          <PanelResizeHandle className="resize-handle" style={{ width: '2px', cursor: 'col-resize', background: 'var(--border-color)' }} />
+
+                          {/* Pane 2 */}
+                          <Panel
+                            defaultSize={50}
+                            minSize={25}
+                            onClick={() => setActivePane(2)}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              position: 'relative',
+                              outline: activePane === 2 ? '1px solid rgba(168, 85, 247, 0.3)' : 'none',
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '3px 8px',
+                                background: 'rgba(0,0,0,0.25)',
+                                fontSize: '0.72rem',
+                                color: activePane === 2 ? '#c084fc' : 'var(--text-secondary)',
+                                borderBottom: '1px solid var(--border-color)',
+                              }}
+                            >
+                              <span>Pane 2: {activeFilePane2 ? activeFilePane2.split('/').pop() : 'Empty'}</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsSplitEditor(false);
+                                  setActivePane(1);
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--text-secondary)',
+                                  cursor: 'pointer',
+                                  fontSize: '11px',
+                                }}
+                                title="Close Split View"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <div style={{ flex: 1, position: 'relative' }}>
+                              {activeFilePane2 && files[activeFilePane2] ? (
+                                <Editor
+                                  path={`split-${activeFilePane2}`}
+                                  height="100%"
+                                  language={files[activeFilePane2].language}
+                                  theme="vs-dark"
+                                  value={files[activeFilePane2].content}
+                                  onChange={(val) => {
+                                    if (!activeFilePane2) return;
+                                    setFiles((prev) => ({
+                                      ...prev,
+                                      [activeFilePane2]: {
+                                        ...prev[activeFilePane2],
+                                        content: val || '',
+                                      },
+                                    }));
+                                  }}
+                                  options={{
+                                    minimap: { enabled: editorMinimap },
+                                    fontSize: editorFontSize,
+                                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+                                    padding: { top: 8 },
+                                    scrollBeyondLastLine: false,
+                                    smoothScrolling: true,
+                                    cursorBlinking: 'smooth',
+                                    cursorSmoothCaretAnimation: 'on',
+                                    formatOnPaste: true,
+                                    automaticLayout: true,
+                                    wordWrap: editorWordWrap,
+                                    tabSize: editorTabSize,
+                                  }}
+                                />
+                              ) : (
+                                <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+                                  Select a file from Explorer to view in Pane 2
+                                </div>
+                              )}
+                            </div>
+                          </Panel>
+                        </PanelGroup>
+                      ) : (
+                        <div style={{ flex: 1, position: 'relative' }}>
+                          {activeFile && files[activeFile] ? (
+                            <Editor
+                              path={activeFile}
+                              height="100%"
+                              language={files[activeFile].language}
+                              theme="vs-dark"
+                              value={files[activeFile].content}
+                              onChange={handleEditorChange}
+                              onMount={handleEditorDidMount}
+                              options={{
+                                minimap: { enabled: editorMinimap },
+                                fontSize: editorFontSize,
+                                fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+                                padding: { top: 12 },
+                                scrollBeyondLastLine: false,
+                                smoothScrolling: true,
+                                cursorBlinking: 'smooth',
+                                cursorSmoothCaretAnimation: 'on',
+                                formatOnPaste: true,
+                                automaticLayout: true,
+                                wordWrap: editorWordWrap,
+                                tabSize: editorTabSize,
+                              }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                display: 'flex',
+                                height: '100%',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'var(--text-secondary)',
+                              }}
+                            >
+                              Loading workspace...
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </Panel>
 
                     {showPreview && (
@@ -2104,7 +2784,34 @@ export default function Workspace() {
                           transition: 'color 0.2s',
                         }}
                       >
-                        <AlertCircle size={12} /> PROBLEMS
+                        <AlertCircle
+                          size={12}
+                          style={{
+                            color: markers.some((m) => m.severity === 8)
+                              ? '#ef4444'
+                              : markers.some((m) => m.severity === 4)
+                              ? '#f59e0b'
+                              : 'inherit',
+                          }}
+                        />
+                        PROBLEMS
+                        {markers.length > 0 && (
+                          <span
+                            style={{
+                              background: markers.some((m) => m.severity === 8)
+                                ? 'rgba(239, 68, 68, 0.2)'
+                                : 'rgba(255, 255, 255, 0.1)',
+                              color: markers.some((m) => m.severity === 8) ? '#f87171' : '#cbd5e1',
+                              fontSize: '10px',
+                              padding: '1px 5px',
+                              borderRadius: '8px',
+                              fontWeight: 600,
+                              fontFamily: 'var(--font-mono)',
+                            }}
+                          >
+                            {markers.length}
+                          </span>
+                        )}
                       </span>
                     </div>
                     {activeBottomTab === 'terminal' && (
@@ -2137,12 +2844,16 @@ export default function Workspace() {
                           <ChevronDownIcon size={12} />
                         </div>
                         <span
-                          title="Split Terminal"
-                          style={{ display: 'flex', cursor: 'pointer' }}
-                          onClick={() => handleNewTerminal('default')}
+                          title="Split Terminal (Side-by-Side)"
+                          style={{
+                            display: 'flex',
+                            cursor: 'pointer',
+                            color: isTerminalSplit ? '#c084fc' : 'inherit',
+                          }}
+                          onClick={handleToggleSplitTerminal}
                           onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
                           onMouseOut={(e) =>
-                            (e.currentTarget.style.color = 'var(--text-secondary)')
+                            (e.currentTarget.style.color = isTerminalSplit ? '#c084fc' : 'var(--text-secondary)')
                           }
                         >
                           <SplitSquareHorizontal size={14} />
@@ -2184,49 +2895,296 @@ export default function Workspace() {
                           No active terminals. Click + to spawn one.
                         </div>
                       )}
-                      {terminals.map((term) => (
-                        <div
-                          key={term.id}
-                          ref={terminalRef(term.id)}
-                          onClick={() => xtermInstances.current[term.id]?.term?.focus()}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            flex: 1,
-                            minHeight: 0,
-                            display:
-                              activeBottomTab === 'terminal' && activeTerminalId === term.id
-                                ? 'block'
-                                : 'none',
-                          }}
-                        />
-                      ))}
+                      {activeBottomTab === 'terminal' && isTerminalSplit && splitTerminalId ? (
+                        <PanelGroup orientation="horizontal" style={{ flex: 1, minHeight: 0 }}>
+                          {/* Left Terminal Pane */}
+                          <Panel
+                            defaultSize={50}
+                            minSize={25}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              minHeight: 0,
+                              position: 'relative',
+                            }}
+                          >
+                            <div
+                              style={{
+                                padding: '3px 8px',
+                                fontSize: '0.72rem',
+                                color: '#22d3ee',
+                                background: 'rgba(0,0,0,0.3)',
+                                borderBottom: '1px solid var(--border-color)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                              }}
+                            >
+                              <span style={{ fontFamily: 'var(--font-mono)' }}>
+                                {terminals.find((t) => t.id === activeTerminalId)?.title || 'Terminal 1'}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: '0.65rem',
+                                  padding: '1px 5px',
+                                  borderRadius: '3px',
+                                  background: 'rgba(6, 182, 212, 0.15)',
+                                  color: '#22d3ee',
+                                }}
+                              >
+                                Left
+                              </span>
+                            </div>
+                            <div
+                              ref={terminalRef(activeTerminalId)}
+                              onClick={() => xtermInstances.current[activeTerminalId]?.term?.focus()}
+                              style={{ width: '100%', height: '100%', flex: 1, minHeight: 0 }}
+                            />
+                          </Panel>
+
+                          <PanelResizeHandle
+                            className="resize-handle"
+                            style={{ width: '2px', cursor: 'col-resize', background: 'var(--border-color)' }}
+                          />
+
+                          {/* Right Terminal Pane */}
+                          <Panel
+                            defaultSize={50}
+                            minSize={25}
+                            style={{ display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative' }}
+                          >
+                            <div
+                              style={{
+                                padding: '3px 8px',
+                                fontSize: '0.72rem',
+                                color: '#c084fc',
+                                background: 'rgba(0,0,0,0.3)',
+                                borderBottom: '1px solid var(--border-color)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                              }}
+                            >
+                              <span style={{ fontFamily: 'var(--font-mono)' }}>
+                                {terminals.find((t) => t.id === splitTerminalId)?.title || 'Terminal 2'}
+                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.65rem',
+                                    padding: '1px 5px',
+                                    borderRadius: '3px',
+                                    background: 'rgba(168, 85, 247, 0.15)',
+                                    color: '#c084fc',
+                                  }}
+                                >
+                                  Right
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsTerminalSplit(false)}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-secondary)',
+                                    cursor: 'pointer',
+                                    fontSize: '11px',
+                                    padding: '0 2px',
+                                  }}
+                                  title="Close Split Terminal"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                            <div
+                              ref={terminalRef(splitTerminalId)}
+                              onClick={() => xtermInstances.current[splitTerminalId]?.term?.focus()}
+                              style={{ width: '100%', height: '100%', flex: 1, minHeight: 0 }}
+                            />
+                          </Panel>
+                        </PanelGroup>
+                      ) : (
+                        terminals.map((term) => (
+                          <div
+                            key={term.id}
+                            ref={terminalRef(term.id)}
+                            onClick={() => xtermInstances.current[term.id]?.term?.focus()}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              flex: 1,
+                              minHeight: 0,
+                              display:
+                                activeBottomTab === 'terminal' && activeTerminalId === term.id
+                                  ? 'block'
+                                  : 'none',
+                            }}
+                          />
+                        ))
+                      )}
 
                       {activeBottomTab === 'output' && (
                         <div
                           style={{
                             color: 'var(--text-secondary)',
                             fontFamily: 'var(--font-mono)',
-                            fontSize: '0.85rem',
+                            fontSize: '0.82rem',
+                            padding: '8px 12px',
+                            lineHeight: 1.6,
                           }}
                         >
-                          [Info] Code Analyzer starting up...
-                          <br />
-                          [Info] Workspace parsed successfully.
-                          <br />
-                          [Info] 0 errors, 0 warnings.
+                          <div style={{ color: '#10b981' }}>✓ [CloudLab Runtime] Environment active.</div>
+                          <div>[Workspace] Project: {projectInfo?.name || workspaceId}</div>
+                          <div>[Diagnostics] {markers.length} marker(s) reported by compiler.</div>
+                          {activeFile && (
+                            <div style={{ color: 'var(--text-primary)', marginTop: '4px' }}>
+                              [Active File] {activeFile} ({files[activeFile]?.language || 'plaintext'})
+                            </div>
+                          )}
                         </div>
                       )}
 
                       {activeBottomTab === 'problems' && (
                         <div
                           style={{
+                            height: '100%',
+                            overflowY: 'auto',
                             color: 'var(--text-secondary)',
-                            fontFamily: 'var(--font-mono)',
+                            fontFamily: 'inherit',
                             fontSize: '0.85rem',
                           }}
                         >
-                          No problems have been detected in the workspace.
+                          {markers.length === 0 ? (
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '12px 16px',
+                                color: 'var(--text-secondary)',
+                              }}
+                            >
+                              <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span> No problems detected in workspace files.
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '6px 8px' }}>
+                              {Object.entries(
+                                markers.reduce((acc: Record<string, typeof markers>, m) => {
+                                  const key = m.resource || activeFile || 'Workspace';
+                                  if (!acc[key]) acc[key] = [];
+                                  acc[key].push(m);
+                                  return acc;
+                                }, {})
+                              ).map(([fileKey, fileMarkers]) => (
+                                <div
+                                  key={fileKey}
+                                  style={{
+                                    background: 'rgba(255, 255, 255, 0.02)',
+                                    borderRadius: '6px',
+                                    border: '1px solid var(--border-color)',
+                                    overflow: 'hidden',
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      padding: '6px 12px',
+                                      background: 'rgba(255, 255, 255, 0.04)',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 600,
+                                      color: 'var(--text-primary)',
+                                    }}
+                                  >
+                                    <FileCode size={13} style={{ color: 'var(--accent-orange)' }} />
+                                    <span style={{ flex: 1 }}>{fileKey}</span>
+                                    <span
+                                      style={{
+                                        background: 'rgba(255, 255, 255, 0.1)',
+                                        padding: '1px 6px',
+                                        borderRadius: '10px',
+                                        fontSize: '0.7rem',
+                                        fontFamily: 'var(--font-mono)',
+                                      }}
+                                    >
+                                      {fileMarkers.length}
+                                    </span>
+                                  </div>
+
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    {fileMarkers.map((prob, pIdx) => {
+                                      const isErr = prob.severity === 8;
+                                      const isWarn = prob.severity === 4;
+                                      return (
+                                        <div
+                                          key={`${fileKey}-${pIdx}`}
+                                          onClick={() =>
+                                            handleNavigateToFileAndPosition(
+                                              prob.resource || activeFile,
+                                              prob.startLineNumber,
+                                              prob.startColumn,
+                                            )
+                                          }
+                                          style={{
+                                            display: 'flex',
+                                            alignItems: 'flex-start',
+                                            gap: '8px',
+                                            padding: '6px 12px',
+                                            cursor: 'pointer',
+                                            borderTop: '1px solid rgba(255, 255, 255, 0.03)',
+                                            transition: 'background 0.15s',
+                                            fontSize: '0.82rem',
+                                          }}
+                                          onMouseOver={(e) =>
+                                            (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)')
+                                          }
+                                          onMouseOut={(e) =>
+                                            (e.currentTarget.style.background = 'transparent')
+                                          }
+                                        >
+                                          <span style={{ marginTop: '2px', flexShrink: 0 }}>
+                                            {isErr ? (
+                                              <XCircle size={13} style={{ color: '#ef4444' }} />
+                                            ) : isWarn ? (
+                                              <AlertTriangle size={13} style={{ color: '#f59e0b' }} />
+                                            ) : (
+                                              <Info size={13} style={{ color: '#06b6d4' }} />
+                                            )}
+                                          </span>
+                                          <span style={{ color: 'var(--text-primary)', flex: 1 }}>
+                                            {prob.message}
+                                            {prob.code && (
+                                              <span
+                                                style={{
+                                                  color: 'var(--text-secondary)',
+                                                  marginLeft: '6px',
+                                                  fontSize: '0.75rem',
+                                                }}
+                                              >
+                                                [{prob.code}]
+                                              </span>
+                                            )}
+                                          </span>
+                                          <span
+                                            style={{
+                                              color: 'var(--text-secondary)',
+                                              fontFamily: 'var(--font-mono)',
+                                              fontSize: '0.75rem',
+                                              whiteSpace: 'nowrap',
+                                            }}
+                                          >
+                                            [{prob.startLineNumber}, {prob.startColumn}]
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2235,45 +3193,251 @@ export default function Workspace() {
                     {activeBottomTab === 'terminal' && terminals.length > 0 && (
                       <div
                         style={{
-                          width: '180px',
+                          width: '190px',
                           borderLeft: '1px solid var(--border-color)',
                           display: 'flex',
                           flexDirection: 'column',
-                          padding: '8px',
+                          padding: '6px',
+                          background: 'rgba(0, 0, 0, 0.15)',
                         }}
                       >
-                        {terminals.map((term) => (
-                          <div
-                            key={term.id}
-                            onClick={() => setActiveTerminalId(term.id)}
-                            style={{
-                              padding: '6px 8px',
-                              cursor: 'pointer',
-                              borderRadius: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              fontSize: '0.8rem',
-                              color:
-                                activeTerminalId === term.id
-                                  ? 'var(--text-primary)'
-                                  : 'var(--text-secondary)',
-                              background:
-                                activeTerminalId === term.id ? 'var(--bg-tertiary)' : 'transparent',
-                            }}
-                            onMouseOver={(e) => {
-                              if (activeTerminalId !== term.id)
-                                e.currentTarget.style.background = 'var(--bg-tertiary)';
-                            }}
-                            onMouseOut={(e) => {
-                              if (activeTerminalId !== term.id)
-                                e.currentTarget.style.background = 'transparent';
-                            }}
-                          >
-                            <TerminalIcon size={12} />
-                            {term.title}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '4px 6px',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.05em',
+                            color: 'var(--text-secondary)',
+                            textTransform: 'uppercase',
+                            borderBottom: '1px solid var(--border-color)',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          <span>TERMINALS ({terminals.length})</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleNewTerminal('default')}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-secondary)',
+                                cursor: 'pointer',
+                                padding: '1px',
+                              }}
+                              title="New Terminal"
+                              onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
+                              onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                            >
+                              <Plus size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleToggleSplitTerminal}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: isTerminalSplit ? '#c084fc' : 'var(--text-secondary)',
+                                cursor: 'pointer',
+                                padding: '1px',
+                              }}
+                              title="Toggle Split Terminal"
+                              onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
+                              onMouseOut={(e) =>
+                                (e.currentTarget.style.color = isTerminalSplit ? '#c084fc' : 'var(--text-secondary)')
+                              }
+                            >
+                              <SplitSquareHorizontal size={12} />
+                            </button>
                           </div>
-                        ))}
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2px',
+                            overflowY: 'auto',
+                            flex: 1,
+                          }}
+                        >
+                          {terminals.map((term) => (
+                            <div
+                              key={term.id}
+                              onClick={() => {
+                                setActiveTerminalId(term.id);
+                                setTimeout(() => {
+                                  try {
+                                    xtermInstances.current[term.id]?.term?.focus();
+                                    xtermInstances.current[term.id]?.fitAddon?.fit();
+                                  } catch (e) {}
+                                }, 50);
+                              }}
+                              style={{
+                                padding: '5px 8px',
+                                cursor: 'pointer',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                fontSize: '0.78rem',
+                                color:
+                                  activeTerminalId === term.id
+                                    ? '#22d3ee'
+                                    : splitTerminalId === term.id && isTerminalSplit
+                                    ? '#c084fc'
+                                    : 'var(--text-secondary)',
+                                background:
+                                  activeTerminalId === term.id
+                                    ? 'rgba(6, 182, 212, 0.15)'
+                                    : splitTerminalId === term.id && isTerminalSplit
+                                    ? 'rgba(168, 85, 247, 0.15)'
+                                    : 'transparent',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseOver={(e) => {
+                                if (activeTerminalId !== term.id && (!isTerminalSplit || splitTerminalId !== term.id)) {
+                                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                }
+                              }}
+                              onMouseOut={(e) => {
+                                if (activeTerminalId !== term.id && (!isTerminalSplit || splitTerminalId !== term.id)) {
+                                  e.currentTarget.style.background = 'transparent';
+                                }
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  flex: 1,
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                <TerminalIcon size={12} style={{ flexShrink: 0 }} />
+                                {editingTerminalId === term.id ? (
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={editingTerminalTitle}
+                                    onChange={(e) => setEditingTerminalTitle(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleRenameTerminal(term.id, editingTerminalTitle);
+                                      if (e.key === 'Escape') setEditingTerminalId(null);
+                                    }}
+                                    onBlur={() => handleRenameTerminal(term.id, editingTerminalTitle)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{
+                                      background: 'rgba(0, 0, 0, 0.5)',
+                                      border: '1px solid var(--accent-cyan)',
+                                      borderRadius: '2px',
+                                      color: '#fff',
+                                      fontSize: '0.75rem',
+                                      padding: '1px 4px',
+                                      outline: 'none',
+                                      width: '90px',
+                                    }}
+                                  />
+                                ) : (
+                                  <span
+                                    onDoubleClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingTerminalId(term.id);
+                                      setEditingTerminalTitle(term.title);
+                                    }}
+                                    style={{
+                                      fontFamily: 'var(--font-mono)',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                    title="Double click to rename"
+                                  >
+                                    {term.title}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                {isTerminalSplit && term.id === activeTerminalId && (
+                                  <span
+                                    style={{
+                                      fontSize: '0.62rem',
+                                      padding: '1px 3px',
+                                      borderRadius: '2px',
+                                      background: 'rgba(6, 182, 212, 0.3)',
+                                      color: '#22d3ee',
+                                    }}
+                                  >
+                                    L
+                                  </span>
+                                )}
+                                {isTerminalSplit && term.id === splitTerminalId && (
+                                  <span
+                                    style={{
+                                      fontSize: '0.62rem',
+                                      padding: '1px 3px',
+                                      borderRadius: '2px',
+                                      background: 'rgba(168, 85, 247, 0.3)',
+                                      color: '#c084fc',
+                                    }}
+                                  >
+                                    R
+                                  </span>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingTerminalId(term.id);
+                                    setEditingTerminalTitle(term.title);
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-secondary)',
+                                    cursor: 'pointer',
+                                    padding: '2px',
+                                    borderRadius: '2px',
+                                    display: 'flex',
+                                  }}
+                                  title="Rename Terminal"
+                                  onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
+                                  onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                                >
+                                  <Edit2 size={11} />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleKillTerminal(term.id);
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-secondary)',
+                                    cursor: 'pointer',
+                                    padding: '2px',
+                                    borderRadius: '2px',
+                                    display: 'flex',
+                                  }}
+                                  title="Kill Terminal"
+                                  onMouseOver={(e) => (e.currentTarget.style.color = '#ef4444')}
+                                  onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                                >
+                                  <Trash size={11} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2359,6 +3523,43 @@ export default function Workspace() {
               💾 {(storageUsage.usedBytes / 1024 / 1024).toFixed(1)} MB /{' '}
               {(storageUsage.quotaBytes / 1024 / 1024).toFixed(0)} MB
             </span>
+
+            {/* Real-time Diagnostics (Problems) Indicator */}
+            <span
+              onClick={() => setActiveBottomTab('problems')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                transition: 'opacity 0.2s',
+                opacity: 0.9,
+              }}
+              onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
+              onMouseOut={(e) => (e.currentTarget.style.opacity = '0.9')}
+              title={`${markers.filter((m) => m.severity === 8).length} error(s), ${markers.filter((m) => m.severity === 4).length} warning(s)`}
+            >
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  color: markers.some((m) => m.severity === 8) ? '#ef4444' : 'var(--text-secondary)',
+                }}
+              >
+                <XCircle size={12} /> {markers.filter((m) => m.severity === 8).length}
+              </span>
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  color: markers.some((m) => m.severity === 4) ? '#f59e0b' : 'var(--text-secondary)',
+                }}
+              >
+                <AlertTriangle size={12} /> {markers.filter((m) => m.severity === 4).length}
+              </span>
+            </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -2367,7 +3568,46 @@ export default function Workspace() {
               onMouseOver={(e) => (e.currentTarget.style.color = 'var(--bg-primary)')}
               onMouseOut={(e) => (e.currentTarget.style.color = '#fff')}
             >
-              Ln 1, Col 1
+              Ln {cursorPos.line}, Col {cursorPos.col}
+            </span>
+            <span
+              onClick={() => setEditorTabSize((prev) => (prev === 2 ? 4 : 2))}
+              style={{ cursor: 'pointer', transition: 'color 0.2s' }}
+              onMouseOver={(e) => (e.currentTarget.style.color = 'var(--bg-primary)')}
+              onMouseOut={(e) => (e.currentTarget.style.color = '#fff')}
+              title="Click to toggle Tab Indentation"
+            >
+              Spaces: {editorTabSize}
+            </span>
+            <span
+              onClick={() => setEditorWordWrap((prev) => (prev === 'on' ? 'off' : 'on'))}
+              style={{
+                cursor: 'pointer',
+                transition: 'color 0.2s',
+                color: editorWordWrap === 'on' ? '#22d3ee' : '#94a3b8',
+              }}
+              onMouseOver={(e) => (e.currentTarget.style.color = 'var(--bg-primary)')}
+              onMouseOut={(e) =>
+                (e.currentTarget.style.color = editorWordWrap === 'on' ? '#22d3ee' : '#94a3b8')
+              }
+              title="Click to toggle Word Wrap (Alt+Z)"
+            >
+              Wrap: {editorWordWrap === 'on' ? 'ON' : 'OFF'}
+            </span>
+            <span
+              onClick={() => setEditorMinimap((prev) => !prev)}
+              style={{
+                cursor: 'pointer',
+                transition: 'color 0.2s',
+                color: editorMinimap ? '#34d399' : '#94a3b8',
+              }}
+              onMouseOver={(e) => (e.currentTarget.style.color = 'var(--bg-primary)')}
+              onMouseOut={(e) =>
+                (e.currentTarget.style.color = editorMinimap ? '#34d399' : '#94a3b8')
+              }
+              title="Click to toggle Minimap"
+            >
+              Map: {editorMinimap ? 'ON' : 'OFF'}
             </span>
             <span
               style={{ cursor: 'pointer', transition: 'color 0.2s' }}

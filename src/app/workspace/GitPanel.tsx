@@ -25,9 +25,10 @@ import { getErrorMessage } from '@/lib/error-utils';
 
 interface GitPanelProps {
   workspaceId: string;
+  onOpenFileDiff?: (filePath: string) => void;
 }
 
-export default function GitPanel({ workspaceId }: GitPanelProps) {
+export default function GitPanel({ workspaceId, onOpenFileDiff }: GitPanelProps) {
   const [isRepo, setIsRepo] = useState<boolean | null>(null);
   const [currentBranch, setCurrentBranch] = useState('');
   const [staged, setStaged] = useState<{ file: string; state: string }[]>([]);
@@ -293,17 +294,31 @@ export default function GitPanel({ workspaceId }: GitPanelProps) {
                   key={item.file}
                   className="group flex items-center justify-between p-2 rounded-lg bg-[#0c1426] hover:bg-[#111e38] border border-white/[0.06] hover:border-emerald-500/30 transition-all text-xs text-emerald-300 font-mono"
                 >
-                  <span className="truncate max-w-[180px]" title={item.file}>
+                  <span
+                    onClick={() => onOpenFileDiff?.(item.file)}
+                    className="truncate max-w-[180px] cursor-pointer hover:underline"
+                    title={`Click to open diff with HEAD: ${item.file}`}
+                  >
                     {item.file}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => handleAction('unstage', item.file)}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-all cursor-pointer"
-                    title="Unstage file"
-                  >
-                    <Minus size={12} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onOpenFileDiff?.(item.file)}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-300 transition-all cursor-pointer"
+                      title="Open Changes (Diff)"
+                    >
+                      <FileCode size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAction('unstage', item.file)}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-all cursor-pointer"
+                      title="Unstage file"
+                    >
+                      <Minus size={12} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -345,10 +360,22 @@ export default function GitPanel({ workspaceId }: GitPanelProps) {
                   key={item.file}
                   className="group flex items-center justify-between p-2 rounded-lg bg-[#0c1426] hover:bg-[#111e38] border border-white/[0.06] hover:border-amber-500/30 transition-all text-xs text-amber-300 font-mono"
                 >
-                  <span className="truncate max-w-[180px]" title={item.file}>
+                  <span
+                    onClick={() => onOpenFileDiff?.(item.file)}
+                    className="truncate max-w-[180px] cursor-pointer hover:underline"
+                    title={`Click to open diff with HEAD: ${item.file}`}
+                  >
                     {item.file}
                   </span>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => onOpenFileDiff?.(item.file)}
+                      className="p-1 rounded hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-300 transition-all cursor-pointer"
+                      title="Open Changes (Diff)"
+                    >
+                      <FileCode size={12} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleAction('stage', item.file)}
