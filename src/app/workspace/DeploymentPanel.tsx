@@ -179,35 +179,35 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
   return (
     <div className="flex flex-col h-full bg-[#070b14] text-slate-100 font-sans select-none">
       {/* Header Bar */}
-      <div className="px-4 py-3 bg-[#0a0f1d] border-b border-white/[0.08] flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-400">
-            <Rocket size={15} />
+      <div className="px-3.5 py-2.5 bg-[#0a0f1d] border-b border-white/[0.08] flex items-center justify-between shrink-0 gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0">
+            <Rocket size={14} />
           </div>
-          <div>
-            <div className="text-xs font-bold text-white flex items-center gap-2">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-white flex items-center gap-1.5 flex-wrap">
               <span>Docker Deployment</span>
               <span
-                className={`text-[9.5px] font-mono px-2 py-0.5 rounded-full border ${
+                className={`text-[9.5px] font-sans font-medium px-2 py-0.5 rounded-full border ${
                   dockerAvailable === false
-                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/25'
                     : status === 'running'
-                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25'
                     : status === 'building' || isDeploying
-                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/25'
                     : 'bg-slate-800 text-slate-400 border-white/10'
                 }`}
               >
                 {dockerAvailable === false
-                  ? 'Daemon Offline'
+                  ? 'Offline'
                   : status === 'running'
-                  ? '● Live Running'
+                  ? '● Live'
                   : isDeploying
-                  ? 'Building Image...'
+                  ? 'Building...'
                   : 'Stopped'}
               </span>
             </div>
-            <div className="text-[10.5px] text-slate-400 font-mono">
+            <div className="text-[11px] text-slate-400 font-sans tracking-normal mt-0.5 truncate">
               {detection?.stack || 'Scanning stack...'}
             </div>
           </div>
@@ -219,89 +219,89 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
             fetchStatus();
             fetchLogs();
           }}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer shrink-0"
           title="Refresh Status"
         >
-          <RefreshCw size={14} className={isDeploying ? 'animate-spin' : ''} />
+          <RefreshCw size={13} className={isDeploying ? 'animate-spin' : ''} />
         </button>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-800">
+      <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 scrollbar-thin scrollbar-thumb-slate-800">
         {/* Error Notice */}
         {errorMsg && (
-          <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-start gap-2.5">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red-400" />
-            <div className="flex-1 space-y-1">
+          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-red-400 text-xs flex items-start gap-2.5">
+            <AlertTriangle size={15} className="mt-0.5 shrink-0 text-red-400" />
+            <div className="flex-1 space-y-1 min-w-0">
               <span className="font-semibold block text-red-300">Deployment Error</span>
-              <p className="leading-relaxed font-mono text-[11px] text-red-200/90 whitespace-pre-wrap break-words">{errorMsg}</p>
+              <p className="leading-normal font-mono text-[11px] text-red-200/90 whitespace-pre-wrap break-words">{errorMsg}</p>
             </div>
             <button
               type="button"
               onClick={() => setErrorMsg(null)}
-              className="p-1 hover:bg-red-500/20 rounded text-red-400 hover:text-red-200 transition-colors cursor-pointer"
+              className="p-1 hover:bg-red-500/20 rounded text-red-400 hover:text-red-200 transition-colors cursor-pointer shrink-0"
               title="Dismiss"
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           </div>
         )}
 
         {/* Docker Offline Notice / Alternative Command */}
         {dockerAvailable === false && !errorMsg && (
-          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300/90 text-xs space-y-2">
-            <div className="flex items-center gap-2 font-semibold text-amber-300">
-              <AlertTriangle size={15} className="text-amber-400 shrink-0" />
-              <span>Docker Desktop Daemon is Offline</span>
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300/90 text-xs space-y-2">
+            <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+              <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+              <span>Docker Daemon Offline</span>
             </div>
-            <p className="text-[11.5px] leading-relaxed text-amber-200/80">
-              Docker Desktop is not currently running. To build and run isolated container sandboxes, start Docker Desktop. You can also run your project directly via the integrated <strong>Terminal</strong> below.
+            <p className="text-[11.5px] leading-normal text-amber-200/80">
+              Docker Desktop is not currently running. To deploy in a container, start Docker Desktop. Or run your project right now in the <strong>Terminal</strong>:
             </p>
-            <div className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-amber-500/20 font-mono text-[11px]">
-              <span className="text-slate-300">Command: <span className="text-emerald-400 font-bold">{runCommand}</span></span>
-              <span className="text-[10px] text-slate-400">Terminal ready</span>
+            <div className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-amber-500/20 font-mono text-[11px] gap-2">
+              <span className="text-slate-300 truncate">Run: <span className="text-emerald-400 font-bold">{runCommand}</span></span>
+              <span className="text-[10px] text-slate-400 shrink-0">Terminal ready</span>
             </div>
           </div>
         )}
 
         {/* Live Container Status Banner */}
         {status === 'running' && url ? (
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/15 via-teal-500/10 to-transparent border border-emerald-500/30 shadow-lg space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
-                <CheckCircle2 size={16} />
-                <span>Container Live & Serving Traffic</span>
+          <div className="p-3.5 rounded-xl bg-gradient-to-br from-emerald-500/15 via-teal-500/10 to-transparent border border-emerald-500/30 shadow-lg space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-emerald-400 font-semibold text-xs">
+                <CheckCircle2 size={15} />
+                <span>Container Live & Serving</span>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
                 Port {hostPort}
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/90 border border-emerald-500/20 text-xs">
-              <div className="flex items-center gap-2 text-slate-200 font-mono truncate">
-                <Globe size={13} className="text-emerald-400 shrink-0" />
+            <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/90 border border-emerald-500/20 text-xs gap-2">
+              <div className="flex items-center gap-1.5 text-slate-200 font-mono text-[11px] truncate">
+                <Globe size={12} className="text-emerald-400 shrink-0" />
                 <span className="truncate">{url}</span>
               </div>
               <a
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400 transition-colors shadow-sm"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400 transition-colors shadow-sm shrink-0"
               >
-                <span>Open App</span>
-                <ExternalLink size={12} />
+                <span>Open</span>
+                <ExternalLink size={11} />
               </a>
             </div>
 
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 pt-0.5">
               <button
                 type="button"
                 disabled={isDeploying}
                 onClick={() => handleAction('restart')}
-                className="flex-1 py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 border border-white/10 transition-colors cursor-pointer"
+                className="flex-1 py-1.5 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 border border-white/10 transition-colors cursor-pointer"
               >
                 <RotateCcw size={12} />
-                <span>Rebuild & Restart</span>
+                <span>Restart</span>
               </button>
               <button
                 type="button"
@@ -316,42 +316,42 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
           </div>
         ) : (
           /* Deploy Action Card */
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0e172a] to-[#0a0f1d] border border-white/10 shadow-lg space-y-3.5">
+          <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#0e172a] to-[#0a0f1d] border border-white/10 shadow-lg space-y-3">
             <div className="space-y-1">
-              <div className="text-sm font-bold text-white flex items-center gap-2">
-                <Zap size={16} className="text-amber-400" />
-                <span>Run in Isolated Docker Container</span>
+              <div className="text-xs font-semibold text-white flex items-center gap-1.5">
+                <Zap size={14} className="text-amber-400" />
+                <span>Isolated Docker Container</span>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Builds a multi-stage Docker container image for your <strong>{detection?.stack || 'project'}</strong> and maps internal ports to local host.
+              <p className="text-[11.5px] text-slate-400 leading-normal">
+                Builds an isolated container sandbox for <strong className="text-slate-200">{detection?.stack || 'your app'}</strong> with port forwarding.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300 font-medium">
-              <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 flex items-center gap-2">
-                <ShieldCheck size={14} className="text-emerald-400 shrink-0" />
+            <div className="flex flex-wrap items-center gap-1.5 text-[10.5px]">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/80 border border-white/5 text-slate-300 font-medium">
+                <ShieldCheck size={12} className="text-emerald-400 shrink-0" />
                 <span>Rootless Sandbox</span>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 flex items-center gap-2">
-                <Globe size={14} className="text-blue-400 shrink-0" />
-                <span>Exposed Port {detection?.defaultPort || 3000}</span>
-              </div>
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/80 border border-white/5 text-slate-300 font-medium">
+                <Globe size={12} className="text-blue-400 shrink-0" />
+                <span>Port {detection?.defaultPort || 3000}</span>
+              </span>
             </div>
 
             <button
               type="button"
               disabled={isDeploying}
               onClick={() => handleAction('start')}
-              className="btn-cta-glow w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-lg disabled:opacity-50"
+              className="btn-cta-glow w-full py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
             >
               {isDeploying ? (
                 <>
-                  <Loader2 size={15} className="animate-spin" />
-                  <span>Building & Launching Container...</span>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Building Container...</span>
                 </>
               ) : (
                 <>
-                  <Play size={14} fill="currentColor" />
+                  <Play size={13} fill="currentColor" />
                   <span>Build & Deploy to Docker</span>
                 </>
               )}
@@ -362,16 +362,16 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
         {/* Dockerfile Viewer / Editor Toggle */}
         <div className="p-3 rounded-xl bg-slate-950/80 border border-white/10 space-y-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-              <FileCode size={14} className="text-teal-400" />
-              <span>Dockerfile Configuration</span>
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-300">
+              <FileCode size={13} className="text-teal-400 shrink-0" />
+              <span>Dockerfile Config</span>
             </div>
             <button
               type="button"
               onClick={() => setShowDockerfile(!showDockerfile)}
-              className="text-[11px] text-teal-400 hover:text-teal-300 underline cursor-pointer"
+              className="text-[11px] text-teal-400 hover:text-teal-300 transition-colors font-medium cursor-pointer"
             >
-              {showDockerfile ? 'Hide Dockerfile' : 'Inspect Dockerfile'}
+              {showDockerfile ? 'Hide' : 'Inspect'}
             </button>
           </div>
 
@@ -380,31 +380,31 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
               rows={6}
               value={customDockerfile}
               onChange={(e) => setCustomDockerfile(e.target.value)}
-              className="w-full bg-[#050811] border border-slate-800 rounded-lg p-2.5 text-xs font-mono text-emerald-300 leading-relaxed outline-none focus:border-teal-400"
+              className="w-full bg-[#050811] border border-slate-800 rounded-lg p-2.5 text-xs font-mono text-emerald-300 leading-relaxed outline-none focus:border-teal-400 resize-none"
             />
           )}
         </div>
 
         {/* Live Streaming Build & Container Logs */}
-        <div className="rounded-2xl bg-[#050811] border border-white/10 overflow-hidden shadow-xl flex flex-col">
-          <div className="px-3.5 py-2 bg-[#0a0f1d] border-b border-white/10 flex items-center justify-between text-xs text-slate-400">
-            <div className="flex items-center gap-2">
-              <Terminal size={13} className="text-emerald-400" />
-              <span className="font-semibold text-slate-300">Deployment & Build Logs</span>
+        <div className="rounded-xl bg-[#050811] border border-white/10 overflow-hidden shadow-lg flex flex-col">
+          <div className="px-3 py-2 bg-[#0a0f1d] border-b border-white/[0.08] flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5">
+              <Terminal size={12} className="text-emerald-400 shrink-0" />
+              <span className="font-medium text-slate-300 text-[11px]">Deployment Logs</span>
             </div>
             <button
               type="button"
               onClick={handleCopyLogs}
-              className="flex items-center gap-1 text-[10.5px] text-slate-400 hover:text-white transition-colors cursor-pointer"
+              className="flex items-center gap-1 text-[10.5px] text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
             >
-              {copiedLogs ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+              {copiedLogs ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
               <span>{copiedLogs ? 'Copied' : 'Copy'}</span>
             </button>
           </div>
 
-          <div className="p-3 font-mono text-[11px] text-slate-300 max-h-56 overflow-y-auto space-y-1 select-text">
+          <div className="p-3 font-mono text-[11px] text-slate-300 max-h-52 overflow-y-auto space-y-1 select-text">
             {logs.length === 0 ? (
-              <div className="text-slate-600 italic">No deployment logs yet. Click Deploy to start.</div>
+              <div className="text-slate-500 font-sans text-xs py-2 text-center">No logs yet. Click Deploy to start.</div>
             ) : (
               logs.map((line, idx) => (
                 <div key={idx} className="leading-relaxed whitespace-pre-wrap break-all">
