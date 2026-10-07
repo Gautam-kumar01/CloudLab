@@ -62,6 +62,9 @@ import DeploymentPanel from './DeploymentPanel';
 import SearchPanel from './SearchPanel';
 import NpmScriptsPanel from './NpmScriptsPanel';
 import FileIcon from './FileIcon';
+import ShareModal from './ShareModal';
+import SnapshotModal from './SnapshotModal';
+import CommandPaletteModal from './CommandPaletteModal';
 
 const COMMAND_ITEMS = [
   { id: 'open-folder', label: 'File: Open Desktop Folder...', icon: '📁' },
@@ -4039,350 +4042,43 @@ export default function Workspace() {
           onChange={handleUploadFileSelect}
         />
 
-        {showCommandPalette && (
-          <div
-            onClick={() => setShowCommandPalette(false)}
-            className="fixed inset-0 z-50 flex justify-center pt-16 sm:pt-24 px-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150"
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="modal-animate-in w-full max-w-xl max-h-[460px] bg-[#090d1a] rounded-2xl border border-white/15 shadow-[0_25px_80px_rgba(0,0,0,0.95),0_0_50px_rgba(16,185,129,0.15)] flex flex-col overflow-hidden"
-            >
-              {/* Top Accent Strip */}
-              <div className="h-1 w-full bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500" />
+        {/* Command Palette Modal */}
+        <CommandPaletteModal
+          isOpen={showCommandPalette}
+          onClose={() => setShowCommandPalette(false)}
+          mode={paletteMode}
+          setMode={setPaletteMode}
+          query={commandQuery}
+          setQuery={setCommandQuery}
+          selectedIndex={selectedPaletteIndex}
+          setSelectedIndex={setSelectedPaletteIndex}
+          commands={COMMAND_ITEMS}
+          fileTree={fileTree}
+          onExecuteCommand={executePaletteCommand}
+          onOpenFile={(filePath) => openFile(filePath)}
+        />
 
-              {/* Search Bar */}
-              <div className="p-3 bg-[#0c1426] border-b border-white/10 flex items-center gap-3">
-                <div className="text-emerald-400 font-mono text-sm pl-1">
-                  {paletteMode === 'commands' ? '>' : '📁'}
-                </div>
-                <input
-                  type="text"
-                  value={commandQuery}
-                  onChange={(e) => {
-                    setCommandQuery(e.target.value);
-                    setSelectedPaletteIndex(0);
-                  }}
-                  placeholder={
-                    paletteMode === 'commands'
-                      ? 'Type a command (e.g. Open Folder, Deploy, Git, Terminal)...'
-                      : 'Search files by name (e.g. page.tsx, index.js)...'
-                  }
-                  autoFocus
-                  className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none font-sans"
-                />
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setPaletteMode(paletteMode === 'commands' ? 'files' : 'commands')}
-                    className="px-2 py-0.5 rounded-md text-[10.5px] font-mono font-semibold bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors"
-                  >
-                    {paletteMode === 'commands' ? 'Switch to Files' : 'Switch to Commands'}
-                  </button>
-                  <span className="text-[10px] font-mono text-slate-500 px-1.5 py-0.5 rounded bg-white/5">
-                    ESC
-                  </span>
-                </div>
-              </div>
-
-              {/* Items List */}
-              <div className="flex-1 overflow-y-auto p-2 space-y-1 select-none scrollbar-thin scrollbar-thumb-slate-800">
-                {paletteMode === 'commands' ? (
-                  /* Commands Mode */
-                  COMMAND_ITEMS
-                    .filter((cmd) => cmd.label.toLowerCase().includes(commandQuery.toLowerCase()))
-                    .map((cmd, idx) => (
-                      <div
-                        key={cmd.id}
-                        onClick={() => executePaletteCommand(cmd.id)}
-                        className={`px-3 py-2 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
-                          idx === selectedPaletteIndex
-                            ? 'bg-emerald-500/15 text-white border border-emerald-500/30'
-                            : 'text-slate-300 hover:bg-slate-900 hover:text-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 text-xs font-medium">
-                          <span>{cmd.icon}</span>
-                          <span>{cmd.label}</span>
-                        </div>
-                        <span className="text-[10px] font-mono text-slate-500">Run</span>
-                      </div>
-                    ))
-                ) : (
-                  /* Quick Open Files Mode */
-                  (() => {
-                    const fileList: { path: string; name: string }[] = [];
-                    function collectFiles(nodeMap: any) {
-                      if (!nodeMap) return;
-                      Object.values(nodeMap).forEach((node: any) => {
-                        if (node.type === 'file') {
-                          fileList.push({ path: node.path, name: node.name || node.path });
-                        }
-                        if (node.children) collectFiles(node.children);
-                      });
-                    }
-                    collectFiles(fileTree);
-
-                    const filtered = fileList.filter(
-                      (f) =>
-                        f.path.toLowerCase().includes(commandQuery.toLowerCase()) ||
-                        f.name.toLowerCase().includes(commandQuery.toLowerCase())
-                    );
-
-                    if (filtered.length === 0) {
-                      return (
-                        <div className="p-6 text-center text-xs text-slate-500">
-                          No matching files found for &quot;{commandQuery}&quot;
-                        </div>
-                      );
-                    }
-
-                    return filtered.map((f, idx) => (
-                      <div
-                        key={f.path}
-                        onClick={() => {
-                          setShowCommandPalette(false);
-                          openFile(f.path);
-                        }}
-                        className={`px-3 py-2 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
-                          idx === selectedPaletteIndex
-                            ? 'bg-emerald-500/15 text-white border border-emerald-500/30'
-                            : 'text-slate-300 hover:bg-slate-900 hover:text-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 text-xs font-mono">
-                          <FileCode size={14} className="text-emerald-400 shrink-0" />
-                          <span className="font-semibold text-white">{f.name}</span>
-                          <span className="text-[11px] text-slate-500 truncate max-w-[280px]">
-                            {f.path}
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-mono text-slate-500">Jump</span>
-                      </div>
-                    ));
-                  })()
-                )}
-              </div>
-            </div>
-          </div>
-        )}
         {/* Phase 3: Collaborators & Access Modal */}
-        {showShareModal && (
-          <div
-            onClick={() => setShowShareModal(false)}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in"
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg bg-[#0c1426] border border-white/15 rounded-2xl p-6 shadow-2xl flex flex-col gap-5 text-white"
-            >
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
-                    <Share size={18} />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-lg leading-tight">Workspace Collaborators</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Manage permissions and team access</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowShareModal(false)}
-                  className="text-slate-400 hover:text-white text-sm px-2 py-1"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Invite Input (Only for Owners) */}
-              {workspaceRole === 'OWNER' && (
-                <div className="flex flex-col gap-2 bg-slate-900/60 p-3.5 rounded-xl border border-white/10">
-                  <span className="text-xs font-semibold text-slate-300">Invite Collaborator</span>
-                  <div className="flex gap-2">
-                    <input
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      placeholder="user@example.com"
-                      className="flex-1 bg-black/40 border border-white/15 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-emerald-500"
-                    />
-                    <select
-                      value={inviteRole}
-                      onChange={(e) => setInviteRole(e.target.value as any)}
-                      className="bg-black/40 border border-white/15 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
-                    >
-                      <option value="EDITOR">Editor</option>
-                      <option value="VIEWER">Viewer</option>
-                    </select>
-                    <button
-                      onClick={handleInviteMember}
-                      disabled={isInviting || !inviteEmail.trim()}
-                      className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-semibold text-xs px-3 py-1.5 rounded-lg transition-colors"
-                    >
-                      {isInviting ? 'Adding...' : 'Invite'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Collaborators List */}
-              <div className="flex flex-col gap-2 max-h-56 overflow-y-auto">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Members & Roles</span>
-                {workspaceMembers.owner && (
-                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 border border-white/5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-purple-600/40 border border-purple-500/50 flex items-center justify-center text-xs font-bold text-purple-200">
-                        {(workspaceMembers.owner.name || workspaceMembers.owner.email || 'O')[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium text-white">{workspaceMembers.owner.name || 'Owner'}</div>
-                        <div className="text-[11px] text-slate-400">{workspaceMembers.owner.email}</div>
-                      </div>
-                    </div>
-                    <span className="text-[11px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded font-mono font-semibold">
-                      OWNER
-                    </span>
-                  </div>
-                )}
-
-                {workspaceMembers.members.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 border border-white/5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-cyan-600/40 border border-cyan-500/50 flex items-center justify-center text-xs font-bold text-cyan-200">
-                        {(m.user?.name || m.user?.email || 'U')[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium text-white">{m.user?.name || 'Member'}</div>
-                        <div className="text-[11px] text-slate-400">{m.user?.email}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[11px] px-2 py-0.5 rounded font-mono font-semibold ${
-                        m.role === 'EDITOR'
-                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                      }`}>
-                        {m.role}
-                      </span>
-                      {workspaceRole === 'OWNER' && (
-                        <button
-                          onClick={() => handleRemoveMember(m.id)}
-                          className="text-red-400 hover:text-red-300 text-xs px-1.5 py-0.5"
-                          title="Remove member"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Copy URL */}
-              <div className="pt-2 border-t border-white/10 flex justify-between items-center">
-                <span className="text-xs text-slate-400">Share workspace URL directly</span>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(window.location.href);
-                    alert('Workspace URL copied to clipboard!');
-                  }}
-                  className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-xs text-white rounded-lg transition-colors flex items-center gap-1.5"
-                >
-                  📋 Copy Link
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          workspaceId={workspaceId}
+          workspaceRole={workspaceRole}
+          membersData={workspaceMembers}
+          onRefreshMembers={fetchMembers}
+        />
 
         {/* Phase 3: Point-in-Time Snapshots & Backups Modal */}
-        {showSnapshotModal && (
-          <div
-            onClick={() => setShowSnapshotModal(false)}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in"
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-xl bg-[#0c1426] border border-white/15 rounded-2xl p-6 shadow-2xl flex flex-col gap-5 text-white"
-            >
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl">
-                    <Package size={18} />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-lg leading-tight">Snapshots & Recovery</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Point-in-time workspace rollback and archives</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowSnapshotModal(false)}
-                  className="text-slate-400 hover:text-white text-sm px-2 py-1"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Create Snapshot Button */}
-              <div className="flex justify-between items-center bg-slate-900/60 p-3.5 rounded-xl border border-white/10">
-                <div>
-                  <div className="text-xs font-semibold text-slate-200">Create New Snapshot</div>
-                  <div className="text-[11px] text-slate-400">Captures workspace files instantly</div>
-                </div>
-                <button
-                  onClick={() => handleCreateSnapshot()}
-                  disabled={isCreatingSnapshot || workspaceRole === 'VIEWER'}
-                  className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5"
-                >
-                  {isCreatingSnapshot ? 'Creating...' : '+ Create Snapshot'}
-                </button>
-              </div>
-
-              {/* Snapshots List */}
-              <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Available Snapshots</span>
-                {snapshotLoading ? (
-                  <div className="text-center py-6 text-xs text-slate-400">Loading snapshots...</div>
-                ) : snapshots.length === 0 ? (
-                  <div className="text-center py-8 text-xs text-slate-500 bg-white/5 rounded-xl border border-dashed border-white/10">
-                    No snapshots taken yet. Create a snapshot before making big changes.
-                  </div>
-                ) : (
-                  snapshots.map((s) => (
-                    <div
-                      key={s.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors"
-                    >
-                      <div>
-                        <div className="text-xs font-semibold text-white">{s.description || 'Snapshot'}</div>
-                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                          {new Date(s.createdAt).toLocaleString()} • {(s.sizeBytes / 1024).toFixed(1)} KB
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleRestoreSnapshot(s.id)}
-                          disabled={workspaceRole === 'VIEWER'}
-                          className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-medium transition-colors"
-                        >
-                          Restore
-                        </button>
-                        {workspaceRole === 'OWNER' && (
-                          <button
-                            onClick={() => handleDeleteSnapshot(s.id)}
-                            className="px-2 py-1 bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 rounded-lg text-xs transition-colors"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        <SnapshotModal
+          isOpen={showSnapshotModal}
+          onClose={() => setShowSnapshotModal(false)}
+          workspaceId={workspaceId}
+          workspaceRole={workspaceRole}
+          snapshots={snapshots}
+          isLoading={snapshotLoading}
+          onRefreshSnapshots={fetchSnapshots}
+          onWorkspaceRestored={() => fetchWorkspace()}
+        />
       </div>
     </>
   );
