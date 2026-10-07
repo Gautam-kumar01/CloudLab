@@ -8,8 +8,8 @@ import { exec } from 'child_process';
 import util from 'util';
 import { logAgentAction } from '@/lib/agent-logger';
 import { auth } from '@/auth';
-import { canAccessWorkspace } from '@/lib/workspace-auth';
-import { workspaceFilePath, workspacePath } from '@/lib/workspace-paths';
+import { canAccessWorkspace, canEditWorkspace } from '@/lib/workspace-auth';
+import { workspaceFilePath, workspacePath, assertSafeRealPath } from '@/lib/workspace-paths';
 
 // In-memory rate limiting map for the AI endpoint
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -103,8 +103,40 @@ export async function POST(req: Request) {
         if (content.type === 'tool-result' && content.result === 'APPROVED') {
           try {
             if (content.toolName === 'writeFile') {
-              const safePath = getSafePath(content.args.path, workspaceId);
-              await fs.writeFile(safePath, content.args.content, 'utf8');
+              if (!workspaceId) {
+                throw new Error('Workspace identifier is required for file operations');
+              }
+              const canEdit = await canEditWorkspace(session.user.id, workspaceId);
+              if (!canEdit) {
+                throw new Error('Forbidden. Edit permission required to write files to this workspace.');
+              }
+
+              const safePath = workspaceFilePath(workspaceId, content.args.path);
+              await assertSafeRealPath(workspaceId, safePath);
+
+              // Quota check
+              const { checkQuota } = await import('@/lib/storage');
+              const workspaceRoot = workspacePath(workspaceId);
+              const contentBuffer = Buffer.from(content.args.content || '', 'utf8');
+              let existingSize = 0;
+              try {
+                const stat = await fs.stat(safePath);
+                existingSize = stat.size;
+              } catch {}
+              const sizeDiff = contentBuffer.byteLength - existingSize;
+              if (sizeDiff > 0) {
+                const quota = await checkQuota(workspaceRoot, sizeDiff);
+                if (!quota.ok) {
+                  throw new Error('Storage quota exceeded (500 MB limit)');
+                }
+              }
+
+              const dirPath = path.dirname(safePath);
+              await fs.mkdir(dirPath, { recursive: true });
+              const tmpPath = `${safePath}.tmp.${Date.now()}`;
+              await fs.writeFile(tmpPath, contentBuffer);
+              await fs.rename(tmpPath, safePath);
+
               content.result = `Successfully wrote to ${content.args.path}`;
               logAgentAction('writeFile', { path: content.args.path, status: 'success' });
             } else if (content.toolName === 'runCommand') {

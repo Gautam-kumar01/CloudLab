@@ -151,8 +151,20 @@ export async function DELETE(req: NextRequest) {
       return apiError('Forbidden. Only workspace owners can remove members.', 403);
     }
 
+    // Verify member belongs to this exact workspace
+    const member = await db.workspaceMember.findFirst({
+      where: {
+        id: memberId,
+        projectId: workspaceId,
+      },
+    });
+
+    if (!member) {
+      return apiError('Member not found in the specified workspace', 404);
+    }
+
     await db.workspaceMember.delete({
-      where: { id: memberId },
+      where: { id: member.id },
     });
 
     await logAuditEvent(session.user.id, 'WORKSPACE_MEMBER_REMOVE', {
@@ -160,7 +172,7 @@ export async function DELETE(req: NextRequest) {
       memberId,
     });
 
-    return apiResponse({ success: true, memberId });
+    return apiResponse({ success: true, memberId: member.id });
   } catch (error: any) {
     console.error('Remove member error:', error);
     return apiError('Failed to remove workspace member', 500, error.message);

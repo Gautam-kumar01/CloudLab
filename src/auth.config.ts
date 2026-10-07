@@ -22,7 +22,6 @@ export default {
     },
     session({ session, token }) {
       if (session.user) {
-        (session as any).accessToken = token.accessToken;
         if (token.sub) {
           session.user.id = token.sub;
         }

@@ -17,12 +17,20 @@ export default async function Dashboard() {
     }
   }
 
-  // 1. Fetch user's existing projects from database
+  // 1. Fetch user's existing projects from database (including collaborative memberships)
   let dbProjects: any[] = [];
   if (session?.user?.id) {
     try {
       dbProjects = await db.project.findMany({
-        where: { ownerId: session.user.id },
+        where: {
+          OR: [
+            { ownerId: session.user.id },
+            { members: { some: { userId: session.user.id } } },
+          ],
+        },
+        include: {
+          members: true,
+        },
         orderBy: { updatedAt: 'desc' },
       });
     } catch (e) {
@@ -30,9 +38,17 @@ export default async function Dashboard() {
     }
   }
 
-  // 2. Fetch GitHub repos if GitHub OAuth access token is available
+  // 2. Fetch GitHub repos if GitHub OAuth account is connected
   let repos: any[] = [];
-  const accessToken = (session as any)?.accessToken;
+  let accessToken: string | null = null;
+  if (session?.user?.id) {
+    try {
+      const ghAccount = await db.account.findFirst({
+        where: { userId: session.user.id, provider: 'github' },
+      });
+      accessToken = ghAccount?.access_token || null;
+    } catch {}
+  }
   if (accessToken) {
     try {
       const res = await fetch('https://api.github.com/user/repos?sort=updated&per_page=30', {
@@ -95,39 +111,7 @@ export default async function Dashboard() {
     });
   }
 
-  // Fallback demo projects if new user with no repos
-  const initialProjects =
-    repoMap.size > 0
-      ? Array.from(repoMap.values())
-      : [
-          {
-            id: 'demo-nextjs',
-            name: 'nextjs-saas-starter',
-            description: 'Full-stack Next.js 15 app with TailwindCSS, authentication, and Postgres.',
-            status: 'Ready',
-            lastAccessed: 'Just now',
-            language: 'TypeScript',
-            isPrivate: false,
-          },
-          {
-            id: 'demo-fastapi',
-            name: 'python-ai-service',
-            description: 'FastAPI microservice with OpenAI and LangChain pipeline integration.',
-            status: 'Ready',
-            lastAccessed: 'Yesterday',
-            language: 'Python',
-            isPrivate: false,
-          },
-          {
-            id: 'demo-react',
-            name: 'vite-dashboard-app',
-            description: 'High-performance React frontend with Monaco editor and charts.',
-            status: 'Ready',
-            lastAccessed: '3 days ago',
-            language: 'JavaScript',
-            isPrivate: false,
-          },
-        ];
+  const initialProjects = Array.from(repoMap.values());
 
   return (
     <div className="flex flex-col min-h-screen w-full bg-[#030712]">

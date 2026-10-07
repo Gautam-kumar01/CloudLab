@@ -1,5 +1,5 @@
 import { auth } from '@/auth';
-import { canEditWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
+import { canEditWorkspace, canAccessWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
 import { apiResponse, apiError, apiValidationError } from '@/lib/api-utils';
 import { FileWriteSchema } from '@/lib/validations/api';
 import { db } from '@/lib/db';
@@ -44,7 +44,8 @@ export async function GET(request: Request) {
     return apiError('Unauthorized', 401);
   }
   const project = await getWorkspaceProject(session.user.id, workspaceId);
-  if (!project || !(await canEditWorkspace(session.user.id, workspaceId))) {
+  const hasAccess = await canAccessWorkspace(session.user.id, workspaceId);
+  if (!project || !hasAccess) {
     return apiError('Forbidden', 403);
   }
 

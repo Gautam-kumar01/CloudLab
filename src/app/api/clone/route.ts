@@ -33,13 +33,13 @@ export async function POST(req: Request) {
     const sanitizedName = name.replace(/[^a-zA-Z0-9_.-]/g, '-').slice(0, 64);
 
     // Retrieve user's GitHub OAuth access token for private repo clone support
-    let accessToken = (session as any)?.accessToken;
-    if (!accessToken && session.user?.id) {
+    let accessToken: string | null = null;
+    if (session.user?.id) {
       try {
         const account = await db.account.findFirst({
           where: { userId: session.user.id, provider: 'github' },
         });
-        accessToken = account?.access_token;
+        accessToken = account?.access_token || null;
       } catch (e) {
         console.warn('Could not fetch account access token:', e);
       }
@@ -74,30 +74,41 @@ export async function POST(req: Request) {
       // Directory doesn't exist or is empty, proceed to clone
     }
 
-    // Build authenticated clone URL
-    let targetCloneUrl = cloneUrl;
-    if (accessToken && parsedUrl.hostname === 'github.com') {
-      const repoPath = parsedUrl.pathname.replace(/^\//, '');
-      targetCloneUrl = `https://x-access-token:${accessToken}@github.com/${repoPath}`;
-    }
-
     // Clean destination directory if it exists but is empty
     try {
       await fs.rm(projectRoot, { recursive: true, force: true });
     } catch {}
 
-    // Execute git clone
-    await runCommand(
-      'git',
-      ['clone', '--depth', '1', '--', targetCloneUrl, projectRoot],
-      { timeout: 3 * 60 * 1000 }
-    );
+    // Execute git clone using ephemeral HTTP Authorization header to prevent token leakage in .git/config
+    const gitArgs: string[] = [];
+    if (accessToken && parsedUrl.hostname === 'github.com') {
+      const basicAuth = Buffer.from(`x-access-token:${accessToken}`).toString('base64');
+      gitArgs.push('-c', `http.extraHeader=AUTHORIZATION: basic ${basicAuth}`);
+    }
+    gitArgs.push('clone', '--depth', '1', '--', cloneUrl, projectRoot);
+
+    try {
+      await runCommand('git', gitArgs, { timeout: 3 * 60 * 1000 });
+    } finally {
+      // Always scrub origin remote credentials as a defense-in-depth measure
+      try {
+        const { scrubGitRemoteCredentials } = await import('@/lib/git-security');
+        await scrubGitRemoteCredentials(projectRoot);
+      } catch {}
+    }
 
     return NextResponse.json({ success: true, projectId: project.id });
   } catch (err: any) {
     console.error('Clone error:', err);
+    // Redact any tokens or credentials before returning error message to client
+    const rawMsg = err.message || 'Failed to clone repository';
+    const sanitizedMsg = rawMsg
+      .replace(/https:\/\/[^@\s]+@/g, 'https://***@')
+      .replace(/ghp_[a-zA-Z0-9]+/g, '***')
+      .replace(/x-access-token:[a-zA-Z0-9_.-]+/g, 'x-access-token:***');
+
     return NextResponse.json(
-      { error: err.message || 'Failed to clone repository' },
+      { error: sanitizedMsg },
       { status: 500 }
     );
   }

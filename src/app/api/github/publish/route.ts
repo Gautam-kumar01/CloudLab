@@ -5,6 +5,7 @@ import { workspacePath } from '@/lib/workspace-paths';
 import { apiResponse, apiError, apiValidationError } from '@/lib/api-utils';
 import { GithubPublishSchema } from '@/lib/validations/api';
 import { runCommand } from '@/lib/process';
+import { db } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,8 +29,15 @@ export async function POST(req: NextRequest) {
       return apiError('Forbidden', 403);
     }
 
-    // Resolve GitHub Token: either from session or provided PAT
-    const token = githubToken || (session as any)?.accessToken || process.env.GITHUB_TOKEN;
+    // Resolve GitHub Token: either from provided PAT, server-side DB account, or fallback env
+    let token = githubToken;
+    if (!token) {
+      const ghAccount = await db.account.findFirst({
+        where: { userId, provider: 'github' },
+      });
+      token = ghAccount?.access_token || process.env.GITHUB_TOKEN;
+    }
+
     if (!token) {
       return apiError(
         'GitHub authentication required. Please sign in with GitHub or provide a Personal Access Token with repo scope.',

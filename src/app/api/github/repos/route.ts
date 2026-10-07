@@ -1,14 +1,22 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { db } from '@/lib/db';
 
 export async function GET() {
   try {
     const session = await auth();
-    if (!session || !(session as any).accessToken) {
-      return NextResponse.json({ error: 'Unauthorized or missing GitHub token' }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = (session as any).accessToken;
+    const ghAccount = await db.account.findFirst({
+      where: { userId: session.user.id, provider: 'github' },
+    });
+    const token = ghAccount?.access_token || process.env.GITHUB_TOKEN;
+
+    if (!token) {
+      return NextResponse.json({ error: 'GitHub account not connected or missing token' }, { status: 401 });
+    }
     
     // Fetch user's repositories
     const res = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100', {

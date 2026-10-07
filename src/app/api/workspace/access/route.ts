@@ -70,6 +70,11 @@ export async function GET(request: Request) {
       return apiError('Workspace not found', 404);
     }
 
+    // Check if the project is disabled by administrator
+    if (project.status === 'DISABLED') {
+      return apiError('Workspace is disabled by administrator', 403);
+    }
+
     // 2. Check if the user is the owner
     if (project.ownerId === userId) {
       return apiResponse({

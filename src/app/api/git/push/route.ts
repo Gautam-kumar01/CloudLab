@@ -53,17 +53,15 @@ export async function POST(request: Request) {
       }
     }
 
-    // Resolve GitHub Token: session, DB accounts, or fallback env
-    let token = (session as any)?.accessToken || process.env.GITHUB_TOKEN;
-    if (!token && session.user?.id) {
+    // Resolve GitHub Token: server-side DB account or fallback env
+    let token = process.env.GITHUB_TOKEN;
+    if (session.user?.id) {
       try {
         const { db } = await import('@/lib/db');
-        const userWithAccount = await db.user.findUnique({
-          where: { id: session.user.id },
-          include: { accounts: true },
+        const ghAccount = await db.account.findFirst({
+          where: { userId: session.user.id, provider: 'github' },
         });
-        const ghAccount = userWithAccount?.accounts?.find((a: any) => a.provider === 'github');
-        token = ghAccount?.access_token || null;
+        token = ghAccount?.access_token || token;
       } catch {}
     }
 
