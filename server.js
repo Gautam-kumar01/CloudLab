@@ -30,54 +30,21 @@ const port = parseInt(process.env.PORT, 10) || 3000;
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
+const { workspaceFilePath, assertSafeRealPath } = require('./src/lib/workspace-paths.js');
+
 app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     httpLogger(req, res);
     try {
       const host = req.headers.host || '';
-      // Dynamic Subdomain Proxy Check: e.g. <workspaceId>.preview.<domain>
+      // Dynamic Subdomain Routing: e.g. <workspaceId>.(preview|run).<domain>
       const subMatch = host.match(/^([a-zA-Z0-9_-]+)\.(preview|run)\./i);
       if (subMatch) {
         const workspaceId = subMatch[1];
-        const { DockerManager } = require('./src/lib/docker-manager');
-        DockerManager.touchActivity(workspaceId);
-
-        const targetPort = 3000;
-        const targetHost = process.env.CONTAINER_HOST || '127.0.0.1';
-
-        const proxyReq = require('http').request(
-          {
-            host: targetHost,
-            port: targetPort,
-            path: req.url,
-            method: req.method,
-            headers: {
-              ...req.headers,
-              host: `${targetHost}:${targetPort}`,
-              'x-forwarded-host': host,
-              'x-forwarded-proto': 'http',
-            },
-          },
-          (proxyRes) => {
-            res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
-            proxyRes.pipe(res, { end: true });
-          }
-        );
-
-        proxyReq.on('error', (err) => {
-          if (!res.headersSent) {
-            res.writeHead(502, { 'Content-Type': 'application/json' });
-            res.end(
-              JSON.stringify({
-                error: 'Workspace dev server not reachable',
-                details: err.message,
-              })
-            );
-          }
-        });
-
-        req.pipe(proxyReq, { end: true });
-        return;
+        // Forward through Next.js authenticated preview handler to ensure session authentication,
+        // RBAC membership checks, port allowlist enforcement, and credential stripping.
+        const originalUrl = req.url || '/';
+        req.url = `/api/preview/${workspaceId}${originalUrl.startsWith('/') ? originalUrl : '/' + originalUrl}`;
       }
 
       const parsedUrl = parse(req.url, true);
@@ -174,15 +141,62 @@ app.prepare().then(() => {
         }
 
         const resolvedWorkspaceId = access.data.projectId || workspaceId;
-        if (!/^[a-zA-Z0-9_-]+$/.test(resolvedWorkspaceId) || !file || file.includes('..')) {
+        if (!/^[a-zA-Z0-9_-]+$/.test(resolvedWorkspaceId) || !file) {
+          socket.destroy();
+          return;
+        }
+
+        const userRole = access.data.role || 'VIEWER';
+        const canEdit = userRole === 'OWNER' || userRole === 'EDITOR';
+
+        // Shared security path validation: blocks directory traversal, null bytes, and .git access
+        let safeFilePath;
+        try {
+          safeFilePath = workspaceFilePath(resolvedWorkspaceId, file);
+          await assertSafeRealPath(resolvedWorkspaceId, safeFilePath);
+        } catch (pathErr) {
+          logger.warn(
+            { error: pathErr.message, workspaceId: resolvedWorkspaceId, file },
+            'Rejected unsafe Yjs collaboration file path'
+          );
           socket.destroy();
           return;
         }
 
         // Room name includes workspace and file
-        const docName = `workspace/${workspaceId}/file/${file}`;
+        const docName = `workspace/${resolvedWorkspaceId}/file/${file}`;
 
         wss.handleUpgrade(request, socket, head, (ws) => {
+          // If user is a read-only VIEWER, intercept incoming WebSocket messages
+          // to prevent document mutation while still allowing real-time observation and awareness (cursor).
+          if (!canEdit) {
+            const decoding = require('lib0/dist/decoding.cjs');
+            const origEmit = ws.emit.bind(ws);
+            ws.emit = function (event, ...args) {
+              if (event === 'message') {
+                const data = args[0];
+                try {
+                  const uint8 = new Uint8Array(data);
+                  const decoder = decoding.createDecoder(uint8);
+                  const messageType = decoding.readVarUint(decoder);
+                  // messageType 0 is messageSync (Yjs sync protocol)
+                  if (messageType === 0) {
+                    const syncType = decoding.readVarUint(decoder);
+                    // syncType 0 is SyncStep1 (reading document state from server)
+                    // syncType 1 is SyncStep2, syncType 2 is Update (sending mutations to server)
+                    if (syncType === 1 || syncType === 2) {
+                      // Silently drop mutating update from read-only VIEWER
+                      return false;
+                    }
+                  }
+                } catch {
+                  return false;
+                }
+              }
+              return origEmit(event, ...args);
+            };
+          }
+
           setupWSConnection(ws, request, { docName });
 
           // Persistence Logic
@@ -191,29 +205,44 @@ app.prepare().then(() => {
             doc.__hasSaveHook = true;
 
             // Load initial content if it exists
-            const workspacePath = path.join(process.cwd(), 'workspaces', resolvedWorkspaceId);
-            const filePath = path.join(workspacePath, file);
-
-            if (fs.existsSync(filePath)) {
-              const content = fs.readFileSync(filePath, 'utf-8');
-              const ytext = doc.getText('monaco');
-              if (ytext.length === 0) {
-                ytext.insert(0, content);
+            if (fs.existsSync(safeFilePath)) {
+              try {
+                const content = fs.readFileSync(safeFilePath, 'utf-8');
+                const ytext = doc.getText('monaco');
+                if (ytext.length === 0) {
+                  ytext.insert(0, content);
+                }
+              } catch (readErr) {
+                logger.error({ error: readErr.message, safeFilePath }, 'Error reading initial Yjs file content');
               }
             }
 
-            // Save on change
+            // Save on change: debounced write using safe paths and atomic write
             let saveTimeout = null;
             doc.on('update', () => {
               if (saveTimeout) clearTimeout(saveTimeout);
-              saveTimeout = setTimeout(() => {
-                const ytext = doc.getText('monaco');
-                const content = ytext.toString();
+              saveTimeout = setTimeout(async () => {
+                try {
+                  // Re-verify safe path before disk write
+                  const targetPath = workspaceFilePath(resolvedWorkspaceId, file);
+                  await assertSafeRealPath(resolvedWorkspaceId, targetPath);
 
-                // Ensure directory exists
-                const dirPath = path.dirname(filePath);
-                fs.mkdirSync(dirPath, { recursive: true });
-                fs.writeFileSync(filePath, content, 'utf-8');
+                  const ytext = doc.getText('monaco');
+                  const content = ytext.toString();
+
+                  const dirPath = path.dirname(targetPath);
+                  fs.mkdirSync(dirPath, { recursive: true });
+
+                  // Atomic write via temp file
+                  const tmpFile = `${targetPath}.tmp.${Date.now()}`;
+                  fs.writeFileSync(tmpFile, content, 'utf-8');
+                  fs.renameSync(tmpFile, targetPath);
+                } catch (saveErr) {
+                  logger.error(
+                    { error: saveErr.message, workspaceId: resolvedWorkspaceId, file },
+                    'Failed to safely persist Yjs document to disk'
+                  );
+                }
               }, 2000); // 2 second debounce
             });
           }

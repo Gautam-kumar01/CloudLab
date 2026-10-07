@@ -4,6 +4,31 @@ import { canAccessWorkspace } from '@/lib/workspace-auth';
 import { apiError } from '@/lib/api-utils';
 import http from 'http';
 
+// Allowed development server ports for preview routing (blocks SSRF to internal services/DBs/Docker daemon)
+const ALLOWED_PREVIEW_PORTS = new Set([3000, 3001, 3002, 5173, 5174, 8000, 8080, 4200, 5000]);
+
+// Safe headers to forward upstream to the workspace preview application
+const ALLOWED_FORWARD_REQUEST_HEADERS = [
+  'accept',
+  'accept-encoding',
+  'accept-language',
+  'content-type',
+  'user-agent',
+  'referer',
+  'range',
+  'if-none-match',
+  'if-modified-since',
+];
+
+// Dangerous headers that must never be mirrored back to the browser from untrusted preview apps
+const BLOCKED_RESPONSE_HEADERS = new Set([
+  'set-cookie',
+  'connection',
+  'keep-alive',
+  'transfer-encoding',
+  'upgrade',
+]);
+
 // Handle all HTTP methods for the preview proxy
 export async function GET(req: NextRequest, context: { params: Promise<{ workspaceId: string; path?: string[] }> }) {
   return handleProxy(req, context);
@@ -52,16 +77,28 @@ async function handleProxy(
       DockerManager.touchActivity(workspaceId);
     } catch {}
 
-    const subpath = pathSegments ? '/' + pathSegments.join('/') : '/';
     const targetUrl = new URL(req.url);
-    const searchString = targetUrl.search || '';
 
-    // Determine target host and port
-    // In Docker bridge, containers are accessible by containerName or mapped host port
-    const port = targetUrl.searchParams.get('_port') ? parseInt(targetUrl.searchParams.get('_port')!, 10) : 3000;
-    const targetHost = process.env.CONTAINER_HOST || '127.0.0.1';
+    // Validate and restrict target port to prevent internal port scanning & SSRF
+    const rawPortStr = targetUrl.searchParams.get('_port');
+    let targetPort = 3000;
+    if (rawPortStr) {
+      const parsedPort = parseInt(rawPortStr, 10);
+      if (isNaN(parsedPort) || !ALLOWED_PREVIEW_PORTS.has(parsedPort)) {
+        return apiError('Forbidden. Port is not an authorized web preview port.', 403);
+      }
+      targetPort = parsedPort;
+    }
 
+    // Strip internal _port parameter from downstream URL
+    const cleanSearchParams = new URLSearchParams(targetUrl.search);
+    cleanSearchParams.delete('_port');
+    const searchString = cleanSearchParams.toString() ? `?${cleanSearchParams.toString()}` : '';
+
+    const subpath = pathSegments ? '/' + pathSegments.join('/') : '/';
     const fullTargetPath = `${subpath}${searchString}`;
+
+    const targetHost = process.env.CONTAINER_HOST || '127.0.0.1';
 
     // Read incoming request body if present
     const method = req.method;
@@ -71,19 +108,28 @@ async function handleProxy(
       bodyBuffer = Buffer.from(arrayBuf);
     }
 
+    // Build stripped headers: NEVER forward session cookies or authorization tokens
+    const forwardHeaders: Record<string, string> = {
+      host: `${targetHost}:${targetPort}`,
+      'x-forwarded-proto': 'http',
+      'x-forwarded-host': req.headers.get('host') || `${targetHost}:${targetPort}`,
+    };
+
+    for (const headerName of ALLOWED_FORWARD_REQUEST_HEADERS) {
+      const val = req.headers.get(headerName);
+      if (val) {
+        forwardHeaders[headerName] = val;
+      }
+    }
+
     return await new Promise<NextResponse>((resolve) => {
       const proxyReq = http.request(
         {
           host: targetHost,
-          port,
+          port: targetPort,
           path: fullTargetPath,
           method,
-          headers: {
-            ...Object.fromEntries(req.headers.entries()),
-            host: `${targetHost}:${port}`,
-            'x-forwarded-for': req.headers.get('x-forwarded-for') || '127.0.0.1',
-            'x-forwarded-proto': 'http',
-          },
+          headers: forwardHeaders,
           timeout: 10000,
         },
         (proxyRes) => {
@@ -92,11 +138,19 @@ async function handleProxy(
           proxyRes.on('end', () => {
             const responseBody = Buffer.concat(chunks);
             const headers: Record<string, string> = {};
+
             for (const [key, val] of Object.entries(proxyRes.headers)) {
-              if (val) {
+              const lowerKey = key.toLowerCase();
+              // Strip cookies and hop-by-hop headers from previewed application
+              if (val && !BLOCKED_RESPONSE_HEADERS.has(lowerKey)) {
                 headers[key] = Array.isArray(val) ? val.join(', ') : val;
               }
             }
+
+            // Enforce response isolation headers
+            headers['x-content-type-options'] = 'nosniff';
+            headers['content-security-policy'] = "frame-ancestors 'self'";
+
             resolve(new NextResponse(responseBody, { status: proxyRes.statusCode || 200, headers }));
           });
         }
@@ -107,7 +161,7 @@ async function handleProxy(
           NextResponse.json(
             {
               error: 'Workspace preview server not reachable',
-              message: `No active server responding on port ${port}. Please run your dev server (e.g. 'npm run dev') in the terminal.`,
+              message: `No active server responding on port ${targetPort}. Please run your dev server (e.g. 'npm run dev') in the terminal.`,
               details: err.message,
             },
             { status: 502 }
