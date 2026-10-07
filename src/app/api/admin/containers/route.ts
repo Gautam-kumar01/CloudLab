@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function DELETE(request: Request) {
-  const { error } = await requireAdmin();
+  const { error, session } = await requireAdmin();
   if (error) return error;
 
   try {
@@ -30,6 +30,12 @@ export async function DELETE(request: Request) {
     const success = await DockerManager.killContainer(id);
     if (!success) {
       return NextResponse.json({ error: 'Failed to kill container' }, { status: 500 });
+    }
+
+    if (session?.user?.id) {
+      await (await import('@/lib/audit')).logAuditEvent(session.user.id, 'CONTAINER_FORCE_KILL', {
+        containerId: id,
+      });
     }
 
     return NextResponse.json({ success: true });

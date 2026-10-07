@@ -107,6 +107,13 @@ export async function POST(req: NextRequest) {
       return apiError(`Repository created at ${htmlUrl}, but initial push failed: ${gitErr.message}`, 500);
     }
 
+    await (await import('@/lib/audit')).logAuditEvent(userId, 'GITHUB_PUBLISH', {
+      workspaceId,
+      repoName: repoData.full_name,
+      repoUrl: htmlUrl,
+      isPrivate,
+    });
+
     return apiResponse({
       success: true,
       repoUrl: htmlUrl,

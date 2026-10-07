@@ -72,6 +72,11 @@ export async function POST(request: Request) {
     const { stdout } = await runCommand('git', [...authArgs, 'push'], { cwd });
     await scrubGitRemoteCredentials(cwd);
 
+    await (await import('@/lib/audit')).logAuditEvent(session.user.id, 'GIT_PUSH', {
+      workspaceId,
+      commitMessage: commitMsg,
+    });
+
     return apiResponse({ success: true, stdout });
   } catch (error: any) {
     console.error('Git push error:', error);

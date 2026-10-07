@@ -270,6 +270,10 @@ export async function POST(req: NextRequest) {
       try {
         await runDocker(['rm', '-f', containerName]);
         appendLog(workspaceId, `[Docker] Container ${containerName} stopped and removed.`);
+        await (await import('@/lib/audit')).logAuditEvent(userId, 'DEPLOYMENT_STOP', {
+          workspaceId,
+          containerName,
+        });
         return apiResponse({ success: true, status: 'stopped' });
       } catch (err: any) {
         return apiResponse({ success: true, status: 'stopped', message: err.message });
@@ -358,6 +362,14 @@ export async function POST(req: NextRequest) {
 
       const { getPreviewRouting } = await import('@/lib/proxy-manager');
       const routing = getPreviewRouting(workspaceId, parseInt(targetPort.toString(), 10));
+
+      await (await import('@/lib/audit')).logAuditEvent(userId, 'DEPLOYMENT_START', {
+        workspaceId,
+        containerName,
+        stack: detection.stack,
+        hostPort,
+        targetPort,
+      });
 
       return apiResponse({
         success: true,

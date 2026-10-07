@@ -34,7 +34,10 @@ export async function GET(req: NextRequest) {
     }
 
     const passThrough = new PassThrough();
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    const archiverPkg = require('archiver');
+    const archive = typeof archiverPkg === 'function'
+      ? archiverPkg('zip', { zlib: { level: 9 } })
+      : (archiverPkg.ZipArchive ? new archiverPkg.ZipArchive({ zlib: { level: 9 } }) : archiverPkg.default('zip', { zlib: { level: 9 } }));
 
     archive.on('error', (err: any) => {
       console.error('Archive error:', err);
@@ -51,6 +54,10 @@ export async function GET(req: NextRequest) {
     });
 
     archive.finalize();
+
+    await (await import('@/lib/audit')).logAuditEvent(session.user.id, 'WORKSPACE_EXPORT', {
+      workspaceId,
+    });
 
     // Convert PassThrough to web ReadableStream
     const readableStream = new ReadableStream({
