@@ -7,7 +7,7 @@ import { runCommand } from '@/lib/process';
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import { workspaceFilePath, workspacePath } from '@/lib/workspace-paths';
+import { workspaceFilePath, workspacePath, assertSafeRealPath } from '@/lib/workspace-paths';
 
 // Helper to determine language for Monaco editor
 function getLanguageFromFilename(filename: string) {
@@ -106,19 +106,17 @@ export async function GET(request: Request) {
     if (repoUrl && repoUrl.startsWith('https://github.com/') && !hasGit) {
       console.log(`[Workspace Auto-Restore] Re-cloning ${repoUrl} into ${workspaceRoot}...`);
       try {
-        let targetUrl = repoUrl;
-        if (accessToken) {
-          const parsed = new URL(repoUrl);
-          targetUrl = `https://x-access-token:${accessToken}@github.com/${parsed.pathname.replace(/^\//, '')}`;
-        }
+        const { getGitAuthArgs, scrubGitRemoteCredentials } = await import('@/lib/git-security');
+        const authArgs = accessToken ? getGitAuthArgs(accessToken) : [];
 
         try {
           await fs.rm(workspaceRoot, { recursive: true, force: true });
         } catch {}
 
-        await runCommand('git', ['clone', '--depth', '1', '--', targetUrl, workspaceRoot], {
+        await runCommand('git', [...authArgs, 'clone', '--depth', '1', '--', repoUrl, workspaceRoot], {
           timeout: 60 * 1000,
         });
+        await scrubGitRemoteCredentials(workspaceRoot);
         console.log(`[Workspace Auto-Restore] Successfully restored repository into ${workspaceRoot}`);
       } catch (cloneErr) {
         console.error('[Workspace Auto-Restore Error]', cloneErr);
@@ -203,11 +201,7 @@ export async function POST(request: Request) {
 
     const workspaceRoot = workspacePath(workspaceId);
     const filePath = workspaceFilePath(workspaceId, filename);
-
-    // Security check to prevent path traversal
-    if (!filePath.startsWith(`${workspaceRoot}${path.sep}`)) {
-      return apiError('Invalid file path: path traversal detected', 403);
-    }
+    await assertSafeRealPath(workspaceId, filePath);
 
     // Ensure workspace exists
     try {
@@ -275,11 +269,7 @@ export async function DELETE(request: Request) {
 
   const workspaceRoot = workspacePath(workspaceId);
   const filePath = workspaceFilePath(workspaceId, filename);
-
-  // Security check to prevent path traversal
-  if (!filePath.startsWith(`${workspaceRoot}${path.sep}`)) {
-    return apiError('Invalid file path: path traversal detected', 403);
-  }
+  await assertSafeRealPath(workspaceId, filePath);
 
   try {
     const stat = await fs.stat(filePath);

@@ -14,11 +14,19 @@ CloudLab currently uses Docker's `--network="host"` (Option A) to easily expose 
 
 ## 3. Authentication & Authorization
 - **NextAuth.js:** Secures all sessions. Session tokens are stored in HttpOnly, secure cookies.
-- **Database Role Enforcement:** The `/admin` routes and APIs are strictly protected by server-side Prisma queries verifying that `user.role === 'ADMIN'`. Middleware alone is not relied upon for sensitive data extraction.
-- **Workspace Access:** WebSocket and API routes (`/api/workspace/*`) verify that the requesting user is either the owner or an authorized collaborator of the project before permitting file reads/writes or terminal spawns.
+- **Fail-Closed Socket.IO Gateway:** Socket.IO connections require a validated user session. Unauthenticated connections are rejected immediately; dev fallback identities are strictly opt-in via environment variables and disabled in production.
+- **Database Role Enforcement:** All workspace mutations and terminal events (`terminal.spawn`, `terminal.toTerm`) verify that the user has `OWNER` or `EDITOR` permissions on the project. `VIEWER` roles are strictly restricted from command execution and file edits.
+- **No Disk Bypass:** Disk-based authorization fallbacks are completely removed in production. Access to a workspace is strictly governed by authenticated database records.
 
-## 4. API & Rate Limiting
-All Next.js API routes validate request payloads using standard Next.js conventions. The platform is designed to incorporate rate-limiting on authentication and AI execution endpoints to prevent abuse.
+## 4. Environment & Secret Hygiene
+- **Sanitized Terminal Environments:** Spawning interactive terminals scrubs all sensitive host environment variables (including `DATABASE_URL`, `NEXTAUTH_SECRET`, cloud provider credentials, and token patterns).
+- **Ephemeral Git Authentication:** Personal Access Tokens (PATs) and GitHub OAuth tokens are never written into `.git/config` on disk. Git operations authenticate via ephemeral CLI headers (`http.extraHeader=AUTHORIZATION: basic ...`), and remote URLs are continuously scrubbed of embedded credentials.
+- **Restricted Git Internal Paths:** Raw workspace file APIs explicitly reject reads or writes to `.git` internal configuration files.
+- **Symlink Jail (`assertSafeRealPath`):** File and download routes enforce realpath verification against the workspace root to prevent symlink traversal outside authorized directories.
 
-## 5. Audit Logging
+## 5. Deployment Sandboxing
+- Deployment containers inherit the same strict isolation constraints as workspace containers: `--cpus=1.0`, `--memory=1g`, `--pids-limit=100`, `--security-opt="no-new-privileges:true"`, `--cap-drop="ALL"`, and restricted tmpfs.
+
+## 6. Audit Logging
 Administrative actions (e.g., forcefully killing a workspace container) are logged into the `AuditLog` table for accountability.
+

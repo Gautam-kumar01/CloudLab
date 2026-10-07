@@ -63,12 +63,13 @@ export async function POST(req: NextRequest) {
     const repoData = await createRepoRes.json();
     const htmlUrl = repoData.html_url;
     const cloneUrl = repoData.clone_url;
-    const authCloneUrl = cloneUrl.replace('https://', `https://${encodeURIComponent(token)}@`);
 
     const cwd = workspacePath(workspaceId);
 
-    // 2. Configure Git, add remote, commit and push
+    // 2. Configure Git, add clean remote, commit and push without storing token on disk
     try {
+      const { getGitAuthArgs, scrubGitRemoteCredentials } = await import('@/lib/git-security');
+
       // Ensure git init
       await runCommand('git', ['init'], { cwd });
 
@@ -76,11 +77,11 @@ export async function POST(req: NextRequest) {
       await runCommand('git', ['config', 'user.name', session.user?.name || 'CloudLab Developer'], { cwd });
       await runCommand('git', ['config', 'user.email', session.user?.email || 'developer@cloudlab.dev'], { cwd });
 
-      // Configure Remote
+      // Configure Remote with clean URL (no credentials on disk)
       try {
         await runCommand('git', ['remote', 'remove', 'origin'], { cwd });
       } catch {}
-      await runCommand('git', ['remote', 'add', 'origin', authCloneUrl], { cwd });
+      await runCommand('git', ['remote', 'add', 'origin', cloneUrl], { cwd });
 
       // Set default branch to main
       await runCommand('git', ['branch', '-M', 'main'], { cwd });
@@ -95,9 +96,12 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Push to GitHub
-      await runCommand('git', ['push', '-u', 'origin', 'main', '--force'], { cwd });
+      // Ephemeral authenticated push without force overwrite
+      const authArgs = getGitAuthArgs(token);
+      await runCommand('git', [...authArgs, 'push', '-u', 'origin', 'main'], { cwd });
 
+      // Guarantee any legacy embedded tokens are stripped
+      await scrubGitRemoteCredentials(cwd);
     } catch (gitErr: any) {
       console.error('Git push to GitHub error:', gitErr);
       return apiError(`Repository created at ${htmlUrl}, but initial push failed: ${gitErr.message}`, 500);

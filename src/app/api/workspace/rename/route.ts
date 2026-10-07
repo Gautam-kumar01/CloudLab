@@ -39,17 +39,12 @@ export async function POST(request: Request) {
 
     const workspaceRoot = workspacePath(workspaceId);
 
-    // Resolve absolute paths
+    // Resolve absolute paths with symlink protection
+    const { assertSafeRealPath } = await import('@/lib/workspace-paths');
     const absoluteOldPath = workspaceFilePath(workspaceId, oldPath);
     const absoluteNewPath = workspaceFilePath(workspaceId, newPath);
-
-    // Security check to prevent path traversal
-    if (!absoluteOldPath.startsWith(workspaceRoot) || !absoluteNewPath.startsWith(workspaceRoot)) {
-      return NextResponse.json(
-        { error: 'Invalid file path: path traversal detected' },
-        { status: 403 },
-      );
-    }
+    await assertSafeRealPath(workspaceId, absoluteOldPath);
+    await assertSafeRealPath(workspaceId, absoluteNewPath);
 
     // Verify old path exists
     try {

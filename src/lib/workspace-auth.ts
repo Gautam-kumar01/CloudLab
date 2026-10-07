@@ -60,35 +60,39 @@ export async function getWorkspaceProject(userId: string, workspaceId: string) {
       return null;
     }
 
-    // Disk-based fallback: check if local workspace folder exists on disk
-    try {
-      const localPath = workspacePath(workspaceId);
-      if (fs.existsSync(localPath)) {
-        return {
-          id: workspaceId,
-          name: workspaceId,
-          ownerId: userId,
-          members: [],
-          status: 'ACTIVE',
-        } as any;
-      }
-    } catch (e) {}
+    // Disk-based fallback: strictly opt-in for isolated local development, completely disabled in production
+    if (process.env.NODE_ENV === 'development' && process.env.ALLOW_DEV_WORKSPACE_FALLBACK === 'true') {
+      try {
+        const localPath = workspacePath(workspaceId);
+        if (fs.existsSync(localPath)) {
+          return {
+            id: workspaceId,
+            name: workspaceId,
+            ownerId: userId,
+            members: [],
+            status: 'ACTIVE',
+          } as any;
+        }
+      } catch (e) {}
+    }
 
     return null;
   } catch (error) {
     console.error('Error checking workspace access:', error);
-    try {
-      const localPath = workspacePath(workspaceId);
-      if (fs.existsSync(localPath)) {
-        return {
-          id: workspaceId,
-          name: workspaceId,
-          ownerId: userId,
-          members: [],
-          status: 'ACTIVE',
-        } as any;
-      }
-    } catch (e) {}
+    if (process.env.NODE_ENV === 'development' && process.env.ALLOW_DEV_WORKSPACE_FALLBACK === 'true') {
+      try {
+        const localPath = workspacePath(workspaceId);
+        if (fs.existsSync(localPath)) {
+          return {
+            id: workspaceId,
+            name: workspaceId,
+            ownerId: userId,
+            members: [],
+            status: 'ACTIVE',
+          } as any;
+        }
+      } catch (e) {}
+    }
     return null;
   }
 }
@@ -103,7 +107,9 @@ const ROLE_LEVELS: Record<string, number> = { VIEWER: 1, EDITOR: 2, OWNER: 3 };
 export async function getWorkspaceRole(userId: string, workspaceId: string): Promise<string | null> {
   const project = await getWorkspaceProject(userId, workspaceId);
   if (!project) return null;
-  return project.members?.find((member: any) => member.userId === userId)?.role || 'OWNER';
+  if (project.ownerId === userId) return 'OWNER';
+  const member = project.members?.find((m: any) => m.userId === userId);
+  return member ? member.role : null;
 }
 
 export async function canEditWorkspace(userId: string, workspaceId: string): Promise<boolean> {

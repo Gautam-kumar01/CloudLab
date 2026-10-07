@@ -207,17 +207,124 @@ app.prepare().then(() => {
         } catch (e2) {}
       }
 
-      if (session && session.user) {
+      if (session && session.user && session.user.id) {
         socket.user = session.user;
-      } else {
-        socket.user = { id: 'dev-user', name: 'Developer', role: 'OWNER' };
+        return next();
       }
-      next();
+
+      // Explicit development fallback only if deliberately opted-in via env
+      if (dev && process.env.ALLOW_DEV_ANONYMOUS === 'true') {
+        socket.user = { id: 'dev-user', name: 'Developer', role: 'DEVELOPER' };
+        return next();
+      }
+
+      logger.warn({ ip: socket.handshake.address }, 'Rejected unauthenticated Socket.IO connection');
+      return next(new Error('Unauthorized: Authentication required'));
     } catch (err) {
-      socket.user = { id: 'dev-user', name: 'Developer', role: 'OWNER' };
-      next();
+      if (dev && process.env.ALLOW_DEV_ANONYMOUS === 'true') {
+        socket.user = { id: 'dev-user', name: 'Developer', role: 'DEVELOPER' };
+        return next();
+      }
+      logger.error({ err }, 'Error during Socket.IO authentication handshake');
+      return next(new Error('Unauthorized: Authentication handshake error'));
     }
   });
+
+  function getSanitizedTerminalEnv(workspacePath) {
+    const SENSITIVE_KEY_PATTERN = /(secret|token|password|key|auth|db|database|credential|private|prisma)/i;
+    const safeEnv = {
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+      LANG: 'en_US.UTF-8',
+      HOME: workspacePath,
+      USERPROFILE: workspacePath,
+      PWD: workspacePath,
+      USER: 'cloudlab',
+      LOGNAME: 'cloudlab',
+      NODE_ENV: 'development',
+      PROMPT_COMMAND: 'PS1="\\[\\033[1;32m\\]cloudlab@workspace\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[0m\\]\\$ "',
+    };
+
+    const ALLOWED_VARS = [
+      'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'COMSPEC', 'TEMP', 'TMP',
+      'APPDATA', 'LOCALAPPDATA', 'WINDIR', 'SYSTEMDRIVE', 'ProgramFiles', 'ProgramFiles(x86)',
+      'CommonProgramFiles', 'CommonProgramFiles(x86)', 'SHELL', 'TERM_PROGRAM',
+    ];
+
+    for (const key of ALLOWED_VARS) {
+      if (process.env[key] !== undefined) {
+        safeEnv[key] = process.env[key];
+      }
+    }
+
+    for (const key of Object.keys(process.env)) {
+      if (SENSITIVE_KEY_PATTERN.test(key)) {
+        delete safeEnv[key];
+      }
+    }
+
+    return safeEnv;
+  }
+
+  async function checkWorkspacePermission(socket, workspaceId) {
+    if (!workspaceId || !/^[a-zA-Z0-9_-]+$/.test(workspaceId)) {
+      return { allowed: false, reason: 'Invalid workspace identifier' };
+    }
+
+    if (dev && process.env.ALLOW_DEV_ANONYMOUS === 'true' && socket.user?.id === 'dev-user') {
+      return { allowed: true, role: 'OWNER', projectId: workspaceId };
+    }
+
+    try {
+      const cookieHeader = socket.request?.headers?.cookie || '';
+      const hostHeader =
+        socket.request?.headers?.['x-forwarded-host'] ||
+        socket.request?.headers?.host ||
+        `localhost:${port}`;
+
+      let accessRes;
+      try {
+        accessRes = await fetch(
+          `http://127.0.0.1:${port}/api/workspace/access?workspaceId=${encodeURIComponent(workspaceId)}`,
+          {
+            headers: {
+              cookie: cookieHeader,
+              host: hostHeader,
+            },
+          }
+        );
+      } catch (e1) {
+        accessRes = await fetch(
+          `http://localhost:${port}/api/workspace/access?workspaceId=${encodeURIComponent(workspaceId)}`,
+          {
+            headers: {
+              cookie: cookieHeader,
+              host: hostHeader,
+            },
+          }
+        );
+      }
+
+      if (!accessRes.ok) {
+        return { allowed: false, reason: 'Workspace not accessible or forbidden' };
+      }
+
+      const json = await accessRes.json();
+      if (!json?.data?.success) {
+        return { allowed: false, reason: 'Access denied' };
+      }
+
+      const role = json.data.role;
+      if (role !== 'OWNER' && role !== 'EDITOR') {
+        return { allowed: false, reason: 'Insufficient permissions (Viewer role cannot execute in terminal)' };
+      }
+
+      return { allowed: true, role, projectId: json.data.projectId || workspaceId };
+    } catch (err) {
+      logger.error({ err, workspaceId }, 'Error validating workspace access for terminal');
+      return { allowed: false, reason: 'Permission validation failed' };
+    }
+  }
 
   let nodePty = null;
   try {
@@ -247,20 +354,53 @@ app.prepare().then(() => {
         return;
       }
 
-      let resolvedWorkspaceId = workspaceId || 'default';
+      if (!workspaceId || !/^[a-zA-Z0-9_-]+$/.test(workspaceId)) {
+        socket.emit('terminal.incData', {
+          id,
+          data: '\r\n\x1b[31m[Error: Missing or invalid workspace identifier]\x1b[0m\r\n',
+        });
+        return;
+      }
 
-      let shell = '';
-      let args = [];
-      const workspacePath = resolvedWorkspaceId
-        ? path.join(process.cwd(), 'workspaces', resolvedWorkspaceId)
-        : process.cwd();
-      
+      const authCheck = await checkWorkspacePermission(socket, workspaceId);
+      if (!authCheck.allowed) {
+        socket.emit('terminal.incData', {
+          id,
+          data: `\r\n\x1b[31m[Error: Forbidden - ${authCheck.reason || 'You do not have permission to execute commands in this workspace'}]\x1b[0m\r\n`,
+        });
+        return;
+      }
+
+      const resolvedWorkspaceId = authCheck.projectId || workspaceId;
+      const workspacePath = path.resolve(process.cwd(), 'workspaces', resolvedWorkspaceId);
+      const workspacesRoot = path.resolve(process.cwd(), 'workspaces');
+
+      if (workspacePath !== workspacesRoot && !workspacePath.startsWith(`${workspacesRoot}${path.sep}`)) {
+        socket.emit('terminal.incData', {
+          id,
+          data: '\r\n\x1b[31m[Error: Invalid workspace directory boundary]\x1b[0m\r\n',
+        });
+        return;
+      }
+
       try {
         fs.mkdirSync(workspacePath, { recursive: true });
       } catch (e) {}
 
+      // Hosted container enforcement: require Docker in production or when explicitly configured
+      const requireContainer = process.env.REQUIRE_CONTAINER_TERMINAL === 'true' ||
+        (!dev && process.env.ALLOW_HOST_TERMINAL !== 'true');
+
+      let effectiveShellType = shellType;
+      if (requireContainer) {
+        effectiveShellType = 'docker';
+      }
+
+      let shell = '';
+      let args = [];
+
       // Cross-platform shell resolution
-      if (shellType === 'docker') {
+      if (effectiveShellType === 'docker') {
         const { DockerManager } = require('./src/lib/docker-manager');
         
         try {
@@ -278,10 +418,10 @@ app.prepare().then(() => {
           });
           return;
         }
-      } else if (shellType === 'node') {
+      } else if (effectiveShellType === 'node') {
         shell = 'node';
         args = [];
-      } else if (shellType === 'cmd' && isWin) {
+      } else if (effectiveShellType === 'cmd' && isWin) {
         shell = 'cmd.exe';
         args = [];
       } else if (isWin) {
@@ -307,17 +447,7 @@ app.prepare().then(() => {
       }
 
       try {
-        const ptyEnv = {
-          ...process.env,
-          TERM: 'xterm-256color',
-          COLORTERM: 'truecolor',
-          LANG: 'en_US.UTF-8',
-          HOME: workspacePath,
-          PWD: workspacePath,
-          USER: 'cloudlab',
-          LOGNAME: 'cloudlab',
-          PROMPT_COMMAND: 'PS1="\\[\\033[1;32m\\]cloudlab@workspace\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[0m\\]\\$ "',
-        };
+        const ptyEnv = getSanitizedTerminalEnv(workspacePath);
         
         const initialCols = Math.max(parseInt(cols, 10) || 80, 20);
         const initialRows = Math.max(parseInt(rows, 10) || 30, 5);
@@ -403,6 +533,8 @@ app.prepare().then(() => {
           });
         }
 
+        ptyProcess.workspaceId = resolvedWorkspaceId;
+        ptyProcess.role = authCheck.role;
         terminals[id] = ptyProcess;
       } catch (e) {
         console.error('[Terminal Spawn Error]', e);
@@ -428,6 +560,9 @@ app.prepare().then(() => {
     socket.on('terminal.toTerm', ({ id, data }) => {
       const term = terminals[id];
       if (term && typeof term.write === 'function' && !term.hasExited) {
+        if (term.role !== 'OWNER' && term.role !== 'EDITOR' && term.role !== 'DEVELOPER') {
+          return;
+        }
         try {
           term.write(data);
         } catch (err) {

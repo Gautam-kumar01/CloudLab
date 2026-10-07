@@ -13,4 +13,17 @@ describe('workspace paths', () => {
     expect(() => workspaceFilePath('project_123', '/etc/passwd')).toThrow('Invalid workspace file path');
     expect(workspaceFilePath('project_123', 'src/index.ts')).toMatch(/workspaces[\\/]project_123[\\/]src[\\/]index.ts$/);
   });
+
+  it('rejects null bytes in file paths', () => {
+    expect(() => workspaceFilePath('project_123', 'index.ts\0.exe')).toThrow('null byte detected');
+  });
+
+  it('blocks reading or modifying .git internal directory unless explicitly allowed', () => {
+    expect(() => workspaceFilePath('project_123', '.git')).toThrow('restricted');
+    expect(() => workspaceFilePath('project_123', '.git/config')).toThrow('restricted');
+    expect(() => workspaceFilePath('project_123', '.git/credentials')).toThrow('restricted');
+    expect(() => workspaceFilePath('project_123', 'sub/.git/HEAD')).toThrow('restricted');
+    expect(workspaceFilePath('project_123', '.git/config', { allowGit: true })).toMatch(/workspaces[\\/]project_123[\\/]\.git[\\/]config$/);
+  });
 });
+

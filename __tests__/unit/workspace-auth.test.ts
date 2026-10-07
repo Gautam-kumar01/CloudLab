@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { canAccessWorkspace, getWorkspaceProject } from '@/lib/workspace-auth';
+import { canAccessWorkspace, getWorkspaceProject, canEditWorkspace, getWorkspaceRole } from '@/lib/workspace-auth';
 import { db } from '@/lib/db';
 
 // Mock the database client
@@ -90,4 +90,55 @@ describe('workspace-auth', () => {
       expect(await canAccessWorkspace('user1', 'proj1')).toBe(false);
     });
   });
+
+  describe('canEditWorkspace and role authorization', () => {
+    it('grants edit permissions to OWNER', async () => {
+      const mockProject = {
+        id: 'proj1',
+        ownerId: 'ownerUser',
+        members: [],
+      };
+      vi.mocked(db.project.findFirst).mockResolvedValue(mockProject as any);
+
+      expect(await getWorkspaceRole('ownerUser', 'proj1')).toBe('OWNER');
+      expect(await canEditWorkspace('ownerUser', 'proj1')).toBe(true);
+    });
+
+    it('grants edit permissions to EDITOR member', async () => {
+      const mockProject = {
+        id: 'proj1',
+        ownerId: 'ownerUser',
+        members: [{ userId: 'editorUser', role: 'EDITOR' }],
+      };
+      vi.mocked(db.project.findFirst).mockResolvedValue(mockProject as any);
+
+      expect(await getWorkspaceRole('editorUser', 'proj1')).toBe('EDITOR');
+      expect(await canEditWorkspace('editorUser', 'proj1')).toBe(true);
+    });
+
+    it('blocks VIEWER member from editing or mutating workspace', async () => {
+      const mockProject = {
+        id: 'proj1',
+        ownerId: 'ownerUser',
+        members: [{ userId: 'viewerUser', role: 'VIEWER' }],
+      };
+      vi.mocked(db.project.findFirst).mockResolvedValue(mockProject as any);
+
+      expect(await getWorkspaceRole('viewerUser', 'proj1')).toBe('VIEWER');
+      expect(await canEditWorkspace('viewerUser', 'proj1')).toBe(false);
+    });
+
+    it('blocks anonymous or non-member users who guess workspace ID', async () => {
+      const mockProject = {
+        id: 'proj1',
+        ownerId: 'ownerUser',
+        members: [{ userId: 'otherUser', role: 'EDITOR' }],
+      };
+      vi.mocked(db.project.findFirst).mockResolvedValue(mockProject as any);
+
+      expect(await getWorkspaceRole('attackerUser', 'proj1')).toBeNull();
+      expect(await canEditWorkspace('attackerUser', 'proj1')).toBe(false);
+    });
+  });
 });
+

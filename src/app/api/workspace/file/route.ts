@@ -5,7 +5,7 @@ import { apiError } from '@/lib/api-utils';
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import { workspaceFilePath, workspacePath } from '@/lib/workspace-paths';
+import { workspaceFilePath, workspacePath, assertSafeRealPath } from '@/lib/workspace-paths';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -39,6 +39,9 @@ export async function GET(request: Request) {
         } catch {}
       }
     }
+
+    // Verify symlink security
+    await assertSafeRealPath(project.id || workspaceId, filePath);
 
     const content = await fs.readFile(filePath, 'utf-8');
     return NextResponse.json({ content });

@@ -321,6 +321,12 @@ export async function POST(req: NextRequest) {
           'run', '-d',
           '--name', containerName,
           '-p', `${hostPort}:${targetPort}`,
+          '--cpus', '1.0',
+          '--memory', '1g',
+          '--pids-limit', '100',
+          '--security-opt', 'no-new-privileges:true',
+          '--cap-drop', 'ALL',
+          '--tmpfs', '/tmp:rw,noexec,nosuid,size=256m',
           '--restart', 'unless-stopped',
           imageName,
         ]);

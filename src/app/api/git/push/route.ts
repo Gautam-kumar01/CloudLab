@@ -28,6 +28,8 @@ export async function POST(request: Request) {
     }
 
     const cwd = workspacePath(workspaceId);
+    const { getGitAuthArgs, scrubGitRemoteCredentials } = await import('@/lib/git-security');
+    await scrubGitRemoteCredentials(cwd);
 
     // Ensure git author is configured
     try {
@@ -51,8 +53,24 @@ export async function POST(request: Request) {
       }
     }
 
-    // Execute git push
-    const { stdout } = await runCommand('git', ['push'], { cwd });
+    // Resolve GitHub Token: session, DB accounts, or fallback env
+    let token = (session as any)?.accessToken || process.env.GITHUB_TOKEN;
+    if (!token && session.user?.id) {
+      try {
+        const { db } = await import('@/lib/db');
+        const userWithAccount = await db.user.findUnique({
+          where: { id: session.user.id },
+          include: { accounts: true },
+        });
+        const ghAccount = userWithAccount?.accounts?.find((a: any) => a.provider === 'github');
+        token = ghAccount?.access_token || null;
+      } catch {}
+    }
+
+    // Execute ephemeral authenticated git push
+    const authArgs = token ? getGitAuthArgs(token) : [];
+    const { stdout } = await runCommand('git', [...authArgs, 'push'], { cwd });
+    await scrubGitRemoteCredentials(cwd);
 
     return apiResponse({ success: true, stdout });
   } catch (error: any) {

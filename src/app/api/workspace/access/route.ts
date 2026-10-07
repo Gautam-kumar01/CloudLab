@@ -52,21 +52,21 @@ export async function GET(request: Request) {
     }
 
     if (!project) {
-      const localPath = workspacePath(workspaceId);
-      console.log(`[AccessCheck] Project not found in DB. Checking local path: ${localPath}`);
-      if (fs.existsSync(localPath)) {
-        console.log(`[AccessCheck] Local path exists. Granting OWNER access.`);
-        // For local fallback, we assume the name is the ID provided
-        return apiResponse({
-          success: true,
-          role: 'OWNER',
-          user: session.user,
-          projectId: workspaceId,
-          projectName: workspaceId,
-          branch: 'main',
-        });
+      if (process.env.NODE_ENV === 'development' && process.env.ALLOW_DEV_WORKSPACE_FALLBACK === 'true') {
+        const localPath = workspacePath(workspaceId);
+        console.log(`[AccessCheck] Project not found in DB. Checking dev fallback path: ${localPath}`);
+        if (fs.existsSync(localPath)) {
+          console.log(`[AccessCheck] Dev fallback path exists. Granting DEVELOPER access.`);
+          return apiResponse({
+            success: true,
+            role: 'EDITOR',
+            user: session.user,
+            projectId: workspaceId,
+            projectName: workspaceId,
+            branch: 'main',
+          });
+        }
       }
-      console.log(`[AccessCheck] Local path does NOT exist.`);
       return apiError('Workspace not found', 404);
     }
 

@@ -4,7 +4,7 @@ import { getWorkspaceProject } from '@/lib/workspace-auth';
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import { workspacePath } from '@/lib/workspace-paths';
+import { workspaceFilePath, workspacePath, assertSafeRealPath } from '@/lib/workspace-paths';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -24,20 +24,10 @@ export async function GET(request: Request) {
     return new NextResponse('Forbidden', { status: 403 });
   }
 
-  // Strict Path Traversal Guard
-  if (filename.includes('../') || filename.includes('..\\')) {
-    return new NextResponse('Invalid file path: path traversal detected', { status: 403 });
-  }
-
-  const workspaceRoot = workspacePath(workspaceId);
-  const filePath = path.resolve(workspaceRoot, filename);
-
-  // Security check to prevent path traversal
-  if (!filePath.startsWith(workspaceRoot)) {
-    return new NextResponse('Invalid file path', { status: 403 });
-  }
-
   try {
+    const filePath = workspaceFilePath(workspaceId, filename);
+    await assertSafeRealPath(workspaceId, filePath);
+
     const stat = await fs.stat(filePath);
 
     if (stat.isDirectory()) {

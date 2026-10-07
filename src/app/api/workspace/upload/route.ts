@@ -46,11 +46,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    // Safety checks
-    const targetFilePath = path.resolve(workspaceRoot, folderPath, file.name);
-    if (!targetFilePath.startsWith(`${workspaceRoot}${path.sep}`)) {
-      return NextResponse.json({ error: 'Invalid path traversal detected' }, { status: 403 });
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB limit
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'File exceeds maximum allowed upload size (50MB)' },
+        { status: 413 }
+      );
     }
+
+    // Safety checks using workspaceFilePath and assertSafeRealPath
+    const { workspaceFilePath, assertSafeRealPath } = await import('@/lib/workspace-paths');
+    const relativeTarget = folderPath ? path.join(folderPath, file.name) : file.name;
+    const targetFilePath = workspaceFilePath(workspaceId, relativeTarget);
+    await assertSafeRealPath(workspaceId, targetFilePath);
 
     // Check quota
     const quota = await checkQuota(workspaceRoot, file.size);
