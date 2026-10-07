@@ -20,7 +20,7 @@ jobs:
         cache: 'npm'
         
     - name: Install Dependencies
-      run: npm install
+      run: npm ci
       
     - name: Generate Prisma Client
       run: npx prisma generate
@@ -29,8 +29,8 @@ jobs:
       run: npm run lint
       
     - name: Run Type Check
-      # npx tsc --noEmit is useful to catch TS errors that eslint might miss
-      run: npx tsc --noEmit || true
+      # Strict TypeScript check without error swallowing
+      run: npx tsc --noEmit
       
     - name: Run Unit & Component Tests
       run: npm run test

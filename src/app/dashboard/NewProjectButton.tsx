@@ -92,6 +92,14 @@ const templateMetadata: Record<string, TemplateMeta> = {
     techStack: 'Go 1.22 • Microservices',
     iconNode: <Zap size={20} className="text-teal-400" />,
   },
+  next: {
+    id: 'next',
+    badge: 'FULLSTACK',
+    badgeColor: 'text-violet-300 bg-violet-500/15 border-violet-500/30',
+    glowColor: 'group-hover:border-violet-500/40',
+    techStack: 'Next.js 15 • React 19 • App Router',
+    iconNode: <Layers size={20} className="text-violet-400" />,
+  },
 };
 
 const funProjectAdjectives = [

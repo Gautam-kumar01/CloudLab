@@ -1,7 +1,7 @@
 import { NextRequest,  } from 'next/server';
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
-import { builtInTemplates } from '@/lib/templates';
+import { builtInTemplates, getTemplate } from '@/lib/templates';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { workspacePath } from '@/lib/workspace-paths';
@@ -45,8 +45,8 @@ export async function POST(req: NextRequest) {
 
     const { name, template: templateId, description } = parseResult.data;
 
-    // Find the template
-    const template = builtInTemplates.find((t) => t.id === templateId) || builtInTemplates[0];
+    // Find the template with normalization & alias support
+    const template = getTemplate(templateId);
 
     // Create the project in the database
     const project = await db.project.create({

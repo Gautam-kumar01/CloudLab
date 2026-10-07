@@ -83,5 +83,46 @@ export const builtInTemplates: Template[] = [
     files: {
       'main.go': "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"Hello from Go!\")\n}"
     }
+  },
+  {
+    id: 'next',
+    name: 'Next.js',
+    description: 'A Next.js fullstack React application with App Router',
+    language: 'typescript',
+    icon: 'Layers',
+    files: {
+      'package.json': "{\n  \"name\": \"nextjs-app\",\n  \"version\": \"0.1.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"dev\": \"next dev\",\n    \"build\": \"next build\",\n    \"start\": \"next start\"\n  },\n  \"dependencies\": {\n    \"react\": \"^19.0.0\",\n    \"react-dom\": \"^19.0.0\",\n    \"next\": \"15.1.0\"\n  }\n}",
+      'app/page.tsx': "export default function Home() {\n  return (\n    <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>\n      <h1>Welcome to Next.js on CloudLab 🚀</h1>\n      <p>Edit app/page.tsx to build your application.</p>\n    </main>\n  );\n}\n",
+      'app/layout.tsx': "export default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang=\"en\">\n      <body>{children}</body>\n    </html>\n  );\n}\n",
+      'README.md': "# Next.js Project\n\nRun `npm run dev` to start the local development server."
+    }
   }
 ];
+
+export function normalizeTemplateId(id?: string): string {
+  if (!id) return 'blank';
+  const clean = id.trim().toLowerCase();
+  const aliasMap: Record<string, string> = {
+    'node': 'nodejs',
+    'nodejs': 'nodejs',
+    'react': 'react-vite',
+    'react-vite': 'react-vite',
+    'next': 'next',
+    'nextjs': 'next',
+    'python': 'python',
+    'java': 'java',
+    'cpp': 'cpp',
+    'c++': 'cpp',
+    'go': 'go',
+    'golang': 'go',
+    'blank': 'blank',
+  };
+  return aliasMap[clean] || clean;
+}
+
+export function getTemplate(id?: string): Template {
+  const norm = normalizeTemplateId(id);
+  const found = builtInTemplates.find((t) => t.id === norm || t.id === id);
+  return found || builtInTemplates[0];
+}
+

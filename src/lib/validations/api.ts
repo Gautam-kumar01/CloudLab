@@ -5,7 +5,20 @@ export const CreateProjectSchema = z.object({
   name: z.string().min(1, 'Project name is required').max(100),
   description: z.string().max(500).optional(),
   template: z
-    .enum(['node', 'react', 'next', 'python', 'java', 'cpp', 'go', 'blank'])
+    .enum([
+      'node',
+      'nodejs',
+      'react',
+      'react-vite',
+      'next',
+      'nextjs',
+      'python',
+      'java',
+      'cpp',
+      'go',
+      'golang',
+      'blank',
+    ])
     .default('blank'),
 });
 
