@@ -248,14 +248,17 @@ export async function POST(req: NextRequest) {
 
       try {
         const { stdout } = await runDocker(['inspect', '--format={{.State.Status}}', containerName]);
-        const status = stdout.trim();
         const hostPort = workspacePorts.get(workspaceId) || 3000;
+        const { getPreviewRouting } = await import('@/lib/proxy-manager');
+        const routing = getPreviewRouting(workspaceId, hostPort);
         return apiResponse({
           status,
           containerName,
           hostPort,
           dockerAvailable: true,
-          url: status === 'running' ? `http://localhost:${hostPort}` : null,
+          url: status === 'running' ? routing.displayUrl : null,
+          subdomainUrl: routing.subdomainUrl,
+          pathUrl: routing.pathUrl,
         });
       } catch {
         return apiResponse({ status: 'not_found', containerName, dockerAvailable: true });
@@ -314,12 +317,21 @@ export async function POST(req: NextRequest) {
       const hostPort = customPort || 3100 + (Math.abs(hashCode(workspaceId)) % 500);
       workspacePorts.set(workspaceId, hostPort);
 
+      // Ensure bridge network exists
+      try {
+        await runDocker(['network', 'create', '--driver', 'bridge', 'cloudlab-net']);
+      } catch {}
+
+      const previewDomain = process.env.PREVIEW_BASE_DOMAIN || 'preview.localhost:3000';
+      const now = Date.now();
+
       // 5. Run new container
       appendLog(workspaceId, `[Docker] Running container ${containerName} mapped to host port ${hostPort}...`);
       try {
         await runDocker([
           'run', '-d',
           '--name', containerName,
+          '--network', 'cloudlab-net',
           '-p', `${hostPort}:${targetPort}`,
           '--cpus', '1.0',
           '--memory', '1g',
@@ -327,6 +339,13 @@ export async function POST(req: NextRequest) {
           '--security-opt', 'no-new-privileges:true',
           '--cap-drop', 'ALL',
           '--tmpfs', '/tmp:rw,noexec,nosuid,size=256m',
+          '--label', 'cloudlab.deployment=true',
+          '--label', `cloudlab.workspace-id=${workspaceId}`,
+          '--label', `cloudlab.last-activity=${now}`,
+          '--label', 'traefik.enable=true',
+          '--label', `traefik.http.routers.${workspaceId}.rule=Host(\`${workspaceId}.${previewDomain}\`)`,
+          '--label', `traefik.http.services.${workspaceId}.loadbalancer.server.port=${targetPort}`,
+          '--label', `caddy=${workspaceId}.${previewDomain}`,
           '--restart', 'unless-stopped',
           imageName,
         ]);
@@ -337,13 +356,18 @@ export async function POST(req: NextRequest) {
         return apiError(`Failed to run Docker container: ${msg}`, 500);
       }
 
+      const { getPreviewRouting } = await import('@/lib/proxy-manager');
+      const routing = getPreviewRouting(workspaceId, parseInt(targetPort.toString(), 10));
+
       return apiResponse({
         success: true,
         status: 'running',
         containerName,
         stack: detection.stack,
         hostPort,
-        url: `http://localhost:${hostPort}`,
+        url: routing.displayUrl,
+        subdomainUrl: routing.subdomainUrl,
+        pathUrl: routing.pathUrl,
       });
     }
 

@@ -7,17 +7,20 @@ interface PreviewPanelProps {
 }
 
 export default function PreviewPanel({ workspaceId, onClose }: PreviewPanelProps) {
-  // Defaulting to a common dev port, e.g. 3001 or 5173
-  const [port, setPort] = useState('3001');
-  const [url, setUrl] = useState(`http://localhost:${port}`);
-  const [inputUrl, setInputUrl] = useState(url);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  // Defaulting to a common dev port, e.g. 3000
+  const [port, setPort] = useState('3000');
+  const [useProxy, setUseProxy] = useState(true);
 
-  const getPreviewUrl = (p: string) => {
-    // In MVP, we map to localhost directly. 
-    // Later, this could call an API to fetch a proxy URL based on the workspaceId.
+  const getPreviewUrl = (p: string, proxy = useProxy) => {
+    if (proxy) {
+      return `/api/preview/${workspaceId}?_port=${p}`;
+    }
     return `http://localhost:${p}`;
   };
+
+  const [url, setUrl] = useState(`/api/preview/${workspaceId}?_port=3000`);
+  const [inputUrl, setInputUrl] = useState(url);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const handleRefresh = () => {
     if (iframeRef.current) {
@@ -29,10 +32,18 @@ export default function PreviewPanel({ workspaceId, onClose }: PreviewPanelProps
     window.open(url, '_blank');
   };
 
+  const toggleProxyMode = () => {
+    const nextProxy = !useProxy;
+    setUseProxy(nextProxy);
+    const newUrl = getPreviewUrl(port, nextProxy);
+    setUrl(newUrl);
+    setInputUrl(newUrl);
+  };
+
   const handleUrlSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const parsed = new URL(inputUrl);
+      const parsed = new URL(inputUrl, window.location.origin);
       if (parsed.port) {
         setPort(parsed.port);
       }
@@ -45,7 +56,7 @@ export default function PreviewPanel({ workspaceId, onClose }: PreviewPanelProps
         setUrl(newUrl);
         setInputUrl(newUrl);
       } else {
-        alert("Please enter a valid URL or a port number.");
+        alert('Please enter a valid URL or a port number.');
       }
     }
   };
@@ -76,6 +87,23 @@ export default function PreviewPanel({ workspaceId, onClose }: PreviewPanelProps
           </form>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={toggleProxyMode}
+            style={{
+              background: useProxy ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+              border: `1px solid ${useProxy ? 'rgba(34, 197, 94, 0.4)' : 'var(--border-color)'}`,
+              color: useProxy ? '#4ade80' : 'var(--text-secondary)',
+              borderRadius: '6px',
+              padding: '2px 8px',
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+            title={useProxy ? 'Routing via CloudLab Reverse Proxy (Click to switch to Direct Localhost)' : 'Routing Direct to Localhost (Click to switch to Reverse Proxy)'}
+          >
+            {useProxy ? 'Proxy' : 'Direct'}
+          </button>
           <button 
             onClick={handleRefresh}
             style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}

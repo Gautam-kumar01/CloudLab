@@ -7,15 +7,20 @@ async function startWorker() {
   logger.info('Starting background job worker...');
   const queue = await getQueue();
 
-  // Register worker for basic workspace cleanup
+  // Register worker for workspace cleanup and idle container termination
   await queue.work('workspace-cleanup', async (jobs: any[]) => {
     for (const job of jobs) {
       logger.info(
         { jobId: job.id, workspaceId: (job.data as any).workspaceId },
-        'Processing workspace-cleanup job',
+        'Processing workspace-cleanup and idle container reaper job',
       );
-      // Simulate cleanup logic
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      try {
+        const { DockerManager } = require('./src/lib/docker-manager');
+        const reaped = await DockerManager.terminateIdleContainers();
+        logger.info({ reapedCount: reaped.length }, 'Completed idle container termination reaper');
+      } catch (e: any) {
+        logger.warn({ error: e.message }, 'Idle container reaper non-fatal error');
+      }
       logger.info({ jobId: job.id }, 'Completed workspace-cleanup job');
     }
   });

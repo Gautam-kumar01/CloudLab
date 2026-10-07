@@ -68,17 +68,37 @@ CMD ["npm", "run", "dev"]
         }
       }
 
+      const previewDomain = process.env.PREVIEW_BASE_DOMAIN || 'preview.localhost:3000';
+      const now = Date.now();
+
+      // Ensure network exists
+      try {
+        await runCommand('docker', ['network', 'create', '--driver', 'bridge', 'cloudlab-net']);
+      } catch {}
+
       await runCommand('docker', [
         'run', '-d', '--publish', `${hostPort}:${targetPort}`,
         ...envArgs, '--name', `${imageName}-container`,
-        '--label', 'cloudlab.deployment=true', '--network', 'bridge',
+        '--network', 'cloudlab-net',
+        '--cpus', '1.0', '--memory', '1g', '--pids-limit', '100',
+        '--tmpfs', '/tmp:rw,noexec,nosuid,size=256m',
+        '--label', 'cloudlab.deployment=true',
+        '--label', `cloudlab.workspace-id=${workspaceId}`,
+        '--label', `cloudlab.last-activity=${now}`,
+        '--label', 'traefik.enable=true',
+        '--label', `traefik.http.routers.${workspaceId}.rule=Host(\`${workspaceId}.${previewDomain}\`)`,
+        '--label', `traefik.http.services.${workspaceId}.loadbalancer.server.port=${targetPort}`,
+        '--label', `caddy=${workspaceId}.${previewDomain}`,
         '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges:true',
         imageName,
       ], { timeout: 60_000 });
 
+      const { getPreviewRouting } = await import('./proxy-manager');
+      const routing = getPreviewRouting(workspaceId, parseInt(targetPort, 10));
+
       return {
         success: true,
-        url: `http://localhost:${hostPort}`
+        url: routing.displayUrl,
       };
 
     } catch (error: any) {

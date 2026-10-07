@@ -34,6 +34,52 @@ app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     httpLogger(req, res);
     try {
+      const host = req.headers.host || '';
+      // Dynamic Subdomain Proxy Check: e.g. <workspaceId>.preview.<domain>
+      const subMatch = host.match(/^([a-zA-Z0-9_-]+)\.(preview|run)\./i);
+      if (subMatch) {
+        const workspaceId = subMatch[1];
+        const { DockerManager } = require('./src/lib/docker-manager');
+        DockerManager.touchActivity(workspaceId);
+
+        const targetPort = 3000;
+        const targetHost = process.env.CONTAINER_HOST || '127.0.0.1';
+
+        const proxyReq = require('http').request(
+          {
+            host: targetHost,
+            port: targetPort,
+            path: req.url,
+            method: req.method,
+            headers: {
+              ...req.headers,
+              host: `${targetHost}:${targetPort}`,
+              'x-forwarded-host': host,
+              'x-forwarded-proto': 'http',
+            },
+          },
+          (proxyRes) => {
+            res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+            proxyRes.pipe(res, { end: true });
+          }
+        );
+
+        proxyReq.on('error', (err) => {
+          if (!res.headersSent) {
+            res.writeHead(502, { 'Content-Type': 'application/json' });
+            res.end(
+              JSON.stringify({
+                error: 'Workspace dev server not reachable',
+                details: err.message,
+              })
+            );
+          }
+        });
+
+        req.pipe(proxyReq, { end: true });
+        return;
+      }
+
       const parsedUrl = parse(req.url, true);
       await handle(req, res, parsedUrl);
     } catch (err) {
@@ -42,6 +88,14 @@ app.prepare().then(() => {
       res.end('internal server error');
     }
   });
+
+  // Automatic periodic idle container termination reaper (every 5 minutes)
+  const { DockerManager: IdleReaperManager } = require('./src/lib/docker-manager');
+  setInterval(() => {
+    IdleReaperManager.terminateIdleContainers(
+      parseInt(process.env.CONTAINER_IDLE_TIMEOUT_MINUTES || '30', 10)
+    ).catch(() => {});
+  }, 5 * 60 * 1000).unref();
 
   const io = new Server(server, {
     cors: { origin: '*' },
@@ -562,6 +616,10 @@ app.prepare().then(() => {
       if (term && typeof term.write === 'function' && !term.hasExited) {
         if (term.role !== 'OWNER' && term.role !== 'EDITOR' && term.role !== 'DEVELOPER') {
           return;
+        }
+        if (term.workspaceId) {
+          const { DockerManager } = require('./src/lib/docker-manager');
+          DockerManager.touchActivity(term.workspaceId);
         }
         try {
           term.write(data);
