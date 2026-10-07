@@ -248,11 +248,12 @@ export async function POST(req: NextRequest) {
 
       try {
         const { stdout } = await runDocker(['inspect', '--format={{.State.Status}}', containerName]);
+        const status = (stdout || '').trim();
         const hostPort = workspacePorts.get(workspaceId) || 3000;
         const { getPreviewRouting } = await import('@/lib/proxy-manager');
         const routing = getPreviewRouting(workspaceId, hostPort);
         return apiResponse({
-          status,
+          status: status || 'stopped',
           containerName,
           hostPort,
           dockerAvailable: true,

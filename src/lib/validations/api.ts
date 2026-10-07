@@ -64,7 +64,7 @@ export const UploadFolderSchema = z.object({
       content: z.string(),
       isBinary: z.boolean().optional(),
     })
-  ).min(1, 'At least one file is required'),
+  ).min(1, 'At least one file is required').max(500, 'Cannot upload more than 500 files per upload'),
 });
 
 // --- Docker Deploy Schema ---

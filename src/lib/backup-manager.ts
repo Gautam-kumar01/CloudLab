@@ -63,6 +63,8 @@ export class BackupManager {
     }
   }
 
+  public static readonly MAX_SNAPSHOTS = 10;
+
   /**
    * Writes the manifest file atomically.
    */
@@ -70,7 +72,9 @@ export class BackupManager {
     const backupDir = this.getBackupDir(workspaceId);
     await fs.mkdir(backupDir, { recursive: true });
     const manifestPath = this.getManifestPath(workspaceId);
-    await fs.writeFile(manifestPath, JSON.stringify(snapshots, null, 2), 'utf-8');
+    const tempPath = `${manifestPath}.tmp.${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    await fs.writeFile(tempPath, JSON.stringify(snapshots, null, 2), 'utf-8');
+    await fs.rename(tempPath, manifestPath);
   }
 
   /**
@@ -139,6 +143,23 @@ export class BackupManager {
 
     const snapshots = await this.readManifest(workspaceId);
     snapshots.push(metadata);
+
+    // Enforce retention limit: prune oldest snapshot archives if exceeding MAX_SNAPSHOTS
+    if (snapshots.length > this.MAX_SNAPSHOTS) {
+      snapshots.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      while (snapshots.length > this.MAX_SNAPSHOTS) {
+        const oldest = snapshots.shift();
+        if (oldest) {
+          const oldArchivePath = path.join(backupDir, oldest.filename);
+          try {
+            await fs.rm(oldArchivePath, { force: true });
+          } catch (e) {
+            console.warn(`[BackupManager] Failed to prune old snapshot archive ${oldest.filename}:`, e);
+          }
+        }
+      }
+    }
+
     await this.writeManifest(workspaceId, snapshots);
 
     return metadata;
@@ -172,6 +193,21 @@ export class BackupManager {
     try {
       // Extract using system tar
       await execFileAsync('tar', ['-xzf', archivePath, '-C', stagingDir]);
+
+      // Clean rollback: prune existing workspace files (except .git) so post-snapshot additions are removed
+      try {
+        const existingEntries = await fs.readdir(targetDir, { withFileTypes: true });
+        for (const entry of existingEntries) {
+          if (entry.name === '.git') {
+            continue; // Preserve git repository structure
+          }
+          await fs.rm(path.join(targetDir, entry.name), { recursive: true, force: true });
+        }
+      } catch (cleanErr: any) {
+        if (cleanErr.code !== 'ENOENT') {
+          console.warn('[BackupManager] Warning during workspace reset before restore:', cleanErr);
+        }
+      }
 
       // Copy unpacked files to workspace root cleanly
       await fs.cp(stagingDir, targetDir, { recursive: true, force: true });

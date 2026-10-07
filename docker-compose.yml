@@ -29,6 +29,9 @@ services:
       - DATABASE_URL=postgresql://cloudlab:cloudlab_password@postgres:5432/cloudlab_dev
       - NODE_ENV=production
       # Add other necessary env vars here (e.g. NEXTAUTH_URL, GITHUB_ID, etc.)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - workspaces_data:/app/workspaces
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,6 +45,9 @@ services:
     environment:
       - DATABASE_URL=postgresql://cloudlab:cloudlab_password@postgres:5432/cloudlab_dev
       - NODE_ENV=production
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - workspaces_data:/app/workspaces
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,3 +56,4 @@ services:
 
 volumes:
   postgres_data:
+  workspaces_data:

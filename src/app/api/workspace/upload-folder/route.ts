@@ -25,6 +25,23 @@ export async function POST(req: NextRequest) {
 
     const { folderName, files } = parseResult.data;
 
+    const MAX_TOTAL_BYTES = 50 * 1024 * 1024; // 50MB aggregate limit
+    const MAX_SINGLE_FILE_BYTES = 10 * 1024 * 1024; // 10MB single file limit
+    let totalBytes = 0;
+
+    for (const file of files) {
+      const fileBytes = file.isBinary
+        ? Buffer.byteLength(file.content, 'base64')
+        : Buffer.byteLength(file.content, 'utf-8');
+      if (fileBytes > MAX_SINGLE_FILE_BYTES) {
+        return apiError(`File "${file.path}" exceeds maximum allowed size of 10MB`, 400);
+      }
+      totalBytes += fileBytes;
+      if (totalBytes > MAX_TOTAL_BYTES) {
+        return apiError('Total folder size exceeds maximum allowed upload limit of 50MB', 400);
+      }
+    }
+
     // Create DB Project record
     const project = await db.project.create({
       data: {

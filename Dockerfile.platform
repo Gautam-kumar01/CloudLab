@@ -38,11 +38,13 @@ ENV HOME=/app/workspaces
 
 # Install git, python3, and essential runtime tools for workspace cloning and terminal execution
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git openssl ca-certificates curl bash tar gzip python3 procps \
+    git openssl ca-certificates curl bash tar gzip python3 procps docker.io \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 --home /app/workspaces --shell /bin/bash nextjs
+    adduser --system --uid 1001 --home /app/workspaces --shell /bin/bash nextjs && \
+    (getent group docker || groupadd docker) && \
+    usermod -aG docker nextjs
 
 # Prepare workspace directory with proper permissions
 RUN mkdir -p /app/workspaces && chown -R nextjs:nodejs /app/workspaces

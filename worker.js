@@ -31,28 +31,83 @@ function getPostgresUrl() {
 }
 
 const boss = new PgBoss(getPostgresUrl());
-
 boss.on('error', (error) => console.error('pg-boss error:', error));
+
+let db = null;
+function getDb() {
+  if (!db) {
+    const { PrismaClient } = require('./src/generated/prisma/client');
+    const { Pool } = require('pg');
+    const { PrismaPg } = require('@prisma/adapter-pg');
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const adapter = new PrismaPg(pool);
+    db = new PrismaClient({ adapter });
+  }
+  return db;
+}
 
 async function startWorker() {
   await boss.start();
-  console.log('Background job worker started');
+  console.log('[Worker] Background job worker started and listening for jobs.');
 
-  // Register worker for basic workspace cleanup
+  // 1. Workspace cleanup & idle container termination reaper
   await boss.work('workspace-cleanup', async (job) => {
-    console.log(
-      `[Job workspace-cleanup] Processing job ${job.id} for workspace ${job.data.workspaceId}`,
-    );
-    // Simulate cleanup logic
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    console.log(`[Job workspace-cleanup] Processing job ${job.id} for workspace ${job.data?.workspaceId}`);
+    try {
+      const { DockerManager } = require('./src/lib/docker-manager');
+      const reaped = await DockerManager.terminateIdleContainers(
+        parseInt(process.env.CONTAINER_IDLE_TIMEOUT_MINUTES || '30', 10)
+      );
+      console.log(`[Job workspace-cleanup] Reaped ${reaped.length} idle container(s)`);
+    } catch (err) {
+      console.warn('[Job workspace-cleanup] Non-fatal idle reaper error:', err.message);
+    }
     console.log(`[Job workspace-cleanup] Completed job ${job.id}`);
   });
 
-  // Example: queue git operations
+  // 2. Git operations worker
   await boss.work('git-operation', async (job) => {
     console.log(`[Job git-operation] Executing ${job.data.operation} for repo ${job.data.repoId}`);
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    console.log(`[Job git-operation] Completed`);
+    console.log(`[Job git-operation] Completed job ${job.id}`);
+  });
+
+  // 3. Deployment queue worker: processes asynchronous deployments
+  await boss.work('deployment', async (job) => {
+    const { deploymentId, projectId, envVars } = job.data;
+    console.log(`[Job deployment] Starting deployment ${deploymentId} for project ${projectId}`);
+    const prisma = getDb();
+
+    await prisma.deployment.update({
+      where: { id: deploymentId },
+      data: { status: 'RUNNING' },
+    });
+
+    try {
+      const { LocalDockerDeployer } = require('./src/lib/deployer');
+      const deployer = new LocalDockerDeployer();
+      const result = await deployer.deploy(projectId, envVars || {});
+
+      await prisma.deployment.update({
+        where: { id: deploymentId },
+        data: result.success
+          ? { status: 'SUCCESS', url: result.url }
+          : { status: 'FAILED' },
+      });
+
+      if (!result.success) {
+        console.error(`[Job deployment] Deployment ${deploymentId} failed:`, result.error);
+      } else {
+        console.log(`[Job deployment] Successfully deployed ${deploymentId} to ${result.url}`);
+      }
+    } catch (err) {
+      console.error(`[Job deployment] Exception during deployment ${deploymentId}:`, err);
+      await prisma.deployment.update({
+        where: { id: deploymentId },
+        data: { status: 'FAILED' },
+      });
+      throw err;
+    }
   });
 }
 

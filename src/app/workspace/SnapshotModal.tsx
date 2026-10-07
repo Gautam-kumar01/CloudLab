@@ -156,8 +156,9 @@ export default function SnapshotModal({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleRestoreSnapshot(s.id)}
-                    disabled={workspaceRole === 'VIEWER'}
-                    className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-medium transition-colors"
+                    disabled={workspaceRole !== 'OWNER'}
+                    title={workspaceRole !== 'OWNER' ? 'Only workspace owner can restore snapshots' : undefined}
+                    className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed border border-emerald-500/40 rounded-lg text-xs font-medium transition-colors"
                   >
                     Restore
                   </button>
