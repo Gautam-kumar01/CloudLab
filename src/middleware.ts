@@ -11,6 +11,8 @@ const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 export default auth((req) => {
   const isApiRoute = req.nextUrl.pathname.startsWith('/api');
   const isAuthApi = req.nextUrl.pathname.startsWith('/api/auth');
+  const isPublicProbeApi =
+    req.nextUrl.pathname === '/api/health' || req.nextUrl.pathname === '/api/ready';
 
   // 1. Global API Rate Limiting (100 req/min)
   if (isApiRoute) {
@@ -47,8 +49,8 @@ export default auth((req) => {
     return Response.redirect(new URL('/sign-in', req.nextUrl));
   }
 
-  // 3. API Protection (Block unauthenticated API access, except for NextAuth routes)
-  if (isApiRoute && !isAuthApi && !isLoggedIn) {
+  // 3. API Protection (Block unauthenticated API access, except for NextAuth routes and infrastructure probes)
+  if (isApiRoute && !isAuthApi && !isPublicProbeApi && !isLoggedIn) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 

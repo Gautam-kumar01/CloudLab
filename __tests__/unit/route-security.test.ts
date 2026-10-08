@@ -4,6 +4,7 @@ import { GET as getFiles, POST as postFiles } from '@/app/api/workspace/files/ro
 import { POST as postBackup } from '@/app/api/workspace/backup/route';
 import { POST as postRestore } from '@/app/api/workspace/restore/route';
 import { GET as getHealth } from '@/app/api/health/route';
+import { GET as getReady } from '@/app/api/ready/route';
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
 
@@ -220,13 +221,23 @@ describe('Route-Level Security and Authorization', () => {
     });
   });
 
-  describe('Health Probe', () => {
+  describe('Health and Readiness Probes', () => {
     it('GET /api/health returns 200 with healthy status', async () => {
       const res = await getHealth();
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.status).toBe('ok');
       expect(json.timestamp).toBeDefined();
+    });
+
+    it('GET /api/ready returns 200 with readiness checks without leaking internal paths', async () => {
+      const res = await getReady();
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.status).toBe('ready');
+      expect(json.checks.database.status).toBe('healthy');
+      expect(json.checks.storage.status).toBe('healthy');
+      expect(json.checks.storage.root).toBeUndefined();
     });
   });
 });

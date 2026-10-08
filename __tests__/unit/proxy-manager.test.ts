@@ -10,7 +10,7 @@ describe('proxy-manager', () => {
     const routing = getPreviewRouting('workspace-abc123', 3000);
     expect(routing.workspaceId).toBe('workspace-abc123');
     expect(routing.targetPort).toBe(3000);
-    expect(routing.containerName).toBe('cloudlab-workspace-workspace-abc123');
+    expect(routing.containerName).toBe('cloudlab-workspace-abc123-container');
     expect(routing.pathUrl).toBe('/api/preview/workspace-abc123/');
     expect(routing.subdomainUrl).toMatch(/^http:\/\/workspace-abc123\./);
   });

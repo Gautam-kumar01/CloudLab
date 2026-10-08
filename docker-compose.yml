@@ -5,7 +5,7 @@ services:
     image: postgres:15-alpine
     container_name: cloudlab-postgres
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: cloudlab
       POSTGRES_PASSWORD: cloudlab_password
@@ -30,8 +30,13 @@ services:
       - NODE_ENV=production
       # Add other necessary env vars here (e.g. NEXTAUTH_URL, GITHUB_ID, etc.)
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - workspaces_data:/app/workspaces
+      - backups_data:/app/backups
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,6 +53,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - workspaces_data:/app/workspaces
+      - backups_data:/app/backups
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,3 +63,4 @@ services:
 volumes:
   postgres_data:
   workspaces_data:
+  backups_data:

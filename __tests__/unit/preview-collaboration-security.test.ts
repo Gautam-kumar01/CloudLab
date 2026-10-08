@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GET as getPreview } from '@/app/api/preview/[workspaceId]/route';
+import { GET as getPreview, isLoopbackTarget, resolveWorkspaceInternalPort, MAX_REQUEST_BODY_BYTES, MAX_RESPONSE_BODY_BYTES } from '@/app/api/preview/[workspaceId]/route';
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import { workspaceFilePath } from '@/lib/workspace-paths';
@@ -62,7 +62,7 @@ describe('Preview and Collaboration Ingress Security', () => {
       expect(json.error?.message || json.error).toMatch(/Forbidden/i);
     });
 
-    it('rejects arbitrary internal port scanning attempts (e.g. Postgres 5432) with 403 Forbidden', async () => {
+    it('blocks host loopback targets in production mode', async () => {
       vi.mocked(auth).mockResolvedValue({
         user: { id: 'legit-user', name: 'Legit' },
       } as any);
@@ -75,18 +75,42 @@ describe('Preview and Collaboration Ingress Security', () => {
         status: 'ACTIVE',
       } as any);
 
-      // Attempt to probe PostgreSQL internal port 5432
-      const req = new Request('http://localhost/api/preview/ws-test?_port=5432');
-      const res = await getPreview(req as any, {
-        params: Promise.resolve({ workspaceId: 'ws-test' }),
-      });
+      const oldEnv = process.env.NODE_ENV;
+      const oldHost = process.env.CONTAINER_HOST;
+      const oldAllow = process.env.ALLOW_LOOPBACK_PREVIEW;
 
-      expect(res.status).toBe(403);
-      const json = await res.json();
-      expect(json.error?.message || json.error).toMatch(/not an authorized web preview port/i);
+      try {
+        (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+        process.env.CONTAINER_HOST = '127.0.0.1';
+        delete process.env.ALLOW_LOOPBACK_PREVIEW;
+
+        const req = new Request('http://localhost/api/preview/ws-test');
+        const res = await getPreview(req as any, {
+          params: Promise.resolve({ workspaceId: 'ws-test' }),
+        });
+
+        expect(res.status).toBe(403);
+        const json = await res.json();
+        expect(json.error?.message || json.error).toMatch(/Direct host loopback preview routing is blocked/i);
+      } finally {
+        (process.env as Record<string, string | undefined>).NODE_ENV = oldEnv;
+        process.env.CONTAINER_HOST = oldHost;
+        process.env.ALLOW_LOOPBACK_PREVIEW = oldAllow;
+      }
     });
 
-    it('rejects Docker daemon port probe (2375) with 403 Forbidden', async () => {
+    it('isLoopbackTarget accurately detects loopback variations', () => {
+      expect(isLoopbackTarget('127.0.0.1')).toBe(true);
+      expect(isLoopbackTarget('localhost')).toBe(true);
+      expect(isLoopbackTarget('0.0.0.0')).toBe(true);
+      expect(isLoopbackTarget('::1')).toBe(true);
+      expect(isLoopbackTarget('127.0.1.1')).toBe(true);
+      expect(isLoopbackTarget('my-app.localhost')).toBe(true);
+      expect(isLoopbackTarget('cloudlab-workspace-container')).toBe(false);
+      expect(isLoopbackTarget('172.18.0.2')).toBe(false);
+    });
+
+    it('rejects oversized request bodies with 413 Payload Too Large', async () => {
       vi.mocked(auth).mockResolvedValue({
         user: { id: 'legit-user', name: 'Legit' },
       } as any);
@@ -99,14 +123,19 @@ describe('Preview and Collaboration Ingress Security', () => {
         status: 'ACTIVE',
       } as any);
 
-      const req = new Request('http://localhost/api/preview/ws-test?_port=2375');
+      const req = new Request('http://localhost/api/preview/ws-test', {
+        headers: {
+          'content-length': String(MAX_REQUEST_BODY_BYTES + 1024),
+        },
+      });
+
       const res = await getPreview(req as any, {
         params: Promise.resolve({ workspaceId: 'ws-test' }),
       });
 
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(413);
       const json = await res.json();
-      expect(json.error?.message || json.error).toMatch(/not an authorized web preview port/i);
+      expect(json.error?.message || json.error).toMatch(/Payload Too Large/i);
     });
   });
 

@@ -41,7 +41,6 @@ export async function GET() {
     checks.storage = {
       status: 'healthy',
       latencyMs: Date.now() - storageStart,
-      root: WORKSPACES_ROOT,
     };
   } catch (err: any) {
     isReady = false;

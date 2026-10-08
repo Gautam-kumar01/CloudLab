@@ -17,7 +17,7 @@ const PREVIEW_BASE_DOMAIN = process.env.PREVIEW_BASE_DOMAIN || 'preview.localhos
  * Resolves preview routing details for a given workspace and port.
  */
 export function getPreviewRouting(workspaceId: string, targetPort: number = 3000): PreviewRoutingInfo {
-  const containerName = `cloudlab-workspace-${workspaceId}`;
+  const containerName = `cloudlab-${workspaceId.toLowerCase()}-container`;
   const subdomainUrl = `http://${workspaceId}.${PREVIEW_BASE_DOMAIN}`;
   const pathUrl = `/api/preview/${workspaceId}/`;
 

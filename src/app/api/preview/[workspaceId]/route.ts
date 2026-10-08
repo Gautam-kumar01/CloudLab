@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { canAccessWorkspace } from '@/lib/workspace-auth';
 import { apiError } from '@/lib/api-utils';
+import { workspacePath } from '@/lib/workspace-paths';
+import { promises as fs } from 'fs';
+import path from 'path';
 import http from 'http';
 
 // Allowed development server ports for preview routing (blocks SSRF to internal services/DBs/Docker daemon)
-const ALLOWED_PREVIEW_PORTS = new Set([3000, 3001, 3002, 5173, 5174, 8000, 8080, 4200, 5000]);
+export const ALLOWED_PREVIEW_PORTS = new Set([3000, 3001, 3002, 5173, 5174, 8000, 8080, 4200, 5000]);
 
 // Safe headers to forward upstream to the workspace preview application
 const ALLOWED_FORWARD_REQUEST_HEADERS = [
@@ -23,11 +26,52 @@ const ALLOWED_FORWARD_REQUEST_HEADERS = [
 // Dangerous headers that must never be mirrored back to the browser from untrusted preview apps
 const BLOCKED_RESPONSE_HEADERS = new Set([
   'set-cookie',
+  'cookie',
+  'authorization',
+  'proxy-authorization',
   'connection',
   'keep-alive',
   'transfer-encoding',
   'upgrade',
 ]);
+
+export const MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024; // 10MB
+export const MAX_RESPONSE_BODY_BYTES = 15 * 1024 * 1024; // 15MB
+
+export async function resolveWorkspaceInternalPort(workspaceId: string): Promise<number> {
+  try {
+    const root = workspacePath(workspaceId);
+    const pkgPath = path.join(root, 'package.json');
+    const pkgRaw = await fs.readFile(pkgPath, 'utf-8');
+    const pkg = JSON.parse(pkgRaw);
+    if (pkg.dependencies?.vite || pkg.devDependencies?.vite) {
+      return 5173;
+    }
+    if (pkg.dependencies?.next || pkg.devDependencies?.next) {
+      return 3000;
+    }
+  } catch {}
+
+  try {
+    const root = workspacePath(workspaceId);
+    await fs.access(path.join(root, 'main.py'));
+    return 8000;
+  } catch {}
+
+  return 3000;
+}
+
+export function isLoopbackTarget(host: string): boolean {
+  const normalized = host.toLowerCase().trim();
+  return (
+    normalized === '127.0.0.1' ||
+    normalized === 'localhost' ||
+    normalized === '0.0.0.0' ||
+    normalized === '::1' ||
+    normalized.startsWith('127.') ||
+    normalized.endsWith('.localhost')
+  );
+}
 
 // Handle all HTTP methods for the preview proxy
 export async function GET(req: NextRequest, context: { params: Promise<{ workspaceId: string; path?: string[] }> }) {
@@ -77,20 +121,32 @@ async function handleProxy(
       DockerManager.touchActivity(workspaceId);
     } catch {}
 
-    const targetUrl = new URL(req.url);
-
-    // Validate and restrict target port to prevent internal port scanning & SSRF
-    const rawPortStr = targetUrl.searchParams.get('_port');
-    let targetPort = 3000;
-    if (rawPortStr) {
-      const parsedPort = parseInt(rawPortStr, 10);
-      if (isNaN(parsedPort) || !ALLOWED_PREVIEW_PORTS.has(parsedPort)) {
-        return apiError('Forbidden. Port is not an authorized web preview port.', 403);
-      }
-      targetPort = parsedPort;
+    // Check request payload size limit
+    const contentLengthHeader = req.headers.get('content-length');
+    if (contentLengthHeader && parseInt(contentLengthHeader, 10) > MAX_REQUEST_BODY_BYTES) {
+      return apiError('Payload Too Large. Request exceeds maximum allowed 10MB limit.', 413);
     }
 
-    // Strip internal _port parameter from downstream URL
+    // Server-side port resolution: NEVER allow client _port to probe host ports!
+    const targetPort = await resolveWorkspaceInternalPort(workspaceId);
+
+    // Target host resolution:
+    // In production container environment, route to the dedicated workspace container
+    const defaultContainerHost = `cloudlab-${workspaceId.toLowerCase()}-container`;
+    const targetHost = process.env.CONTAINER_HOST || defaultContainerHost;
+
+    // Reject loopback targets in production
+    const isLoopback = isLoopbackTarget(targetHost);
+    const allowLoopback =
+      process.env.ALLOW_LOOPBACK_PREVIEW === 'true' ||
+      (process.env.NODE_ENV !== 'production' && !process.env.PREVIEW_STRICT_ISOLATION);
+
+    if (isLoopback && !allowLoopback) {
+      return apiError('Forbidden. Direct host loopback preview routing is blocked for security.', 403);
+    }
+
+    // Strip internal _port parameter completely from query string
+    const targetUrl = new URL(req.url);
     const cleanSearchParams = new URLSearchParams(targetUrl.search);
     cleanSearchParams.delete('_port');
     const searchString = cleanSearchParams.toString() ? `?${cleanSearchParams.toString()}` : '';
@@ -98,13 +154,14 @@ async function handleProxy(
     const subpath = pathSegments ? '/' + pathSegments.join('/') : '/';
     const fullTargetPath = `${subpath}${searchString}`;
 
-    const targetHost = process.env.CONTAINER_HOST || '127.0.0.1';
-
     // Read incoming request body if present
     const method = req.method;
     let bodyBuffer: Buffer | undefined;
     if (method !== 'GET' && method !== 'HEAD') {
       const arrayBuf = await req.arrayBuffer();
+      if (arrayBuf.byteLength > MAX_REQUEST_BODY_BYTES) {
+        return apiError('Payload Too Large. Request body exceeds 10MB limit.', 413);
+      }
       bodyBuffer = Buffer.from(arrayBuf);
     }
 
@@ -123,6 +180,9 @@ async function handleProxy(
     }
 
     return await new Promise<NextResponse>((resolve) => {
+      let receivedBytes = 0;
+      let limitExceeded = false;
+
       const proxyReq = http.request(
         {
           host: targetHost,
@@ -134,22 +194,58 @@ async function handleProxy(
         },
         (proxyRes) => {
           const chunks: Buffer[] = [];
-          proxyRes.on('data', (chunk) => chunks.push(chunk));
+          proxyRes.on('data', (chunk: Buffer) => {
+            receivedBytes += chunk.length;
+            if (receivedBytes > MAX_RESPONSE_BODY_BYTES) {
+              limitExceeded = true;
+              proxyReq.destroy();
+            } else {
+              chunks.push(chunk);
+            }
+          });
+
           proxyRes.on('end', () => {
+            if (limitExceeded) {
+              return resolve(
+                NextResponse.json(
+                  { error: 'Payload Too Large: Preview response exceeded maximum 15MB limit' },
+                  { status: 413 }
+                )
+              );
+            }
+
             const responseBody = Buffer.concat(chunks);
             const headers: Record<string, string> = {};
 
             for (const [key, val] of Object.entries(proxyRes.headers)) {
               const lowerKey = key.toLowerCase();
-              // Strip cookies and hop-by-hop headers from previewed application
-              if (val && !BLOCKED_RESPONSE_HEADERS.has(lowerKey)) {
-                headers[key] = Array.isArray(val) ? val.join(', ') : val;
+              if (!val || BLOCKED_RESPONSE_HEADERS.has(lowerKey)) {
+                continue;
               }
+
+              // Sanitize redirects (Location header)
+              if (lowerKey === 'location') {
+                const locStr = Array.isArray(val) ? val[0] : val;
+                try {
+                  const parsed = new URL(locStr, `http://${targetHost}:${targetPort}`);
+                  headers['location'] = `/api/preview/${workspaceId}${parsed.pathname}${parsed.search}`;
+                } catch {
+                  if (locStr.startsWith('/') && !locStr.startsWith(`/api/preview/${workspaceId}`)) {
+                    headers['location'] = `/api/preview/${workspaceId}${locStr}`;
+                  } else {
+                    headers['location'] = locStr;
+                  }
+                }
+                continue;
+              }
+
+              headers[key] = Array.isArray(val) ? val.join(', ') : val;
             }
 
             // Enforce response isolation headers
             headers['x-content-type-options'] = 'nosniff';
             headers['content-security-policy'] = "frame-ancestors 'self'";
+            headers['x-frame-options'] = 'SAMEORIGIN';
 
             resolve(new NextResponse(responseBody, { status: proxyRes.statusCode || 200, headers }));
           });
@@ -157,11 +253,20 @@ async function handleProxy(
       );
 
       proxyReq.on('error', (err) => {
+        if (limitExceeded) {
+          return resolve(
+            NextResponse.json(
+              { error: 'Payload Too Large: Preview response exceeded maximum 15MB limit' },
+              { status: 413 }
+            )
+          );
+        }
+
         resolve(
           NextResponse.json(
             {
               error: 'Workspace preview server not reachable',
-              message: `No active server responding on port ${targetPort}. Please run your dev server (e.g. 'npm run dev') in the terminal.`,
+              message: `No active server responding on container ${targetHost}:${targetPort}. Please verify your dev server is running.`,
               details: err.message,
             },
             { status: 502 }
