@@ -14,12 +14,22 @@ export default auth((req) => {
   const isPublicProbeApi =
     req.nextUrl.pathname === '/api/health' || req.nextUrl.pathname === '/api/ready';
 
-  // 1. Global API Rate Limiting (100 req/min)
-  if (isApiRoute) {
-    const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
+  // 1. Global API Rate Limiting (100 req/min, health probes exempt)
+  if (isApiRoute && !isPublicProbeApi) {
+    const forwarded = req.headers.get('x-forwarded-for');
+    const ip = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
     const now = Date.now();
     const windowMs = 60 * 1000; // 1 minute window
     const maxRequests = 100; // Max 100 requests per minute
+
+    // Periodically prune stale rate limit entries to prevent memory leaks
+    if (rateLimitMap.size > 1000) {
+      for (const [k, v] of rateLimitMap.entries()) {
+        if (now > v.resetTime) {
+          rateLimitMap.delete(k);
+        }
+      }
+    }
 
     const record = rateLimitMap.get(ip);
     if (!record || now > record.resetTime) {

@@ -3,6 +3,7 @@ import { GET as getFile } from '@/app/api/workspace/file/route';
 import { GET as getFiles, POST as postFiles } from '@/app/api/workspace/files/route';
 import { POST as postBackup } from '@/app/api/workspace/backup/route';
 import { POST as postRestore } from '@/app/api/workspace/restore/route';
+import { POST as postRename } from '@/app/api/workspace/rename/route';
 import { GET as getHealth } from '@/app/api/health/route';
 import { GET as getReady } from '@/app/api/ready/route';
 import { auth } from '@/auth';
@@ -218,6 +219,69 @@ describe('Route-Level Security and Authorization', () => {
 
       const res = await postRestore(req as any);
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe('POST /api/workspace/rename', () => {
+    it('returns 401 Unauthorized when unauthenticated', async () => {
+      vi.mocked(auth).mockResolvedValue(null as any);
+
+      const req = new Request('http://localhost/api/workspace/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId: 'ws-1', oldPath: 'a.js', newPath: 'b.js' }),
+      });
+
+      const res = await postRename(req as any);
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 403 Forbidden on cross-tenant rename attempt', async () => {
+      vi.mocked(auth).mockResolvedValue({
+        user: { id: 'attacker-1', name: 'Attacker' },
+      } as any);
+
+      vi.mocked(db.project.findFirst).mockResolvedValue({
+        id: 'ws-victim',
+        name: 'victim-project',
+        ownerId: 'victim-99',
+        members: [],
+        status: 'ACTIVE',
+      } as any);
+
+      const req = new Request('http://localhost/api/workspace/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId: 'ws-victim', oldPath: 'a.js', newPath: 'b.js' }),
+      });
+
+      const res = await postRename(req as any);
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 403 Forbidden on path traversal in rename', async () => {
+      vi.mocked(auth).mockResolvedValue({
+        user: { id: 'owner-1', name: 'Owner' },
+      } as any);
+
+      vi.mocked(db.project.findFirst).mockResolvedValue({
+        id: 'ws-1',
+        name: 'my-project',
+        ownerId: 'owner-1',
+        members: [],
+        status: 'ACTIVE',
+      } as any);
+
+      const req = new Request('http://localhost/api/workspace/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId: 'ws-1', oldPath: '../secret.txt', newPath: 'b.js' }),
+      });
+
+      const res = await postRename(req as any);
+      expect(res.status).toBe(403);
+      const json = await res.json();
+      expect(json.error).toMatch(/path traversal detected/i);
     });
   });
 
