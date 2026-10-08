@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { Terminal, ArrowRight, Menu, X, Sparkles } from 'lucide-react';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Terminal, ArrowRight, Menu, X, Sparkles } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 function GithubIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -13,11 +14,11 @@ function GithubIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 const navLinks = [
-  { href: '#ide-demo', label: 'Live IDE' },
-  { href: '#features', label: 'Features' },
-  { href: '#how-it-works', label: 'How It Works' },
-  { href: '#comparison', label: 'Why CloudLab' },
-  { href: '#faq', label: 'FAQ' },
+  { href: "#overview", label: "Overview" },
+  { href: "#workflow", label: "How It Works" },
+  { href: "#architecture", label: "Architecture" },
+  { href: "#features", label: "Capabilities" },
+  { href: "#faq", label: "FAQ" },
 ];
 
 export default function Navbar() {
@@ -27,42 +28,42 @@ export default function Navbar() {
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
     if (mobileOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     }
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     };
   }, [mobileOpen]);
 
   return (
     <>
-      <header className={`cl-navbar ${scrolled ? 'scrolled' : ''}`}>
-        <div className="cl-container w-full flex items-center justify-between gap-4">
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? "bg-[#030712]/90 backdrop-blur-md border-b border-white/10 shadow-lg"
+            : "bg-transparent border-b border-transparent"
+        }`}
+      >
+        <div className="cl-container w-full h-16 flex items-center justify-between gap-4">
           {/* Brand Logo */}
           <Link href="/" className="flex items-center gap-3 group" aria-label="CloudLab Home">
             <div className="relative">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(139, 92, 246, 0.2))',
-                  boxShadow: 'inset 0 0 0 1px rgba(52, 211, 153, 0.4), 0 0 20px rgba(16, 185, 129, 0.25)',
-                }}
-              >
-                <Terminal className="w-5 h-5 text-[#34d399]" />
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                <Terminal className="w-5 h-5" />
               </div>
             </div>
             <span className="font-bold text-[18px] tracking-tight text-white flex items-center gap-1">
-              Cloud<span className="text-[#34d399]">Lab</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-[#10b981]/15 text-[#34d399] border border-[#10b981]/30 ml-1">
-                v2.0
+              Cloud<span className="text-emerald-400">Lab</span>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 ml-1">
+                Docker IDE
               </span>
             </span>
           </Link>
@@ -73,7 +74,7 @@ export default function Navbar() {
               <a
                 key={l.href}
                 href={l.href}
-                className="text-[14px] font-medium text-[#94a3b8] hover:text-white transition-colors duration-200"
+                className="text-[14px] font-medium text-slate-300 hover:text-white transition-colors duration-200"
               >
                 {l.label}
               </a>
@@ -82,11 +83,14 @@ export default function Navbar() {
 
           {/* Action CTAs */}
           <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
+
             <a
               href="https://github.com/Gautam-kumar01/CloudLab"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#94a3b8] hover:text-white rounded-lg hover:bg-white/5 transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/5 transition"
+              aria-label="GitHub Repository"
             >
               <GithubIcon className="w-4 h-4" />
               <span>GitHub</span>
@@ -108,22 +112,25 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Mobile Hamburger */}
-          <button
-            type="button"
-            className="md:hidden w-10 h-10 rounded-lg flex items-center justify-center border border-white/10 text-white hover:bg-white/5 transition"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-          >
-            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+          {/* Mobile Actions & Hamburger */}
+          <div className="flex md:hidden items-center gap-2">
+            <ThemeToggle />
+            <button
+              type="button"
+              className="w-10 h-10 rounded-lg flex items-center justify-center border border-white/10 text-white hover:bg-white/5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            >
+              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Mobile Drawer */}
       {mobileOpen && (
         <div
-          className="md:hidden fixed inset-0 z-40 pt-[70px]"
+          className="md:hidden fixed inset-0 z-40 pt-16"
           onClick={() => setMobileOpen(false)}
         >
           <div className="absolute inset-0 bg-black/85 backdrop-blur-md" />
@@ -135,7 +142,7 @@ export default function Navbar() {
                     key={l.href}
                     href={l.href}
                     onClick={() => setMobileOpen(false)}
-                    className="px-3 py-2.5 rounded-lg text-[15px] font-medium text-[#94a3b8] hover:text-white hover:bg-white/5 transition"
+                    className="px-3 py-2.5 rounded-lg text-[15px] font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
                   >
                     {l.label}
                   </a>

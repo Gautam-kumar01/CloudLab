@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { Terminal, Heart } from 'lucide-react';
+import Link from "next/link";
+import { Terminal, Heart } from "lucide-react";
 
 function GithubIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -16,7 +16,7 @@ export default function Footer() {
     <footer className="border-t border-white/10 bg-[#030712] text-slate-400 text-xs py-14">
       <div className="cl-container">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
-          {/* Brand & Status Column */}
+          {/* Brand Column */}
           <div className="md:col-span-2 space-y-4">
             <Link href="/" className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
@@ -27,53 +27,56 @@ export default function Footer() {
               </span>
             </Link>
             <p className="max-w-sm text-slate-400 text-sm leading-relaxed">
-              The modern browser-based cloud development environment. Write code, collaborate live, run terminals, and ship software with isolated Docker containers.
+              Browser-based cloud development environment running inside isolated Docker containers.
+              Code with Monaco, execute shell commands in xterm.js, and preview live full-stack applications.
             </p>
-            {/* Status Pill */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>All Systems Operational</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>Docker Container Engine: Ready</span>
             </div>
           </div>
 
-          {/* Product Links */}
+          {/* Navigation Links */}
           <div className="space-y-3">
             <h4 className="font-semibold text-white text-sm">Product</h4>
             <ul className="space-y-2 text-slate-400">
-              <li><a href="#ide-demo" className="hover:text-white transition">Live IDE Studio</a></li>
-              <li><a href="#features" className="hover:text-white transition">Docker Sandboxes</a></li>
-              <li><a href="#how-it-works" className="hover:text-white transition">Multiplayer CRDT</a></li>
-              <li><a href="#comparison" className="hover:text-white transition">AI Copilot Tools</a></li>
+              <li><a href="#overview" className="hover:text-white transition">Overview</a></li>
+              <li><a href="#workflow" className="hover:text-white transition">How It Works</a></li>
+              <li><a href="#architecture" className="hover:text-white transition">Docker Architecture</a></li>
+              <li><a href="#features" className="hover:text-white transition">Workspace Tools</a></li>
+              <li><a href="#faq" className="hover:text-white transition">FAQ</a></li>
             </ul>
           </div>
 
-          {/* Account & Resources */}
+          {/* Developer & Auth */}
           <div className="space-y-3">
             <h4 className="font-semibold text-white text-sm">Developer</h4>
             <ul className="space-y-2 text-slate-400">
               <li><Link href="/sign-in" className="hover:text-white transition">Sign In</Link></li>
               <li><Link href="/sign-up" className="hover:text-white transition">Create Account</Link></li>
-              <li><a href="https://github.com/Gautam-kumar01/CloudLab" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">GitHub Repository</a></li>
-              <li><a href="#faq" className="hover:text-white transition">Documentation FAQ</a></li>
+              <li><Link href="/dashboard" className="hover:text-white transition">Dashboard</Link></li>
+              <li>
+                <a
+                  href="https://github.com/Gautam-kumar01/CloudLab"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-white transition inline-flex items-center gap-1.5"
+                >
+                  <GithubIcon className="w-3.5 h-3.5" />
+                  <span>GitHub Repository</span>
+                </a>
+              </li>
             </ul>
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-slate-500 text-[12px]">
-            © {new Date().getFullYear()} CloudLab IDE. Open source cloud development environment.
-          </p>
-          <div className="flex items-center gap-4 text-slate-400">
-            <a
-              href="https://github.com/Gautam-kumar01/CloudLab"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 hover:text-white transition text-[12px]"
-            >
-              <GithubIcon className="w-4 h-4" />
-              <span>Gautam-kumar01/CloudLab</span>
-            </a>
+        {/* Bottom Disclaimer & Copyright */}
+        <div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-400 text-[11px]">
+          <div>
+            &copy; {new Date().getFullYear()} CloudLab. Open-source cloud developer workspaces.
+          </div>
+          <div className="text-slate-400">
+            Powered by Docker Engine, Monaco Editor, and pg-boss on PostgreSQL.
           </div>
         </div>
       </div>
