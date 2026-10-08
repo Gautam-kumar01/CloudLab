@@ -19,8 +19,10 @@ export async function GET(request: Request) {
   if (!session?.user?.id) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
-  const project = await getWorkspaceProject(session.user.id, workspaceId);
-  if (!project) {
+
+  const { canAccessWorkspace } = await import('@/lib/workspace-auth');
+  const hasAccess = await canAccessWorkspace(session.user.id, workspaceId);
+  if (!hasAccess) {
     return new NextResponse('Forbidden', { status: 403 });
   }
 
@@ -34,14 +36,16 @@ export async function GET(request: Request) {
       return new NextResponse('Cannot directly download a directory', { status: 400 });
     }
 
-    // Use Web Streams API to stream the file instead of Node stream to support Edge/App router better natively
-    // Read the file as a buffer for the MVP as it's safe for 50MB files.
-    // For gigabyte files we would want a proper ReadableStream.
+    if (stat.size > 100 * 1024 * 1024) {
+      return new NextResponse('File too large for direct download (max 100MB)', { status: 413 });
+    }
+
     const fileBuffer = await fs.readFile(filePath);
+    const cleanFilename = path.basename(filePath).replace(/["\r\n]/g, '');
 
     return new NextResponse(fileBuffer, {
       headers: {
-        'Content-Disposition': `attachment; filename="${path.basename(filePath)}"`,
+        'Content-Disposition': `attachment; filename="${cleanFilename}"`,
         'Content-Type': 'application/octet-stream',
         'Content-Length': stat.size.toString(),
       },

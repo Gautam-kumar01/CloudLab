@@ -12,8 +12,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const workspaceId = searchParams.get('workspaceId');
 
-    if (!workspaceId) {
-      return NextResponse.json({ error: 'Workspace ID is required' }, { status: 400 });
+    if (!workspaceId || !/^[a-zA-Z0-9_-]+$/.test(workspaceId)) {
+      return NextResponse.json({ error: 'Valid workspace ID is required' }, { status: 400 });
     }
 
     const session = await auth();

@@ -66,7 +66,17 @@ export async function POST(req: NextRequest) {
     return acc;
   }, {} as Record<string, string>);
 
-  await addJob('deployment', { deploymentId: deployment.id, projectId, envVars }, { singletonKey: deployment.id });
+  await addJob(
+    'deployment',
+    { deploymentId: deployment.id, projectId, envVars, userId: session.user.id },
+    { singletonKey: deployment.id }
+  );
+
+  const { logAuditEvent } = await import('@/lib/audit');
+  await logAuditEvent(session.user.id, 'DEPLOYMENT_START', {
+    workspaceId: projectId,
+    deploymentId: deployment.id,
+  });
 
   return NextResponse.json({ deployment });
 }

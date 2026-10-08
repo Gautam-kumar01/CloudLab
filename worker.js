@@ -39,7 +39,7 @@ function getDb() {
     const { PrismaClient } = require('./src/generated/prisma/client');
     const { Pool } = require('pg');
     const { PrismaPg } = require('@prisma/adapter-pg');
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const pool = new Pool({ connectionString: getPostgresUrl() });
     const adapter = new PrismaPg(pool);
     db = new PrismaClient({ adapter });
   }
@@ -74,7 +74,7 @@ async function startWorker() {
 
   // 3. Deployment queue worker: processes asynchronous deployments
   await boss.work('deployment', async (job) => {
-    const { deploymentId, projectId, envVars } = job.data;
+    const { deploymentId, projectId, envVars, userId } = job.data;
     console.log(`[Job deployment] Starting deployment ${deploymentId} for project ${projectId}`);
     const prisma = getDb();
 
@@ -95,6 +95,23 @@ async function startWorker() {
           : { status: 'FAILED' },
       });
 
+      if (userId) {
+        try {
+          await prisma.auditLog.create({
+            data: {
+              userId,
+              action: result.success ? 'DEPLOYMENT_SUCCESS' : 'DEPLOYMENT_FAILURE',
+              details: JSON.stringify({
+                workspaceId: projectId,
+                deploymentId,
+                url: result.url,
+                error: result.error,
+              }),
+            },
+          });
+        } catch {}
+      }
+
       if (!result.success) {
         console.error(`[Job deployment] Deployment ${deploymentId} failed:`, result.error);
       } else {
@@ -106,9 +123,57 @@ async function startWorker() {
         where: { id: deploymentId },
         data: { status: 'FAILED' },
       });
+
+      if (userId) {
+        try {
+          await prisma.auditLog.create({
+            data: {
+              userId,
+              action: 'DEPLOYMENT_FAILURE',
+              details: JSON.stringify({
+                workspaceId: projectId,
+                deploymentId,
+                error: err.message,
+              }),
+            },
+          });
+        } catch {}
+      }
+
       throw err;
     }
   });
 }
 
-startWorker().catch(console.error);
+async function runWorkerWithRetry(maxRetries = 10, delayMs = 3000) {
+  for (let i = 1; i <= maxRetries; i++) {
+    try {
+      await startWorker();
+      return;
+    } catch (err) {
+      console.error(`[Worker] Connection attempt ${i}/${maxRetries} failed:`, err.message);
+      if (i === maxRetries) {
+        console.error('[Worker] Fatal: Unable to establish database worker connection. Exiting.');
+        process.exit(1);
+      }
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+}
+
+// Graceful termination handling
+process.on('SIGTERM', async () => {
+  console.log('[Worker] SIGTERM received, stopping pg-boss worker gracefully...');
+  try { await boss.stop(); } catch {}
+  process.exit(0);
+});
+process.on('SIGINT', async () => {
+  console.log('[Worker] SIGINT received, stopping pg-boss worker gracefully...');
+  try { await boss.stop(); } catch {}
+  process.exit(0);
+});
+
+runWorkerWithRetry().catch((err) => {
+  console.error('[Worker] Unhandled error in worker lifecycle:', err);
+  process.exit(1);
+});

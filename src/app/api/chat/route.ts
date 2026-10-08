@@ -191,6 +191,9 @@ IMPORTANT RULES:
               execute: async ({ path: dirPath }) => {
                 try {
                   const safePath = getSafePath(dirPath, workspaceId);
+                  if (workspaceId) {
+                    await assertSafeRealPath(workspaceId, safePath);
+                  }
                   const items = await fs.readdir(safePath, { withFileTypes: true });
                   return items
                     .map((item) => `${item.isDirectory() ? '[DIR]' : '[FILE]'} ${item.name}`)
@@ -208,6 +211,13 @@ IMPORTANT RULES:
               execute: async ({ path: filePath }) => {
                 try {
                   const safePath = getSafePath(filePath, workspaceId);
+                  if (workspaceId) {
+                    await assertSafeRealPath(workspaceId, safePath);
+                  }
+                  const stat = await fs.stat(safePath);
+                  if (stat.size > 500 * 1024) {
+                    return `Error: File exceeds maximum readable size for AI (500KB limit).`;
+                  }
                   const content = await fs.readFile(safePath, 'utf8');
                   logAgentAction('readFile', { path: filePath });
                   return content;
