@@ -28,24 +28,19 @@ describe('Phase 1 Lifecycle & Persistence Verification', () => {
 
   describe('DockerManager Alignment for Deployments & Sandboxes', () => {
     it('accepts valid deployment container names in killContainer', async () => {
-      // Valid workspace sandbox name
-      expect(async () => {
-        // Will throw system/docker error if not installed, but must not throw 'Invalid container identifier'
-        try {
-          await DockerManager.killContainer('cloudlab-workspace-test1');
-        } catch (err: any) {
-          expect(err.message).not.toBe('Invalid container identifier');
-        }
-      }).not.toThrow();
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      // Valid deployment container name
-      expect(async () => {
-        try {
-          await DockerManager.killContainer('cloudlab-proj123-container');
-        } catch (err: any) {
-          expect(err.message).not.toBe('Invalid container identifier');
-        }
-      }).not.toThrow();
+      try {
+        await DockerManager.killContainer('cloudlab-workspace-test1');
+      } catch (err: any) {
+        expect(err.message).not.toBe('Invalid container identifier');
+      }
+
+      try {
+        await DockerManager.killContainer('cloudlab-proj123-container');
+      } catch (err: any) {
+        expect(err.message).not.toBe('Invalid container identifier');
+      }
 
       // Invalid / malicious container identifier
       await expect(DockerManager.killContainer('malicious; rm -rf /')).rejects.toThrow(
@@ -54,6 +49,8 @@ describe('Phase 1 Lifecycle & Persistence Verification', () => {
       await expect(DockerManager.killContainer('../escape')).rejects.toThrow(
         'Invalid container identifier'
       );
+
+      consoleSpy.mockRestore();
     });
 
     it('tracks activity correctly for idle reaper', () => {
