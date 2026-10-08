@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Configure Git, add clean remote, commit and push without storing token on disk
     try {
-      const { getGitAuthArgs, scrubGitRemoteCredentials } = await import('@/lib/git-security');
+      const { getGitAuthEnv, scrubGitRemoteCredentials } = await import('@/lib/git-security');
 
       // Ensure git init
       await runCommand('git', ['init'], { cwd });
@@ -105,8 +105,11 @@ export async function POST(req: NextRequest) {
       }
 
       // Ephemeral authenticated push without force overwrite
-      const authArgs = getGitAuthArgs(token);
-      await runCommand('git', [...authArgs, 'push', '-u', 'origin', 'main'], { cwd });
+      const authEnv = getGitAuthEnv(token);
+      await runCommand('git', ['push', '-u', 'origin', 'main'], {
+        cwd,
+        env: { ...process.env, ...authEnv },
+      });
 
       // Guarantee any legacy embedded tokens are stripped
       await scrubGitRemoteCredentials(cwd);

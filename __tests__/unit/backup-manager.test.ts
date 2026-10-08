@@ -92,4 +92,26 @@ describe('BackupManager', () => {
     // The latest snapshot should exist
     expect(list.find((s) => s.id === created[10])).toBeDefined();
   });
+
+  it('rolls back workspace state if copy operation fails during restore', async () => {
+    // 1. Take snapshot
+    const snapshot = await BackupManager.createSnapshot(testWorkspaceId, 'Rollback test snapshot');
+
+    // 2. Change workspace content to something we expect to be retained upon failed restore
+    const expectedContent = 'console.log("original untouched content");';
+    await fs.writeFile(path.join(testWorkspaceDir, 'index.js'), expectedContent, 'utf-8');
+
+    // 3. Spy on fs.cp to simulate an unexpected I/O failure
+    const originalCp = fs.cp;
+    const cpSpy = vi.spyOn(fs, 'cp').mockRejectedValueOnce(new Error('Simulated disk failure'));
+
+    // 4. Attempt restore, expect it to reject
+    await expect(BackupManager.restoreSnapshot(testWorkspaceId, snapshot.id)).rejects.toThrow('Simulated disk failure');
+
+    // 5. Verify that original workspace content was safely rolled back
+    const contentAfterFailure = await fs.readFile(path.join(testWorkspaceDir, 'index.js'), 'utf-8');
+    expect(contentAfterFailure).toBe(expectedContent);
+
+    cpSpy.mockRestore();
+  });
 });

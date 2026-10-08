@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     }
 
     const cwd = workspacePath(workspaceId);
-    const { getGitAuthArgs, scrubGitRemoteCredentials } = await import('@/lib/git-security');
+    const { getGitAuthEnv, scrubGitRemoteCredentials } = await import('@/lib/git-security');
     await scrubGitRemoteCredentials(cwd);
 
     // Ensure git author is configured
@@ -65,9 +65,12 @@ export async function POST(request: Request) {
       } catch {}
     }
 
-    // Execute ephemeral authenticated git push
-    const authArgs = token ? getGitAuthArgs(token) : [];
-    const { stdout } = await runCommand('git', [...authArgs, 'push'], { cwd });
+    // Execute ephemeral authenticated git push with credentials in environment rather than argv
+    const authEnv = token ? getGitAuthEnv(token) : {};
+    const { stdout } = await runCommand('git', ['push'], {
+      cwd,
+      env: { ...process.env, ...authEnv },
+    });
     await scrubGitRemoteCredentials(cwd);
 
     await (await import('@/lib/audit')).logAuditEvent(session.user.id, 'GIT_PUSH', {

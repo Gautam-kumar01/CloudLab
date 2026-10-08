@@ -188,38 +188,62 @@ export class BackupManager {
 
     // Staging unpack directory to prevent Zip Slip and partial corruption
     const stagingDir = path.join(backupDir, `staging_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`);
+    const rollbackDir = path.join(backupDir, `rollback_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`);
     await fs.mkdir(stagingDir, { recursive: true });
 
     try {
-      // Extract using system tar
+      // 1. Extract archive to staging directory first
       await execFileAsync('tar', ['-xzf', archivePath, '-C', stagingDir]);
 
-      // Clean rollback: prune existing workspace files (except .git) so post-snapshot additions are removed
-      try {
-        const existingEntries = await fs.readdir(targetDir, { withFileTypes: true });
-        for (const entry of existingEntries) {
-          if (entry.name === '.git') {
-            continue; // Preserve git repository structure
-          }
-          await fs.rm(path.join(targetDir, entry.name), { recursive: true, force: true });
+      // 2. Safely stage existing files into rollback directory before modifying workspace
+      await fs.mkdir(rollbackDir, { recursive: true });
+      const existingEntries = await fs.readdir(targetDir, { withFileTypes: true });
+      const movedEntries: string[] = [];
+
+      for (const entry of existingEntries) {
+        if (entry.name === '.git') {
+          continue; // Preserve git repository structure in-place
         }
-      } catch (cleanErr: any) {
-        if (cleanErr.code !== 'ENOENT') {
-          console.warn('[BackupManager] Warning during workspace reset before restore:', cleanErr);
-        }
+        await fs.rename(path.join(targetDir, entry.name), path.join(rollbackDir, entry.name));
+        movedEntries.push(entry.name);
       }
 
-      // Copy unpacked files to workspace root cleanly
-      await fs.cp(stagingDir, targetDir, { recursive: true, force: true });
+      // 3. Copy unpacked files from staging to target workspace root
+      try {
+        await fs.cp(stagingDir, targetDir, { recursive: true, force: true });
+        // Restore succeeded cleanly! Delete rollback files
+        await fs.rm(rollbackDir, { recursive: true, force: true });
+      } catch (copyErr) {
+        // Restore failed midway: automatically roll back to previous state
+        console.error('[BackupManager] Restore failed during file copy, rolling back workspace state...', copyErr);
+        try {
+          // Remove any partially copied files (except .git)
+          const partialEntries = await fs.readdir(targetDir, { withFileTypes: true });
+          for (const entry of partialEntries) {
+            if (entry.name === '.git') continue;
+            await fs.rm(path.join(targetDir, entry.name), { recursive: true, force: true });
+          }
+          // Move previous files back into place
+          for (const entryName of movedEntries) {
+            await fs.rename(path.join(rollbackDir, entryName), path.join(targetDir, entryName));
+          }
+        } catch (rollbackErr) {
+          console.error('[BackupManager] Critical: Failed to restore previous workspace files during rollback:', rollbackErr);
+        }
+        throw copyErr;
+      }
 
       return {
         success: true,
         restoredAt: new Date().toISOString(),
       };
     } finally {
-      // Clean up staging directory
+      // Clean up staging and any leftover rollback directory
       try {
         await fs.rm(stagingDir, { recursive: true, force: true });
+      } catch {}
+      try {
+        await fs.rm(rollbackDir, { recursive: true, force: true });
       } catch {}
     }
   }

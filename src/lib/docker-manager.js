@@ -130,15 +130,19 @@ const DockerManager = {
   },
 
   /**
-   * Lists all running CloudLab workspace containers.
+   * Lists all running CloudLab workspace and deployment containers.
    */
   async listContainers() {
     try {
-      const { stdout } = await docker(['ps', '--filter', 'label=cloudlab.workspace=true', '--format', '{{json .}}']);
+      const { stdout } = await docker(['ps', '--filter', 'label=cloudlab.workspace-id', '--format', '{{json .}}']);
       const lines = stdout.trim().split('\n').filter(Boolean);
       return lines.map(line => {
         try {
-          return JSON.parse(line);
+          const item = JSON.parse(line);
+          const labels = item.Labels || '';
+          item.isDeployment = labels.includes('cloudlab.deployment=true');
+          item.isWorkspace = labels.includes('cloudlab.workspace=true');
+          return item;
         } catch (e) {
           return null;
         }
@@ -153,7 +157,7 @@ const DockerManager = {
    * Kills any docker container by name or ID (useful for Admin force kill).
    */
   async killContainer(containerId) {
-    if (!/^[a-f0-9]{12,64}$/i.test(containerId) && !/^cloudlab-workspace-[a-zA-Z0-9_-]+$/.test(containerId)) {
+    if (!/^[a-f0-9]{12,64}$/i.test(containerId) && !/^cloudlab-[a-zA-Z0-9_-]+$/.test(containerId)) {
       throw new Error('Invalid container identifier');
     }
     try {
@@ -174,9 +178,10 @@ const DockerManager = {
     const reaped = [];
 
     try {
+      // Query all CloudLab managed containers (both workspace sandboxes and deployment containers)
       const { stdout } = await docker([
         'ps',
-        '--filter', 'label=cloudlab.workspace=true',
+        '--filter', 'label=cloudlab.workspace-id',
         '--format', '{{.ID}}\t{{.Names}}\t{{.Labels}}'
       ]);
 
@@ -205,11 +210,13 @@ const DockerManager = {
 
         if (now - lastAct > maxIdleMs) {
           const idleMins = Math.round((now - lastAct) / 60000);
-          console.log(`[Idle Reaper] Terminating idle workspace container ${cName} (inactive for ${idleMins}m)`);
+          const isDeployment = labelsStr.includes('cloudlab.deployment=true');
+          const typeStr = isDeployment ? 'deployment' : 'workspace';
+          console.log(`[Idle Reaper] Terminating idle ${typeStr} container ${cName} (inactive for ${idleMins}m)`);
           try {
             await docker(['stop', cName]);
             if (workspaceId) activityMap.delete(workspaceId);
-            reaped.push({ container: cName, workspaceId, idleMinutes: idleMins });
+            reaped.push({ container: cName, workspaceId, idleMinutes: idleMins, type: typeStr });
           } catch (stopErr) {
             console.error(`[Idle Reaper] Error stopping ${cName}:`, stopErr);
           }

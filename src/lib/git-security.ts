@@ -31,6 +31,21 @@ export function getGitAuthArgs(token: string): string[] {
 }
 
 /**
+ * Returns ephemeral environment variables for git authentication.
+ * Uses GIT_CONFIG_COUNT / GIT_CONFIG_KEY_* / GIT_CONFIG_VALUE_* so credentials
+ * are never exposed in process argument lists (ps, /proc/cmdline).
+ */
+export function getGitAuthEnv(token: string): Record<string, string> {
+  if (!token) return {};
+  const basicAuth = Buffer.from(`x-access-token:${token}`).toString('base64');
+  return {
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'http.extraHeader',
+    GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basicAuth}`,
+  };
+}
+
+/**
  * Checks if a relative path attempts to read internal git credentials or configuration.
  */
 export function isGitInternalPath(relativePath: string): boolean {

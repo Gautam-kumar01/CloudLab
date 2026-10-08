@@ -107,15 +107,16 @@ export async function GET(request: Request) {
     if (repoUrl && repoUrl.startsWith('https://github.com/') && !hasGit) {
       console.log(`[Workspace Auto-Restore] Re-cloning ${repoUrl} into ${workspaceRoot}...`);
       try {
-        const { getGitAuthArgs, scrubGitRemoteCredentials } = await import('@/lib/git-security');
-        const authArgs = accessToken ? getGitAuthArgs(accessToken) : [];
+        const { getGitAuthEnv, scrubGitRemoteCredentials } = await import('@/lib/git-security');
+        const authEnv = accessToken ? getGitAuthEnv(accessToken) : {};
 
         try {
           await fs.rm(workspaceRoot, { recursive: true, force: true });
         } catch {}
 
-        await runCommand('git', [...authArgs, 'clone', '--depth', '1', '--', repoUrl, workspaceRoot], {
+        await runCommand('git', ['clone', '--depth', '1', '--', repoUrl, workspaceRoot], {
           timeout: 60 * 1000,
+          env: { ...process.env, ...authEnv },
         });
         await scrubGitRemoteCredentials(workspaceRoot);
         console.log(`[Workspace Auto-Restore] Successfully restored repository into ${workspaceRoot}`);

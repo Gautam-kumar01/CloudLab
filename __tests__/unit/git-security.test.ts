@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getGitAuthArgs, isGitInternalPath, scrubGitRemoteCredentials } from '@/lib/git-security';
+import { getGitAuthArgs, getGitAuthEnv, isGitInternalPath, scrubGitRemoteCredentials } from '@/lib/git-security';
 import * as processModule from '@/lib/process';
 
 describe('git-security', () => {
@@ -14,8 +14,20 @@ describe('git-security', () => {
     expect(decoded).toBe('x-access-token:ghp_testToken123');
   });
 
-  it('returns empty array when token is empty', () => {
+  it('generates ephemeral environment variables for git config without exposing in process args', () => {
+    const env = getGitAuthEnv('ghp_testToken123');
+    expect(env.GIT_CONFIG_COUNT).toBe('1');
+    expect(env.GIT_CONFIG_KEY_0).toBe('http.extraHeader');
+    expect(env.GIT_CONFIG_VALUE_0).toMatch(/^AUTHORIZATION: basic /);
+
+    const base64Part = env.GIT_CONFIG_VALUE_0.replace('AUTHORIZATION: basic ', '');
+    const decoded = Buffer.from(base64Part, 'base64').toString('utf-8');
+    expect(decoded).toBe('x-access-token:ghp_testToken123');
+  });
+
+  it('returns empty array or object when token is empty', () => {
     expect(getGitAuthArgs('')).toEqual([]);
+    expect(getGitAuthEnv('')).toEqual({});
   });
 
   it('identifies internal .git paths that must be blocked', () => {

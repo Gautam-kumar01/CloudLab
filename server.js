@@ -167,35 +167,105 @@ app.prepare().then(() => {
         const docName = `workspace/${resolvedWorkspaceId}/file/${file}`;
 
         wss.handleUpgrade(request, socket, head, (ws) => {
-          // If user is a read-only VIEWER, intercept incoming WebSocket messages
-          // to prevent document mutation while still allowing real-time observation and awareness (cursor).
-          if (!canEdit) {
-            const decoding = require('lib0/dist/decoding.cjs');
-            const origEmit = ws.emit.bind(ws);
-            ws.emit = function (event, ...args) {
-              if (event === 'message') {
-                const data = args[0];
-                try {
-                  const uint8 = new Uint8Array(data);
-                  const decoder = decoding.createDecoder(uint8);
-                  const messageType = decoding.readVarUint(decoder);
-                  // messageType 0 is messageSync (Yjs sync protocol)
-                  if (messageType === 0) {
-                    const syncType = decoding.readVarUint(decoder);
-                    // syncType 0 is SyncStep1 (reading document state from server)
-                    // syncType 1 is SyncStep2, syncType 2 is Update (sending mutations to server)
-                    if (syncType === 1 || syncType === 2) {
-                      // Silently drop mutating update from read-only VIEWER
+          let currentRole = userRole;
+          let lastCheckTime = Date.now();
+          const decoding = require('lib0/dist/decoding.cjs');
+          const origEmit = ws.emit.bind(ws);
+
+          // Proactive periodic revocation checker (every 30 seconds)
+          const revokeInterval = setInterval(async () => {
+            if (ws.readyState !== 1) { // 1 = OPEN
+              clearInterval(revokeInterval);
+              return;
+            }
+            try {
+              let res = null;
+              try {
+                const r = await fetch(
+                  `http://127.0.0.1:${port}/api/workspace/access?workspaceId=${encodeURIComponent(resolvedWorkspaceId)}`,
+                  {
+                    headers: {
+                      cookie: request.headers.cookie || '',
+                      host: request.headers.host || `localhost:${port}`,
+                    },
+                  }
+                );
+                res = await r.json();
+              } catch {
+                const r = await fetch(
+                  `http://localhost:${port}/api/workspace/access?workspaceId=${encodeURIComponent(resolvedWorkspaceId)}`,
+                  {
+                    headers: {
+                      cookie: request.headers.cookie || '',
+                      host: request.headers.host || `localhost:${port}`,
+                    },
+                  }
+                );
+                res = await r.json();
+              }
+
+              if (!res?.data?.success) {
+                logger.warn({ workspaceId: resolvedWorkspaceId }, 'Terminating active Yjs session: access revoked');
+                clearInterval(revokeInterval);
+                ws.close(4003, 'Workspace access revoked');
+              } else {
+                currentRole = res.data.role || 'VIEWER';
+              }
+            } catch {}
+          }, 30000);
+          revokeInterval.unref();
+
+          ws.on('close', () => clearInterval(revokeInterval));
+
+          // Message interceptor: silently drop mutating updates if user is a VIEWER,
+          // and re-verify role when mutations arrive.
+          ws.emit = function (event, ...args) {
+            if (event === 'message') {
+              const data = args[0];
+              try {
+                const uint8 = new Uint8Array(data);
+                const decoder = decoding.createDecoder(uint8);
+                const messageType = decoding.readVarUint(decoder);
+                // messageType 0 is messageSync (Yjs sync protocol)
+                if (messageType === 0) {
+                  const syncType = decoding.readVarUint(decoder);
+                  // syncType 1 is SyncStep2, syncType 2 is Update (sending mutations to server)
+                  if (syncType === 1 || syncType === 2) {
+                    const now = Date.now();
+                    if (now - lastCheckTime > 20000) {
+                      lastCheckTime = now;
+                      fetch(
+                        `http://127.0.0.1:${port}/api/workspace/access?workspaceId=${encodeURIComponent(resolvedWorkspaceId)}`,
+                        {
+                          headers: {
+                            cookie: request.headers.cookie || '',
+                            host: request.headers.host || `localhost:${port}`,
+                          },
+                        }
+                      )
+                        .then((r) => r.json())
+                        .then((res) => {
+                          if (!res?.data?.success) {
+                            try { ws.close(4003, 'Workspace access revoked'); } catch {}
+                          } else {
+                            currentRole = res.data.role || 'VIEWER';
+                          }
+                        })
+                        .catch(() => {});
+                    }
+
+                    if (currentRole !== 'OWNER' && currentRole !== 'EDITOR') {
+                      // Drop mutating update from read-only VIEWER
                       return false;
                     }
                   }
-                } catch {
-                  return false;
                 }
+              } catch {
+                return false;
               }
-              return origEmit(event, ...args);
-            };
-          }
+            }
+            return origEmit(event, ...args);
+          };
 
           setupWSConnection(ws, request, { docName });
 
@@ -640,9 +710,59 @@ app.prepare().then(() => {
       }
     });
 
-    socket.on('terminal.toTerm', ({ id, data }) => {
+    // Proactively revalidate active open terminals every 30 seconds
+    const terminalRecheckInterval = setInterval(async () => {
+      if (socket.disconnected) {
+        clearInterval(terminalRecheckInterval);
+        return;
+      }
+      for (const [tId, term] of Object.entries(terminals)) {
+        if (!term || term.hasExited || !term.workspaceId) continue;
+        const authCheck = await checkWorkspacePermission(socket, term.workspaceId);
+        if (
+          !authCheck.allowed ||
+          (authCheck.role !== 'OWNER' && authCheck.role !== 'EDITOR' && authCheck.role !== 'DEVELOPER')
+        ) {
+          socket.emit('terminal.incData', {
+            id: tId,
+            data: '\r\n\x1b[31m[Session Revoked: Workspace membership or editor permission revoked]\x1b[0m\r\n',
+          });
+          term.hasExited = true;
+          try {
+            term.kill();
+          } catch (e) {}
+          delete terminals[tId];
+        }
+      }
+    }, 30000);
+    terminalRecheckInterval.unref();
+
+    socket.on('terminal.toTerm', async ({ id, data }) => {
       const term = terminals[id];
       if (term && typeof term.write === 'function' && !term.hasExited) {
+        // Re-validate permission if 20 seconds have elapsed since last check
+        const now = Date.now();
+        if (!term.lastAuthCheck || now - term.lastAuthCheck > 20000) {
+          term.lastAuthCheck = now;
+          const authCheck = await checkWorkspacePermission(socket, term.workspaceId);
+          if (
+            !authCheck.allowed ||
+            (authCheck.role !== 'OWNER' && authCheck.role !== 'EDITOR' && authCheck.role !== 'DEVELOPER')
+          ) {
+            socket.emit('terminal.incData', {
+              id,
+              data: '\r\n\x1b[31m[Session Revoked: Workspace membership or editor permission revoked]\x1b[0m\r\n',
+            });
+            term.hasExited = true;
+            try {
+              term.kill();
+            } catch (e) {}
+            delete terminals[id];
+            return;
+          }
+          term.role = authCheck.role;
+        }
+
         if (term.role !== 'OWNER' && term.role !== 'EDITOR' && term.role !== 'DEVELOPER') {
           return;
         }
@@ -670,6 +790,7 @@ app.prepare().then(() => {
     });
 
     socket.on('disconnect', () => {
+      clearInterval(terminalRecheckInterval);
       console.log('Client disconnected from terminal socket');
       if (userId) {
         activeSessions.delete(userId);
