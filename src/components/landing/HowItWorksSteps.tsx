@@ -124,13 +124,13 @@ export default function HowItWorksSteps() {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="cl-badge mb-4">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+            <Sparkles className="w-3.5 h-3.5 text-[#ccff00]" />
             <span>HOW TO USE CLOUDLAB</span>
           </div>
           <h2 className="typo-h1 text-white tracking-tight">
-            How to start coding in <span className="text-emerald-400">CloudLab</span>
+            How to start coding in <span className="text-[#ccff00]">CloudLab</span>
           </h2>
-          <p className="typo-body-lg mt-4 text-slate-300">
+          <p className="typo-body-lg mt-4 text-zinc-300">
             From zero local setup to an active containerized workspace in four practical steps.
           </p>
         </div>
@@ -142,40 +142,40 @@ export default function HowItWorksSteps() {
             return (
               <div
                 key={step.number}
-                className="bento-card flex flex-col justify-between group hover:border-emerald-500/30 transition-all duration-300"
+                className="bento-card flex flex-col justify-between group hover:border-[#ccff00]/35 transition-all duration-300"
               >
                 <div>
                   {/* Step Top Bar */}
                   <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-2.5">
-                      <span className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold flex items-center justify-center">
+                      <span className="w-8 h-8 rounded-lg bg-[#ccff00]/15 border border-[#ccff00]/30 text-[#ccff00] text-xs font-mono font-bold flex items-center justify-center">
                         {step.number}
                       </span>
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                         {step.badge}
                       </span>
                     </div>
-                    <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 group-hover:text-emerald-400 group-hover:bg-emerald-500/10 transition">
+                    <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 group-hover:text-[#ccff00] group-hover:bg-[#ccff00]/10 transition">
                       <Icon className="w-5 h-5" />
                     </div>
                   </div>
 
                   {/* Step Title & Subtitle */}
-                  <h3 className="text-xl font-bold text-white tracking-tight mb-2 group-hover:text-emerald-300 transition-colors">
+                  <h3 className="text-xl font-bold text-white tracking-tight mb-2 group-hover:text-white transition-colors">
                     {step.title}
                   </h3>
-                  <p className="text-xs font-medium text-emerald-400/90 mb-3">
+                  <p className="text-xs font-semibold text-[#ccff00] mb-3">
                     {step.subtitle}
                   </p>
-                  <p className="text-sm text-slate-400 leading-relaxed mb-6">
+                  <p className="text-sm text-zinc-300 leading-relaxed mb-6 font-normal">
                     {step.description}
                   </p>
 
                   {/* Bullet Points */}
                   <div className="space-y-2 mb-8 pt-4 border-t border-white/5">
                     {step.details.map((detail, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-xs text-slate-300">
-                        <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <div key={idx} className="flex items-center gap-2 text-xs text-zinc-200">
+                        <Check className="w-3.5 h-3.5 text-[#ccff00] shrink-0" />
                         <span>{detail}</span>
                       </div>
                     ))}

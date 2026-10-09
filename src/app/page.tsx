@@ -11,7 +11,7 @@ import FAQSection from "@/components/landing/FAQSection";
 
 export default function LandingPage() {
   return (
-    <div className="cloudlab-landing min-h-screen text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-black">
+    <div className="cloudlab-landing min-h-screen text-slate-100 flex flex-col font-sans selection:bg-[#ccff00] selection:text-black">
       {/* Navigation Bar */}
       <Navbar />
 
@@ -126,27 +126,27 @@ export default function LandingPage() {
         {/* ============================================================
             FINAL CALL TO ACTION
             ============================================================ */}
-        <section className="cl-section relative overflow-hidden py-20 bg-gradient-to-b from-transparent to-[#050914]">
+        <section className="cl-section relative overflow-hidden py-20 bg-gradient-to-b from-transparent to-[#070709]">
           <div className="cl-container relative z-10">
-            <div className="max-w-4xl mx-auto rounded-3xl p-8 sm:p-14 border border-emerald-500/25 bg-gradient-to-b from-[#0b162c] to-[#070e1c] text-center shadow-2xl relative overflow-hidden">
+            <div className="max-w-4xl mx-auto rounded-3xl p-8 sm:p-14 border border-[#ccff00]/25 bg-gradient-to-b from-[#141416] to-[#0c0c0e] text-center shadow-2xl relative overflow-hidden">
               <div
                 className="absolute inset-0 pointer-events-none opacity-20"
                 style={{
                   backgroundImage:
-                    "radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.4) 0%, transparent 70%)",
+                    "radial-gradient(circle at 50% 0%, rgba(204, 255, 0, 0.25) 0%, transparent 70%)",
                 }}
               />
 
               <div className="cl-badge mb-5">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                <Sparkles className="w-3.5 h-3.5 text-[#ccff00]" />
                 <span>START BUILDING TODAY</span>
               </div>
 
               <h2 className="typo-h1 text-white tracking-tight mb-4">
-                Ready to experience <span className="text-emerald-400">CloudLab</span>?
+                Ready to experience <span className="text-[#ccff00]">CloudLab</span>?
               </h2>
 
-              <p className="typo-body-lg text-slate-300 max-w-xl mx-auto mb-8 font-normal">
+              <p className="typo-body-lg text-zinc-300 max-w-xl mx-auto mb-8 font-normal">
                 Launch a containerized workspace in seconds. Edit code, run tests, and preview
                 applications directly from your browser with zero local machine friction.
               </p>
@@ -154,7 +154,7 @@ export default function LandingPage() {
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   href="/sign-up"
-                  className="cl-btn cl-btn-primary w-full sm:w-auto px-8 h-12 text-[15px] font-bold shadow-lg shadow-emerald-500/20"
+                  className="cl-btn cl-btn-primary w-full sm:w-auto px-8 h-12 text-[15px] font-bold shadow-lg shadow-[#ccff00]/20"
                 >
                   <span>Start Coding Free</span>
                   <ArrowRight className="w-4 h-4" />

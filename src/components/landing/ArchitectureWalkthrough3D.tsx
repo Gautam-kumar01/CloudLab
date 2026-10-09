@@ -217,11 +217,11 @@ export default function ArchitectureWalkthrough3D() {
       {/* Visual Controls Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5 px-1">
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono">
-            <Activity className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#ccff00]/10 border border-[#ccff00]/25 text-[#ccff00] text-xs font-mono font-semibold">
+            <Activity className="w-3.5 h-3.5 text-[#ccff00]" />
             <span>Interactive Docker Container Workflow</span>
           </span>
-          <span className="text-[11px] text-slate-400 hidden sm:inline">
+          <span className="text-[11px] text-zinc-400 hidden sm:inline">
             (Demo illustration — verified container flow)
           </span>
         </div>
@@ -229,12 +229,12 @@ export default function ArchitectureWalkthrough3D() {
         {/* Action Controls */}
         <div className="flex items-center gap-2">
           {/* View mode toggle */}
-          <div className="inline-flex rounded-lg bg-slate-900/80 p-0.5 border border-white/10 text-xs">
+          <div className="inline-flex rounded-lg bg-[#141416] p-0.5 border border-white/10 text-xs">
             <button
               type="button"
               onClick={() => setViewMode("3d")}
               className={`px-2.5 py-1 rounded-md transition font-medium ${
-                viewMode === "3d" ? "bg-emerald-500/20 text-emerald-300 font-semibold" : "text-slate-400 hover:text-white"
+                viewMode === "3d" ? "bg-[#ccff00]/20 text-[#ccff00] font-semibold" : "text-zinc-400 hover:text-white"
               }`}
               aria-label="3D Isometric perspective view"
             >
@@ -244,7 +244,7 @@ export default function ArchitectureWalkthrough3D() {
               type="button"
               onClick={() => setViewMode("flat")}
               className={`px-2.5 py-1 rounded-md transition font-medium ${
-                viewMode === "flat" ? "bg-emerald-500/20 text-emerald-300 font-semibold" : "text-slate-400 hover:text-white"
+                viewMode === "flat" ? "bg-[#ccff00]/20 text-[#ccff00] font-semibold" : "text-zinc-400 hover:text-white"
               }`}
               aria-label="2D Diagram flow view"
             >
@@ -253,11 +253,11 @@ export default function ArchitectureWalkthrough3D() {
           </div>
 
           {/* Stepper buttons */}
-          <div className="flex items-center gap-1 bg-slate-900/80 rounded-lg p-0.5 border border-white/10">
+          <div className="flex items-center gap-1 bg-[#141416] rounded-lg p-0.5 border border-white/10">
             <button
               type="button"
               onClick={handlePrev}
-              className="p-1.5 text-slate-400 hover:text-white rounded hover:bg-white/5 transition"
+              className="p-1.5 text-zinc-400 hover:text-white rounded hover:bg-white/5 transition"
               aria-label="Previous architecture stage"
               title="Previous stage"
             >
@@ -266,16 +266,16 @@ export default function ArchitectureWalkthrough3D() {
             <button
               type="button"
               onClick={togglePlay}
-              className="p-1.5 text-slate-300 hover:text-emerald-400 rounded hover:bg-white/5 transition"
+              className="p-1.5 text-zinc-300 hover:text-[#ccff00] rounded hover:bg-white/5 transition"
               aria-label={isPlaying ? "Pause walkthrough animation" : "Play walkthrough animation"}
               title={isPlaying ? "Pause" : "Play"}
             >
-              {isPlaying ? <Pause className="w-4 h-4 text-emerald-400" /> : <Play className="w-4 h-4" />}
+              {isPlaying ? <Pause className="w-4 h-4 text-[#ccff00]" /> : <Play className="w-4 h-4" />}
             </button>
             <button
               type="button"
               onClick={handleNext}
-              className="p-1.5 text-slate-400 hover:text-white rounded hover:bg-white/5 transition"
+              className="p-1.5 text-zinc-400 hover:text-white rounded hover:bg-white/5 transition"
               aria-label="Next architecture stage"
               title="Next stage"
             >
@@ -284,7 +284,7 @@ export default function ArchitectureWalkthrough3D() {
             <button
               type="button"
               onClick={handleReset}
-              className="p-1.5 text-slate-400 hover:text-white rounded hover:bg-white/5 transition"
+              className="p-1.5 text-zinc-400 hover:text-white rounded hover:bg-white/5 transition"
               aria-label="Replay from stage 1"
               title="Replay from start"
             >
@@ -295,9 +295,9 @@ export default function ArchitectureWalkthrough3D() {
       </div>
 
       {/* Main Architecture Frame */}
-      <div className="rounded-2xl border border-white/10 bg-[#090d1a]/95 backdrop-blur-xl shadow-2xl overflow-hidden">
+      <div className="rounded-2xl border border-white/10 bg-[#111113]/98 backdrop-blur-xl shadow-2xl overflow-hidden">
         {/* Stages Progress Track */}
-        <div className="grid grid-cols-3 sm:grid-cols-6 border-b border-white/10 bg-[#050914]/80">
+        <div className="grid grid-cols-3 sm:grid-cols-6 border-b border-white/10 bg-[#0c0c0e]/90">
           {ARCHITECTURE_STAGES.map((stage, idx) => {
             const Icon = stage.icon;
             const isActive = idx === activeStageIdx;
@@ -310,27 +310,27 @@ export default function ArchitectureWalkthrough3D() {
                   setActiveStageIdx(idx);
                   setIsPlaying(false);
                 }}
-                className={`relative px-3 py-3 text-left transition-all duration-200 border-r border-white/5 last:border-r-0 flex flex-col gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                className={`relative px-3 py-3 text-left transition-all duration-200 border-r border-white/5 last:border-r-0 flex flex-col gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ccff00] ${
                   isActive
-                    ? "bg-emerald-500/10 border-b-2 border-b-emerald-400 text-white"
-                    : "hover:bg-white/5 text-slate-400 hover:text-slate-200"
+                    ? "bg-[#ccff00]/10 border-b-2 border-b-[#ccff00] text-white"
+                    : "hover:bg-white/5 text-zinc-400 hover:text-white"
                 }`}
                 aria-selected={isActive}
                 role="tab"
               >
                 <div className="flex items-center justify-between w-full">
-                  <span className="text-[10px] font-mono font-semibold text-emerald-400">
+                  <span className="text-[10px] font-mono font-semibold text-[#ccff00]">
                     {stage.step}
                   </span>
                   <Icon
                     className={`w-3.5 h-3.5 ${
-                      isActive ? "text-emerald-400" : isCompleted ? "text-emerald-500/70" : "text-slate-500"
+                      isActive ? "text-[#ccff00]" : isCompleted ? "text-[#ccff00]/70" : "text-zinc-500"
                     }`}
                   />
                 </div>
                 <span className="text-[12px] font-medium truncate">{stage.shortName}</span>
                 {isActive && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-400 to-teal-300" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#ccff00] to-[#b8e600]" />
                 )}
               </button>
             );
@@ -340,7 +340,7 @@ export default function ArchitectureWalkthrough3D() {
         {/* Body Split: Architecture Visualizer (Left/Top) & Stage Inspector (Right/Bottom) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[460px]">
           {/* Visual Story Container */}
-          <div className="lg:col-span-7 p-6 sm:p-8 flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-b from-[#0b1022] to-[#070b16]">
+          <div className="lg:col-span-7 p-6 sm:p-8 flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-b from-[#141416] to-[#0c0c0e]">
             {/* Background Grid Accent */}
             <div
               className="absolute inset-0 opacity-20 pointer-events-none"
@@ -352,13 +352,13 @@ export default function ArchitectureWalkthrough3D() {
             />
 
             {/* Stage Path Connector Legend */}
-            <div className="w-full flex items-center justify-between text-[11px] font-mono text-slate-400 mb-6 z-10 px-2">
+            <div className="w-full flex items-center justify-between text-[11px] font-mono text-zinc-400 mb-6 z-10 px-2">
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-[#ccff00] animate-pulse" />
                 <span>Stage {activeStage.step} of 06:</span>
                 <strong className="text-white font-semibold">{activeStage.name}</strong>
               </span>
-              <span className="text-slate-400">
+              <span className="text-zinc-400">
                 {isPlaying ? "Auto-cycling stages" : "Paused"}
               </span>
             </div>
@@ -388,8 +388,8 @@ export default function ArchitectureWalkthrough3D() {
                       }}
                       className={`cursor-pointer rounded-xl p-3 sm:p-3.5 transition-all duration-200 border flex items-center justify-between gap-3 ${
                         isActive
-                          ? "bg-emerald-500/10 border-emerald-400 text-white shadow-lg shadow-emerald-500/10"
-                          : "bg-[#0b1325]/80 border-white/10 hover:border-white/20 text-slate-300 hover:bg-[#0f172a]"
+                          ? "bg-[#ccff00]/10 border-[#ccff00] text-white shadow-lg shadow-[#ccff00]/10"
+                          : "bg-[#141416]/90 border-white/10 hover:border-white/20 text-zinc-300 hover:bg-[#1a1a1c]"
                       }`}
                       role="button"
                       tabIndex={0}
@@ -402,29 +402,29 @@ export default function ArchitectureWalkthrough3D() {
                       aria-label={`Select stage ${stage.step}: ${stage.name}`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-xs font-mono font-bold text-emerald-400 w-6">
+                        <span className="text-xs font-mono font-bold text-[#ccff00] w-6">
                           {stage.step}
                         </span>
                         <div
                           className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                            isActive ? "bg-emerald-500/20 text-emerald-300" : "bg-white/5 text-slate-400"
+                            isActive ? "bg-[#ccff00]/20 text-[#ccff00]" : "bg-white/5 text-zinc-400"
                           }`}
                         >
                           <Icon className="w-4 h-4" />
                         </div>
                         <div>
                           <div className="text-xs font-semibold text-white">{stage.name}</div>
-                          <div className="text-[11px] text-slate-400">{stage.tag}</div>
+                          <div className="text-[11px] text-zinc-400">{stage.tag}</div>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
                         {isActive ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#ccff00]/20 text-[#ccff00] border border-[#ccff00]/35">
                             Inspecting
                           </span>
                         ) : (
-                          <ChevronRight className="w-4 h-4 text-slate-500" />
+                          <ChevronRight className="w-4 h-4 text-zinc-500" />
                         )}
                       </div>
                     </div>
@@ -435,21 +435,21 @@ export default function ArchitectureWalkthrough3D() {
 
             {/* Real Data Flow Caption */}
             <div className="mt-4 text-center z-10">
-              <p className="text-[11px] text-slate-400 font-mono">
+              <p className="text-[11px] text-zinc-400 font-mono">
                 Browser IDE &rarr; API &rarr; pg-boss Worker &rarr; Docker Host &rarr; Workspace Container &rarr; Preview
               </p>
             </div>
           </div>
 
           {/* Stage Inspector Detail Panel (Right Side) */}
-          <div className="lg:col-span-5 p-6 sm:p-8 flex flex-col justify-between border-t lg:border-t-0 lg:border-l border-white/10 bg-[#070b16]">
+          <div className="lg:col-span-5 p-6 sm:p-8 flex flex-col justify-between border-t lg:border-t-0 lg:border-l border-white/10 bg-[#0e0e10]">
             <div>
               {/* Header Badge */}
               <div className="flex items-center justify-between gap-2 mb-3">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-semibold">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#ccff00]/15 border border-[#ccff00]/30 text-[#ccff00] text-xs font-mono font-semibold">
                   Stage {activeStage.step}: {activeStage.tag}
                 </span>
-                <span className="text-[11px] font-mono text-slate-400">
+                <span className="text-[11px] font-mono text-zinc-400">
                   {activeStageIdx + 1} / {ARCHITECTURE_STAGES.length}
                 </span>
               </div>
@@ -460,33 +460,33 @@ export default function ArchitectureWalkthrough3D() {
               </h3>
 
               {/* Beginner Summary Card */}
-              <div className="mt-4 p-4 rounded-xl bg-slate-900/90 border border-white/10">
-                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 mb-1.5">
+              <div className="mt-4 p-4 rounded-xl bg-[#141416]/90 border border-white/10">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[#ccff00] mb-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Beginner Walkthrough</span>
                 </div>
-                <h4 className="text-sm font-semibold text-slate-200 mb-1">
+                <h4 className="text-sm font-semibold text-white mb-1">
                   {activeStage.beginnerTitle}
                 </h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
+                <p className="text-xs text-zinc-300 leading-relaxed">
                   {activeStage.beginnerSummary}
                 </p>
               </div>
 
               {/* Under The Hood Details */}
               <div className="mt-4 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
-                  <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-200">
+                  <Terminal className="w-3.5 h-3.5 text-[#ccff00]" />
                   <span>Under the Hood (Engineering Architecture)</span>
                 </div>
-                <p className="text-xs text-slate-400 leading-relaxed bg-[#040711] p-3 rounded-lg border border-white/5 font-sans">
+                <p className="text-xs text-zinc-300 leading-relaxed bg-[#0a0a0c] p-3 rounded-lg border border-white/5 font-sans">
                   {activeStage.underTheHood}
                 </p>
               </div>
 
               {/* Technical Configuration Specs */}
               <div className="mt-4 pt-3 border-t border-white/10">
-                <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-2">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 mb-2">
                   Verified Runtime Specs
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -495,8 +495,8 @@ export default function ArchitectureWalkthrough3D() {
                       key={spec.label}
                       className="p-2 rounded-lg bg-white/[0.03] border border-white/5"
                     >
-                      <div className="text-[10px] text-slate-400 font-mono">{spec.label}</div>
-                      <div className="text-[11px] font-semibold text-emerald-300 truncate mt-0.5">
+                      <div className="text-[10px] text-zinc-400 font-mono">{spec.label}</div>
+                      <div className="text-[11px] font-semibold text-[#ccff00] truncate mt-0.5">
                         {spec.value}
                       </div>
                     </div>
@@ -507,14 +507,14 @@ export default function ArchitectureWalkthrough3D() {
 
             {/* Bottom Code Reality Pill */}
             <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 text-slate-400 text-[11px] font-mono truncate">
-                <Shield className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <div className="flex items-center gap-2 text-zinc-400 text-[11px] font-mono truncate">
+                <Shield className="w-3.5 h-3.5 text-[#ccff00] shrink-0" />
                 <span className="truncate">{activeStage.codeReality}</span>
               </div>
               <button
                 type="button"
                 onClick={handleNext}
-                className="shrink-0 inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-medium text-xs ml-2"
+                className="shrink-0 inline-flex items-center gap-1 text-[#ccff00] hover:text-white font-medium text-xs ml-2"
               >
                 <span>Next Stage</span>
                 <ChevronRight className="w-3.5 h-3.5" />

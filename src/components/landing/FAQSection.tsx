@@ -54,13 +54,13 @@ export default function FAQSection() {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="cl-badge mb-4">
-            <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
+            <HelpCircle className="w-3.5 h-3.5 text-[#ccff00]" />
             <span>FREQUENTLY ASKED QUESTIONS</span>
           </div>
           <h2 className="typo-h1 text-white tracking-tight">
-            Clear answers about <span className="text-emerald-400">CloudLab</span>
+            Clear answers about <span className="text-[#ccff00]">CloudLab</span>
           </h2>
-          <p className="typo-body-lg mt-4 text-slate-300">
+          <p className="typo-body-lg mt-4 text-zinc-300">
             Honest architectural answers for developers who care about what runs under the hood.
           </p>
         </div>
@@ -72,25 +72,25 @@ export default function FAQSection() {
             return (
               <div
                 key={idx}
-                className="rounded-xl border border-white/10 bg-[#090d1a]/80 backdrop-blur-md overflow-hidden transition-colors hover:border-white/20"
+                className="rounded-xl border border-white/10 bg-[#111113]/85 backdrop-blur-md overflow-hidden transition-colors hover:border-white/20"
               >
                 <button
                   type="button"
                   onClick={() => toggle(idx)}
-                  className="w-full px-6 py-4 text-left flex items-center justify-between gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                  className="w-full px-6 py-4 text-left flex items-center justify-between gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ccff00]"
                   aria-expanded={isOpen}
                 >
                   <span className="text-sm sm:text-base font-semibold text-white">
                     {faq.question}
                   </span>
                   <ChevronDown
-                    className={`w-4 h-4 text-emerald-400 shrink-0 transition-transform duration-200 ${
+                    className={`w-4 h-4 text-[#ccff00] shrink-0 transition-transform duration-200 ${
                       isOpen ? "rotate-180" : ""
                     }`}
                   />
                 </button>
                 {isOpen && (
-                  <div className="px-6 pb-5 pt-1 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-white/5 font-sans">
+                  <div className="px-6 pb-5 pt-1 text-xs sm:text-sm text-zinc-300 leading-relaxed border-t border-white/5 font-sans">
                     {faq.answer}
                   </div>
                 )}

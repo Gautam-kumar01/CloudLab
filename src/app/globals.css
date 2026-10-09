@@ -211,28 +211,73 @@ body {
 .cloudlab-landing {
   --landing-canvas: #0a0a0a;
   --landing-surface: #121214;
-  --landing-text: #f4f4f5;
-  --landing-muted: #a1a1aa;
+  --landing-text: #ffffff;
+  --landing-muted: #b8b8bd;
   --landing-accent: #ccff00;
+  --accent: #ccff00;
+  --accent-light: #ccff00;
+  --accent-hover: #b8e600;
+  --accent-glow: rgba(204, 255, 0, 0.35);
+  --accent-soft: rgba(204, 255, 0, 0.12);
+  --border-accent: rgba(204, 255, 0, 0.3);
   min-height: 100vh;
   color: var(--landing-text);
   background:
     radial-gradient(ellipse 35% 36% at 10% 28%, rgba(204, 255, 0, 0.035), transparent 74%),
-    radial-gradient(ellipse 36% 42% at 88% 38%, rgba(138, 43, 226, 0.055), transparent 74%),
+    radial-gradient(ellipse 36% 42% at 88% 38%, rgba(204, 255, 0, 0.025), transparent 74%),
     #0a0a0a;
+}
+
+.cloudlab-landing .cl-btn-primary {
+  background: #ccff00;
+  color: #050505;
+  font-weight: 750;
+  border: 1px solid rgba(204, 255, 0, 0.6);
+  box-shadow: 0 4px 18px rgba(204, 255, 0, 0.28);
+}
+
+.cloudlab-landing .cl-btn-primary:hover {
+  background: #b8e600;
+  color: #000000;
+  transform: translateY(-1.5px);
+  box-shadow: 0 8px 24px rgba(204, 255, 0, 0.42);
+}
+
+.cloudlab-landing .cl-badge {
+  background: rgba(204, 255, 0, 0.1);
+  border: 1px solid rgba(204, 255, 0, 0.28);
+  color: #ccff00;
+  box-shadow: 0 0 16px rgba(204, 255, 0, 0.1);
+}
+
+.cloudlab-landing .cl-badge:hover {
+  background: rgba(204, 255, 0, 0.16);
+  border-color: rgba(204, 255, 0, 0.45);
+}
+
+.cloudlab-landing .cl-badge-dot {
+  background: #ccff00;
+  box-shadow: 0 0 8px #ccff00;
 }
 
 .cloudlab-nav {
   height: 64px;
-  background: rgba(10, 10, 10, 0.84);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(14, 14, 14, 0.92);
+  border-bottom: 1px solid rgba(204, 255, 0, 0.16);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
 
 .cloudlab-nav--scrolled {
-  background: rgba(10, 10, 10, 0.96);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+  background: rgba(12, 12, 12, 0.98);
+  border-bottom: 1px solid rgba(204, 255, 0, 0.28);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(204, 255, 0, 0.2);
+}
+
+.cloudlab-footer {
+  background: linear-gradient(180deg, #241106 0%, #2e1608 50%, #1c0b03 100%);
+  border-top: 1px solid rgba(234, 88, 12, 0.35);
+  box-shadow: 0 -4px 24px rgba(234, 88, 12, 0.08);
 }
 
 @media (min-width: 1024px) and (max-width: 1199px) {

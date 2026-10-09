@@ -54,13 +54,13 @@ export default function Navbar() {
           {/* Brand Logo */}
           <Link href="/" className="flex items-center gap-3 group" aria-label="CloudLab Home">
             <div className="relative">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 bg-[#ccff00]/15 border border-[#ccff00]/30 text-[#ccff00]">
                 <Terminal className="w-5 h-5" />
               </div>
             </div>
             <span className="font-bold text-[18px] tracking-tight text-white flex items-center gap-1">
-              Cloud<span className="text-emerald-400">Lab</span>
-              <span className="cloudlab-nav__brand-tag text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 ml-1">
+              Cloud<span className="text-[#ccff00]">Lab</span>
+              <span className="cloudlab-nav__brand-tag text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-[#ccff00]/15 text-[#ccff00] border border-[#ccff00]/30 ml-1">
                 Docker IDE
               </span>
             </span>
@@ -72,7 +72,7 @@ export default function Navbar() {
               <a
                 key={l.href}
                 href={l.href}
-                className="text-[14px] font-medium text-slate-300 hover:text-white transition-colors duration-200"
+                className="text-[14px] font-medium text-zinc-300 hover:text-[#ccff00] transition-colors duration-200"
               >
                 {l.label}
               </a>
@@ -87,7 +87,7 @@ export default function Navbar() {
               href="https://github.com/Gautam-kumar01/CloudLab"
               target="_blank"
               rel="noopener noreferrer"
-              className="cloudlab-nav__github flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/5 transition"
+              className="cloudlab-nav__github flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-zinc-300 hover:text-[#ccff00] rounded-lg hover:bg-white/5 transition"
               aria-label="GitHub Repository"
             >
               <GithubIcon className="w-4 h-4" />
@@ -115,7 +115,7 @@ export default function Navbar() {
             <ThemeToggle />
             <button
               type="button"
-              className="w-10 h-10 rounded-lg flex items-center justify-center border border-white/10 text-white hover:bg-white/5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+              className="w-10 h-10 rounded-lg flex items-center justify-center border border-white/10 text-white hover:bg-white/5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ccff00]"
               onClick={() => setMobileOpen(!mobileOpen)}
               aria-label={mobileOpen ? "Close menu" : "Open menu"}
             >
@@ -133,14 +133,14 @@ export default function Navbar() {
         >
           <div className="absolute inset-0 bg-black/85 backdrop-blur-md" />
           <div className="relative cl-container py-4" onClick={(e) => e.stopPropagation()}>
-            <div className="rounded-2xl border border-white/10 bg-[#0f172a]/95 p-5 shadow-2xl backdrop-blur-xl">
+            <div className="rounded-2xl border border-[#ccff00]/20 bg-[#121214]/98 p-5 shadow-2xl backdrop-blur-xl">
               <nav className="flex flex-col gap-2">
                 {navLinks.map((l) => (
                   <a
                     key={l.href}
                     href={l.href}
                     onClick={() => setMobileOpen(false)}
-                    className="px-3 py-2.5 rounded-lg text-[15px] font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
+                    className="px-3 py-2.5 rounded-lg text-[15px] font-medium text-zinc-300 hover:text-[#ccff00] hover:bg-[#ccff00]/10 transition"
                   >
                     {l.label}
                   </a>

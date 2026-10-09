@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Terminal, Heart } from "lucide-react";
+import { Terminal } from "lucide-react";
 
 function GithubIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -13,54 +13,54 @@ function GithubIcon(props: React.SVGProps<SVGSVGElement>) {
 
 export default function Footer() {
   return (
-    <footer className="border-t border-white/10 bg-[#030712] text-slate-400 text-xs py-14">
+    <footer className="cloudlab-footer border-t border-[#ea580c]/35 text-[#fed7aa] text-xs py-14">
       <div className="cl-container">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
           {/* Brand Column */}
           <div className="md:col-span-2 space-y-4">
             <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <div className="w-8 h-8 rounded-lg bg-[#ea580c]/25 border border-[#ea580c]/50 flex items-center justify-center text-[#fdba74]">
                 <Terminal className="w-4 h-4" />
               </div>
               <span className="font-bold text-base text-white">
-                Cloud<span className="text-emerald-400">Lab</span>
+                Cloud<span className="text-[#fb923c]">Lab</span>
               </span>
             </Link>
-            <p className="max-w-sm text-slate-400 text-sm leading-relaxed">
+            <p className="max-w-sm text-[#ffedd5] text-sm leading-relaxed font-normal">
               Browser-based cloud development environment running inside isolated Docker containers.
               Code with Monaco, execute shell commands in xterm.js, and preview live full-stack applications.
             </p>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#7c2d12]/60 border border-[#ea580c]/50 text-[#fdba74] text-[11px] font-semibold font-mono">
+              <span className="w-2 h-2 rounded-full bg-[#fb923c] animate-pulse" />
               <span>Docker Container Engine: Ready</span>
             </div>
           </div>
 
           {/* Navigation Links */}
           <div className="space-y-3">
-            <h4 className="font-semibold text-white text-sm">Product</h4>
-            <ul className="space-y-2 text-slate-400">
-              <li><a href="#overview" className="hover:text-white transition">Overview</a></li>
-              <li><a href="#workflow" className="hover:text-white transition">How It Works</a></li>
-              <li><a href="#architecture" className="hover:text-white transition">Docker Architecture</a></li>
-              <li><a href="#features" className="hover:text-white transition">Workspace Tools</a></li>
-              <li><a href="#faq" className="hover:text-white transition">FAQ</a></li>
+            <h4 className="font-bold text-white text-sm tracking-wide">Product</h4>
+            <ul className="space-y-2">
+              <li><a href="#overview" className="text-[#fed7aa] hover:text-white transition font-medium">Overview</a></li>
+              <li><a href="#workflow" className="text-[#fed7aa] hover:text-white transition font-medium">How It Works</a></li>
+              <li><a href="#architecture" className="text-[#fed7aa] hover:text-white transition font-medium">Docker Architecture</a></li>
+              <li><a href="#features" className="text-[#fed7aa] hover:text-white transition font-medium">Workspace Tools</a></li>
+              <li><a href="#faq" className="text-[#fed7aa] hover:text-white transition font-medium">FAQ</a></li>
             </ul>
           </div>
 
           {/* Developer & Auth */}
           <div className="space-y-3">
-            <h4 className="font-semibold text-white text-sm">Developer</h4>
-            <ul className="space-y-2 text-slate-400">
-              <li><Link href="/sign-in" className="hover:text-white transition">Sign In</Link></li>
-              <li><Link href="/sign-up" className="hover:text-white transition">Create Account</Link></li>
-              <li><Link href="/dashboard" className="hover:text-white transition">Dashboard</Link></li>
+            <h4 className="font-bold text-white text-sm tracking-wide">Developer</h4>
+            <ul className="space-y-2">
+              <li><Link href="/sign-in" className="text-[#fed7aa] hover:text-white transition font-medium">Sign In</Link></li>
+              <li><Link href="/sign-up" className="text-[#fed7aa] hover:text-white transition font-medium">Create Account</Link></li>
+              <li><Link href="/dashboard" className="text-[#fed7aa] hover:text-white transition font-medium">Dashboard</Link></li>
               <li>
                 <a
                   href="https://github.com/Gautam-kumar01/CloudLab"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-white transition inline-flex items-center gap-1.5"
+                  className="text-[#fed7aa] hover:text-white transition inline-flex items-center gap-1.5 font-medium"
                 >
                   <GithubIcon className="w-3.5 h-3.5" />
                   <span>GitHub Repository</span>
@@ -71,11 +71,11 @@ export default function Footer() {
         </div>
 
         {/* Bottom Disclaimer & Copyright */}
-        <div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-400 text-[11px]">
-          <div>
+        <div className="pt-8 border-t border-[#ea580c]/25 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px]">
+          <div className="text-[#fed7aa] font-medium">
             &copy; {new Date().getFullYear()} CloudLab. Open-source cloud developer workspaces.
           </div>
-          <div className="text-slate-400">
+          <div className="text-[#fdba74] font-medium">
             Powered by Docker Engine, Monaco Editor, and pg-boss on PostgreSQL.
           </div>
         </div>

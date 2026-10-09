@@ -110,13 +110,13 @@ export default function WorkspaceCapabilities() {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="cl-badge mb-4">
-            <Laptop className="w-3.5 h-3.5 text-emerald-400" />
+            <Laptop className="w-3.5 h-3.5 text-[#ccff00]" />
             <span>GENUINE CAPABILITIES</span>
           </div>
           <h2 className="typo-h1 text-white tracking-tight">
-            Tools built into every <span className="text-emerald-400">CloudLab Workspace</span>
+            Tools built into every <span className="text-[#ccff00]">CloudLab Workspace</span>
           </h2>
-          <p className="typo-body-lg mt-4 text-slate-300">
+          <p className="typo-body-lg mt-4 text-zinc-300">
             Real features backed by genuine implementation in our codebase.
           </p>
         </div>
@@ -133,14 +133,14 @@ export default function WorkspaceCapabilities() {
                 onClick={() => setSelectedIdx(idx)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 border ${
                   isSelected
-                    ? "bg-emerald-500/15 border-emerald-400 text-white shadow-lg shadow-emerald-500/10"
-                    : "bg-white/[0.03] border-white/10 text-slate-400 hover:text-white hover:bg-white/5"
+                    ? "bg-[#ccff00]/15 border-[#ccff00] text-white shadow-lg shadow-[#ccff00]/10"
+                    : "bg-white/[0.03] border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
                 }`}
                 aria-selected={isSelected}
                 role="tab"
               >
                 <Icon
-                  className={`w-4 h-4 ${isSelected ? "text-emerald-400" : "text-slate-400"}`}
+                  className={`w-4 h-4 ${isSelected ? "text-[#ccff00]" : "text-zinc-400"}`}
                 />
                 <span>{cap.title}</span>
               </button>
@@ -153,7 +153,7 @@ export default function WorkspaceCapabilities() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             {/* Info Side */}
             <div className="lg:col-span-7 space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-semibold">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#ccff00]/10 border border-[#ccff00]/25 text-[#ccff00] text-xs font-mono font-semibold">
                 <ActiveIcon className="w-3.5 h-3.5" />
                 <span>{activeCapability.badge}</span>
               </div>
@@ -162,14 +162,14 @@ export default function WorkspaceCapabilities() {
                 {activeCapability.headline}
               </h3>
 
-              <p className="text-sm text-slate-300 leading-relaxed">
+              <p className="text-sm text-zinc-300 leading-relaxed">
                 {activeCapability.description}
               </p>
 
               <div className="pt-4 space-y-2.5">
                 {activeCapability.highlights.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2.5 text-xs text-slate-200">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div key={idx} className="flex items-center gap-2.5 text-xs text-zinc-200">
+                    <CheckCircle2 className="w-4 h-4 text-[#ccff00] shrink-0" />
                     <span>{item}</span>
                   </div>
                 ))}
@@ -177,23 +177,23 @@ export default function WorkspaceCapabilities() {
             </div>
 
             {/* Visual Preview Side */}
-            <div className="lg:col-span-5 rounded-xl border border-white/10 bg-[#070b16] p-6 shadow-inner">
+            <div className="lg:col-span-5 rounded-xl border border-white/10 bg-[#0c0c0e] p-6 shadow-inner">
               <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#ccff00]" />
                 </div>
-                <span className="text-[11px] font-mono text-slate-400">
+                <span className="text-[11px] font-mono text-zinc-400">
                   cloudlab-workspace
                 </span>
               </div>
 
               <div className="space-y-3 font-mono text-xs">
-                <div className="text-slate-400 text-[11px]">
+                <div className="text-zinc-400 text-[11px]">
                   # Feature: {activeCapability.title}
                 </div>
-                <div className="p-3 rounded-lg bg-black/50 border border-white/5 text-emerald-300 text-[11px] leading-relaxed">
+                <div className="p-3 rounded-lg bg-black/50 border border-white/5 text-[#ccff00] text-[11px] leading-relaxed">
                   {activeCapability.id === "editor" && (
                     <>
                       <div>1 &nbsp; import React from &quot;react&quot;;</div>
@@ -204,41 +204,41 @@ export default function WorkspaceCapabilities() {
                   )}
                   {activeCapability.id === "terminal" && (
                     <>
-                      <div className="text-slate-400">cloudlab@workspace:/workspace$ npm run dev</div>
-                      <div className="text-emerald-400">&gt; ready - started server on 0.0.0.0:3000</div>
-                      <div className="text-teal-300">&gt; local: http://localhost:3000</div>
+                      <div className="text-zinc-400">cloudlab@workspace:/workspace$ npm run dev</div>
+                      <div className="text-[#ccff00]">&gt; ready - started server on 0.0.0.0:3000</div>
+                      <div className="text-zinc-300">&gt; local: http://localhost:3000</div>
                     </>
                   )}
                   {activeCapability.id === "collaboration" && (
                     <>
-                      <div className="text-slate-400">[Yjs Sync] Connected to room: workspace-main</div>
-                      <div className="text-emerald-400">&gt; Peer &quot;Alex&quot; joined (cursor on line 14)</div>
-                      <div className="text-teal-300">&gt; Converged state: 0 merge conflicts</div>
+                      <div className="text-zinc-400">[Yjs Sync] Connected to room: workspace-main</div>
+                      <div className="text-[#ccff00]">&gt; Peer &quot;Alex&quot; joined (cursor on line 14)</div>
+                      <div className="text-zinc-300">&gt; Converged state: 0 merge conflicts</div>
                     </>
                   )}
                   {activeCapability.id === "preview" && (
                     <>
-                      <div className="text-slate-400">[Preview Proxy] Bound to container: 3000</div>
-                      <div className="text-emerald-400">&gt; Proxy status: 200 OK</div>
-                      <div className="text-teal-300">&gt; URL: /api/preview/[workspace-id]</div>
+                      <div className="text-zinc-400">[Preview Proxy] Bound to container: 3000</div>
+                      <div className="text-[#ccff00]">&gt; Proxy status: 200 OK</div>
+                      <div className="text-zinc-300">&gt; URL: /api/preview/[workspace-id]</div>
                     </>
                   )}
                   {activeCapability.id === "worker" && (
                     <>
-                      <div className="text-slate-400">[pg-boss] Listening for jobs: deployment, cleanup</div>
-                      <div className="text-emerald-400">&gt; Job deployment started for project</div>
-                      <div className="text-teal-300">&gt; Idle reaper: 0 inactive containers terminated</div>
+                      <div className="text-zinc-400">[pg-boss] Listening for jobs: deployment, cleanup</div>
+                      <div className="text-[#ccff00]">&gt; Job deployment started for project</div>
+                      <div className="text-zinc-300">&gt; Idle reaper: 0 inactive containers terminated</div>
                     </>
                   )}
                   {activeCapability.id === "ai" && (
                     <>
-                      <div className="text-slate-400">[AI Assistant] Analyzing workspace context...</div>
-                      <div className="text-emerald-400">&gt; Suggestion: Ensure environment variables match .env.example</div>
-                      <div className="text-teal-300">&gt; Ready for coding queries</div>
+                      <div className="text-zinc-400">[AI Assistant] Analyzing workspace context...</div>
+                      <div className="text-[#ccff00]">&gt; Suggestion: Ensure environment variables match .env.example</div>
+                      <div className="text-zinc-300">&gt; Ready for coding queries</div>
                     </>
                   )}
                 </div>
-                <div className="text-[10px] text-slate-400 text-right">
+                <div className="text-[10px] text-zinc-400 text-right">
                   Verified in CloudLab codebase
                 </div>
               </div>
