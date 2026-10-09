@@ -83,8 +83,6 @@
 
 * {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
 html {
@@ -205,6 +203,918 @@ body {
   font-size: 15px;
   line-height: 1.65;
   color: var(--text-muted);
+}
+
+/* ============================================================
+   CloudLab Landing — monochrome canvas, acid-lime signal
+   ============================================================ */
+.cloudlab-landing {
+  --landing-canvas: #0a0a0a;
+  --landing-surface: #121214;
+  --landing-text: #f4f4f5;
+  --landing-muted: #a1a1aa;
+  --landing-accent: #ccff00;
+  min-height: 100vh;
+  color: var(--landing-text);
+  background:
+    radial-gradient(ellipse 35% 36% at 10% 28%, rgba(204, 255, 0, 0.035), transparent 74%),
+    radial-gradient(ellipse 36% 42% at 88% 38%, rgba(138, 43, 226, 0.055), transparent 74%),
+    #0a0a0a;
+}
+
+.cloudlab-nav {
+  height: 64px;
+  background: rgba(10, 10, 10, 0.84);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.cloudlab-nav--scrolled {
+  background: rgba(10, 10, 10, 0.96);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+}
+
+@media (min-width: 1024px) and (max-width: 1199px) {
+  .cloudlab-nav__brand-tag,
+  .cloudlab-nav__github {
+    display: none;
+  }
+
+  .cloudlab-nav .cl-container {
+    gap: 0.75rem;
+    padding-inline: 1rem;
+  }
+
+  .cloudlab-nav nav {
+    gap: 0.875rem;
+  }
+}
+
+.landing-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(7.25rem, 12vh, 9rem) 0 clamp(3.5rem, 5.5vw, 5rem);
+  scroll-margin-top: 80px;
+  background: #0a0a0a;
+}
+
+.landing-hero__ambient {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.38;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to bottom, black 0%, black 54%, transparent 100%);
+}
+
+.landing-hero__ambient::before,
+.landing-hero__ambient::after {
+  position: absolute;
+  content: "";
+  width: min(58vw, 760px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(38px);
+  animation: landing-ambient-drift 24s ease-in-out infinite alternate;
+}
+
+.landing-hero__ambient::before {
+  top: -32%;
+  right: -12%;
+  background: radial-gradient(circle, rgba(138, 43, 226, 0.12), transparent 68%);
+}
+
+.landing-hero__ambient::after {
+  bottom: -46%;
+  left: 2%;
+  background: radial-gradient(circle, rgba(204, 255, 0, 0.075), transparent 70%);
+  animation-delay: -9s;
+}
+
+.landing-hero__rings {
+  position: absolute;
+  z-index: -1;
+  top: 48%;
+  left: -8%;
+  width: min(66vw, 820px);
+  aspect-ratio: 1;
+  pointer-events: none;
+  transform: translate(-10%, -50%);
+}
+
+.landing-hero__rings::before,
+.landing-hero__rings::after {
+  position: absolute;
+  content: "";
+  border: 1px solid rgba(204, 255, 0, 0.15);
+  border-radius: 50%;
+  inset: 0;
+  animation: landing-ring-pulse 18s ease-in-out infinite;
+}
+
+.landing-hero__rings::after {
+  inset: 14%;
+  border-color: rgba(138, 43, 226, 0.15);
+  animation-duration: 23s;
+  animation-delay: -7s;
+  animation-direction: alternate-reverse;
+}
+
+.landing-hero__container {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-hero__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(360px, 0.88fr);
+  align-items: center;
+  gap: clamp(3rem, 6vw, 6rem);
+}
+
+.landing-hero__content {
+  position: relative;
+  isolation: isolate;
+  z-index: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.landing-hero__copy {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-hero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 25px;
+  color: var(--landing-accent);
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.19em;
+}
+
+.landing-hero__eyebrow-line {
+  display: block;
+  width: clamp(42px, 6vw, 82px);
+  height: 1px;
+  background: linear-gradient(90deg, rgba(204, 255, 0, 0.85), rgba(204, 255, 0, 0.08));
+}
+
+.landing-hero__title {
+  max-width: 14.5ch;
+  margin: 0;
+  color: #f5f5f5;
+  font-size: clamp(3.1rem, 5.25vw, 5.1rem);
+  font-weight: 780;
+  line-height: 1.015;
+  letter-spacing: -0.075em;
+  text-wrap: balance;
+}
+
+.landing-hero__title-accent {
+  display: block;
+  margin-top: 0.08em;
+  color: var(--landing-accent);
+}
+
+.landing-hero__description {
+  max-width: 54ch;
+  margin: 25px 0 0;
+  color: #b8b8bd;
+  font-size: clamp(1rem, 1.3vw, 1.125rem);
+  line-height: 1.75;
+  text-wrap: pretty;
+}
+
+.landing-hero__pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.landing-hero__pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 15px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  color: #d4d4d8;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 0.8rem;
+  font-weight: 550;
+  text-decoration: none;
+  transition: color 180ms ease, border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.landing-hero__pill:hover {
+  transform: translateY(-2px);
+  border-color: rgba(204, 255, 0, 0.42);
+  color: #efffb3;
+  background: rgba(204, 255, 0, 0.055);
+}
+
+.landing-signup-card {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 480px);
+  margin-left: auto;
+  overflow: hidden;
+  padding: clamp(1.5rem, 2.7vw, 2rem);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 22px;
+  background: linear-gradient(155deg, rgba(23, 23, 25, 0.98), rgba(15, 15, 17, 0.98));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.landing-signup-card::before {
+  position: absolute;
+  z-index: -1;
+  top: -165px;
+  right: -125px;
+  width: 320px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(204, 255, 0, 0.11), transparent 68%);
+  content: "";
+}
+
+.landing-signup-card__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.landing-signup-card__icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid rgba(204, 255, 0, 0.32);
+  border-radius: 14px;
+  color: #0a0a0a;
+  background: var(--landing-accent);
+  box-shadow: 0 0 28px rgba(204, 255, 0, 0.14);
+}
+
+.landing-signup-card__brand-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.landing-signup-card__brand-copy strong {
+  color: #f4f4f5;
+  font-size: 0.9rem;
+  font-weight: 680;
+}
+
+.landing-signup-card__brand-copy small,
+.landing-signup-card__status,
+.landing-signup-card__eyebrow,
+.landing-signup-card__ready-label {
+  color: #94949a;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.landing-signup-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  color: #c4c4ca;
+  letter-spacing: 0.08em;
+}
+
+.landing-signup-card__status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--landing-accent);
+  box-shadow: 0 0 10px rgba(204, 255, 0, 0.65);
+}
+
+.landing-signup-card__eyebrow {
+  margin: 0 0 9px;
+  color: var(--landing-accent);
+}
+
+.landing-signup-card h2 {
+  margin: 0;
+  color: #f5f5f5;
+  font-size: clamp(1.65rem, 2.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 1.12;
+}
+
+.landing-signup-card__intro {
+  margin: 11px 0 0;
+  color: #a7a7ae;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.landing-signup-card__form {
+  margin-top: 22px;
+}
+
+.landing-signup-card__github {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1px solid var(--landing-accent);
+  border-radius: 12px;
+  color: #11120a;
+  background: var(--landing-accent);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 720;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.landing-signup-card__github span {
+  flex: 1;
+}
+
+.landing-signup-card__github:hover {
+  transform: translateY(-2px);
+  background: #d8ff38;
+  box-shadow: 0 12px 28px rgba(204, 255, 0, 0.15);
+}
+
+.landing-signup-card__divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 25px 0 15px;
+  color: #85858d;
+  font-size: 0.62rem;
+  font-weight: 720;
+  letter-spacing: 0.15em;
+}
+
+.landing-signup-card__divider::before,
+.landing-signup-card__divider::after {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.09);
+  content: "";
+}
+
+.landing-signup-card__ready {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.landing-signup-card__ready-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--landing-accent);
+  background: rgba(204, 255, 0, 0.09);
+}
+
+.landing-signup-card__ready-label {
+  color: #9b9ba2;
+  font-size: 0.58rem;
+}
+
+.landing-signup-card__ready h3 {
+  margin: 4px 0 0;
+  color: #f0f0f1;
+  font-size: 0.93rem;
+  font-weight: 650;
+}
+
+.landing-signup-card__ready p {
+  margin: 4px 0 0;
+  color: #a3a3aa;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.landing-signup-card__checklist {
+  display: grid;
+  gap: 11px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  color: #c2c2c8;
+  font-size: 0.79rem;
+}
+
+.landing-signup-card__checklist li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.landing-signup-card__checklist svg {
+  flex: 0 0 auto;
+  color: var(--landing-accent);
+}
+
+.landing-signup-card__footer {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin: 22px 0 0;
+  padding-top: 17px;
+  border-top: 1px solid rgba(255, 255, 255, 0.085);
+  color: #92929a;
+  font-size: 0.78rem;
+}
+
+.landing-signup-card__footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--landing-accent);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.landing-hero__architecture {
+  margin-top: clamp(3.5rem, 6vw, 5rem);
+}
+
+/* Interactive isometric Docker workflow */
+.docker-workflow {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 580px);
+  margin-inline: auto;
+}
+
+.docker-workflow__topline,
+.docker-workflow__legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #a1a1aa;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.65rem;
+}
+
+.docker-workflow__topline {
+  margin: 0 2px 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.docker-workflow__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #d7ff45;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+
+.docker-workflow__eyebrow i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ccff00;
+  box-shadow: 0 0 12px rgba(204, 255, 0, 0.7);
+  animation: docker-workflow-beacon 2.4s ease-in-out infinite;
+}
+
+.docker-workflow__topline-note {
+  color: #8f9098;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.docker-workflow__scene {
+  position: relative;
+  min-height: 318px;
+  overflow: hidden;
+  perspective: 1050px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse 62% 54% at 72% 74%, rgba(138, 43, 226, 0.1), transparent 72%),
+    radial-gradient(ellipse 45% 55% at 19% 17%, rgba(204, 255, 0, 0.055), transparent 76%),
+    linear-gradient(155deg, #101114, #0b0b0d 72%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 20px 45px rgba(0, 0, 0, 0.24);
+}
+
+.docker-workflow__scene::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 30px 30px;
+  mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 85%, transparent);
+  content: "";
+}
+
+.docker-workflow__route {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.docker-workflow__route-line {
+  fill: none;
+  stroke: url(#docker-workflow-route-gradient);
+  stroke-width: 2.25;
+  stroke-dasharray: 7 7;
+  vector-effect: non-scaling-stroke;
+}
+
+.docker-workflow__route-packet {
+  fill: #ccff00;
+  filter: drop-shadow(0 0 5px rgba(204, 255, 0, 0.9));
+}
+
+.docker-workflow__host-zone {
+  position: absolute;
+  z-index: 0;
+  right: 2.7%;
+  bottom: 5%;
+  width: 63.8%;
+  height: 37%;
+  border: 1px dashed rgba(138, 43, 226, 0.48);
+  border-radius: 15px;
+  background: linear-gradient(135deg, rgba(138, 43, 226, 0.055), rgba(138, 43, 226, 0.012));
+  box-shadow: inset 0 0 22px rgba(138, 43, 226, 0.035);
+}
+
+.docker-workflow__host-label {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 35%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid rgba(138, 43, 226, 0.36);
+  border-radius: 999px;
+  color: #d2b6ff;
+  background: #15101d;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.52rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.docker-workflow__nodes {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-areas: "browser api queue" "preview container engine";
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 112px);
+  gap: 44px 18px;
+  min-height: 318px;
+  padding: 19px 14px 12px;
+  transform: rotateX(6deg);
+  transform-style: preserve-3d;
+}
+
+.docker-workflow__node {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 12px;
+  overflow: visible;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-bottom-width: 3px;
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+  border-radius: 13px;
+  color: #f4f4f5;
+  background: linear-gradient(145deg, rgba(27, 28, 31, 0.98), rgba(15, 15, 17, 0.98));
+  box-shadow: 0 9px 17px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transform: translateZ(8px);
+  transform-style: preserve-3d;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.docker-workflow__node:hover {
+  z-index: 4;
+  transform: translate3d(0, -4px, 18px);
+  border-color: rgba(204, 255, 0, 0.42);
+}
+
+.docker-workflow__node[aria-pressed="true"] {
+  z-index: 3;
+  border-color: rgba(204, 255, 0, 0.74);
+  border-bottom-color: #ccff00;
+  background: linear-gradient(145deg, rgba(37, 45, 12, 0.98), rgba(18, 22, 12, 0.98));
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.45), 0 0 24px rgba(204, 255, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transform: translate3d(0, -3px, 24px) scale(1.025);
+}
+
+.docker-workflow__node--browser-ide { grid-area: browser; }
+.docker-workflow__node--api-server { grid-area: api; }
+.docker-workflow__node--job-queue { grid-area: queue; }
+.docker-workflow__node--docker-engine { grid-area: engine; }
+.docker-workflow__node--project-container { grid-area: container; }
+.docker-workflow__node--preview-proxy { grid-area: preview; }
+
+.docker-workflow__node-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 22px;
+}
+
+.docker-workflow__node-step {
+  color: #ccff00;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.63rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
+.docker-workflow__node-icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid rgba(204, 255, 0, 0.15);
+  border-radius: 8px;
+  color: #d7ff45;
+  background: rgba(204, 255, 0, 0.07);
+}
+
+.docker-workflow__node--docker-engine .docker-workflow__node-icon {
+  color: #c7a7ff;
+  border-color: rgba(138, 43, 226, 0.28);
+  background: rgba(138, 43, 226, 0.1);
+}
+
+.docker-workflow__node-icon.is-container {
+  width: 34px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+}
+
+.docker-workflow__container-glyph {
+  width: 33px;
+  height: 31px;
+  color: #ccff00;
+  filter: drop-shadow(0 0 7px rgba(204, 255, 0, 0.16));
+}
+
+.docker-workflow__node-title {
+  display: block;
+  overflow: hidden;
+  color: #f0f0f1;
+  font-size: 0.71rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docker-workflow__node-tag {
+  display: block;
+  overflow: hidden;
+  color: #92929a;
+  font-size: 0.57rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docker-workflow__container-stamp {
+  position: absolute;
+  right: -5px;
+  bottom: -8px;
+  padding: 2px 6px;
+  border: 1px solid rgba(138, 43, 226, 0.42);
+  border-radius: 999px;
+  color: #d8c4f2;
+  background: #17111f;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.48rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.docker-workflow__legend {
+  flex-wrap: wrap;
+  margin: 10px 2px 0;
+  font-size: 0.59rem;
+}
+
+.docker-workflow__legend span:last-child {
+  color: #bca2d8;
+}
+
+@keyframes docker-workflow-beacon {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.78); }
+}
+
+@media (max-width: 600px) {
+  .docker-workflow__scene,
+  .docker-workflow__nodes {
+    min-height: 292px;
+  }
+
+  .docker-workflow__nodes {
+    grid-template-rows: repeat(2, 102px);
+    gap: 42px 7px;
+    padding: 17px 8px 10px;
+  }
+
+  .docker-workflow__node {
+    gap: 4px;
+    padding: 8px 7px;
+    border-radius: 11px;
+  }
+
+  .docker-workflow__node-title {
+    font-size: 0.63rem;
+  }
+
+  .docker-workflow__node-tag {
+    font-size: 0.5rem;
+  }
+
+  .docker-workflow__host-zone {
+    right: 2%;
+    width: 64%;
+    height: 36%;
+  }
+
+  .docker-workflow__host-label {
+    left: 33%;
+    font-size: 0.44rem;
+    letter-spacing: 0.03em;
+  }
+
+  .docker-workflow__container-stamp {
+    font-size: 0.42rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .docker-workflow__eyebrow i,
+  .docker-workflow__route-packet {
+    animation: none !important;
+    display: none;
+  }
+
+  .docker-workflow__node {
+    transition: none;
+  }
+}
+
+.cloudlab-landing a:focus-visible,
+.cloudlab-landing button:focus-visible {
+  outline: 2px solid var(--landing-accent);
+  outline-offset: 4px;
+}
+
+@keyframes landing-ring-pulse {
+  0%, 100% { transform: scale(0.97); opacity: 0.58; }
+  50% { transform: scale(1.035); opacity: 1; }
+}
+
+@keyframes landing-ambient-drift {
+  0% { transform: translate3d(-2%, 0, 0) scale(0.96); }
+  100% { transform: translate3d(3%, 2%, 0) scale(1.06); }
+}
+
+@media (max-width: 1023px) {
+  .landing-hero__layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.75rem;
+    max-width: 760px;
+    margin-inline: auto;
+  }
+
+  .landing-hero__content {
+    max-width: 720px;
+  }
+
+  .landing-hero__rings {
+    top: 48%;
+    left: -10%;
+    width: min(112vw, 680px);
+    transform: translate(-10%, -50%);
+  }
+
+  .landing-signup-card {
+    width: min(100%, 560px);
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .landing-hero {
+    padding-top: 7rem;
+    padding-bottom: 3rem;
+  }
+
+  .landing-hero__layout {
+    gap: 2.25rem;
+  }
+
+  .landing-hero__eyebrow {
+    margin-bottom: 19px;
+    font-size: 0.68rem;
+  }
+
+  .landing-hero__title {
+    max-width: 13ch;
+    font-size: clamp(2.7rem, 11.5vw, 3.5rem);
+    line-height: 1.04;
+  }
+
+  .landing-hero__description {
+    margin-top: 19px;
+    font-size: 0.98rem;
+    line-height: 1.68;
+  }
+
+  .landing-hero__pills {
+    gap: 8px;
+    margin-top: 23px;
+  }
+
+  .landing-hero__pill {
+    min-height: 37px;
+    padding-inline: 12px;
+    font-size: 0.73rem;
+  }
+
+  .landing-signup-card {
+    padding: 1.35rem;
+    border-radius: 18px;
+  }
+
+  .landing-signup-card__brand {
+    margin-bottom: 23px;
+  }
+
+  .landing-hero__architecture {
+    margin-top: 3rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cloudlab-landing *,
+  .cloudlab-landing *::before,
+  .cloudlab-landing *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Gradient Text Shimmers */
@@ -3801,4 +4711,3 @@ html[data-theme="light"] .tech-badge__name {
   pointer-events: none;
   background: radial-gradient(ellipse 95% 75% at 50% 35%, transparent 0%, rgba(2, 6, 15, 0.65) 100%);
 }
-

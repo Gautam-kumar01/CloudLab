@@ -1,21 +1,8 @@
-"use client";
-
 import Link from "next/link";
-import {
-  ArrowRight,
-  Terminal,
-  Cpu,
-  Layers,
-  Globe2,
-  CheckCircle2,
-  Sparkles,
-  Code2,
-  ShieldCheck,
-  PlaySquare,
-  Lock,
-} from "lucide-react";
+import { ArrowRight, CheckCircle2, Code2, Sparkles } from "lucide-react";
 import Navbar from "@/components/landing/Navbar";
 import Footer from "@/components/landing/Footer";
+import GitHubSignupButton from "@/components/landing/GitHubSignupButton";
 import ArchitectureWalkthrough3D from "@/components/landing/ArchitectureWalkthrough3D";
 import HowItWorksSteps from "@/components/landing/HowItWorksSteps";
 import DockerSecurityDeepDive from "@/components/landing/DockerSecurityDeepDive";
@@ -24,7 +11,7 @@ import FAQSection from "@/components/landing/FAQSection";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-black">
+    <div className="cloudlab-landing min-h-screen text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-black">
       {/* Navigation Bar */}
       <Navbar />
 
@@ -34,83 +21,83 @@ export default function LandingPage() {
             ============================================================ */}
         <section
           id="overview"
-          className="relative pt-28 sm:pt-36 pb-16 sm:pb-24 overflow-hidden"
+          className="landing-hero"
         >
-          {/* Subtle Ambient Radial Gradients (Calm, not overpowering) */}
-          <div
-            className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] pointer-events-none opacity-20 blur-3xl rounded-full"
-            style={{
-              background: "radial-gradient(circle, rgba(16, 185, 129, 0.4) 0%, rgba(6, 182, 212, 0.1) 50%, transparent 80%)",
-            }}
-          />
+          <div className="landing-hero__ambient" aria-hidden="true" />
 
-          <div className="cl-container relative z-10">
-            {/* Hero Header Content */}
-            <div className="text-center max-w-4xl mx-auto mb-12 sm:mb-16">
-              {/* Honest Badge */}
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-semibold mb-6 shadow-sm">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span>Docker-Powered Developer Workspaces</span>
-                <span className="text-emerald-700 hidden sm:inline">&bull;</span>
-                <span className="text-slate-400 font-normal hidden sm:inline">In-Browser Cloud IDE</span>
+          <div className="cl-container landing-hero__container relative z-10">
+            <div className="landing-hero__layout">
+              <div className="landing-hero__content">
+                <div className="landing-hero__rings" aria-hidden="true" />
+                <div className="landing-hero__copy">
+                  <div className="landing-hero__eyebrow">
+                    <span>START SHIPPING</span>
+                    <span className="landing-hero__eyebrow-line" aria-hidden="true" />
+                  </div>
+
+                  <h1 className="landing-hero__title">
+                    Build in the cloud.
+                    <span className="landing-hero__title-accent">Keep your flow.</span>
+                  </h1>
+
+                  <p className="landing-hero__description">
+                    A browser-based IDE with Docker-powered workspaces, live previews, and
+                    collaboration built in—so you can start building without local setup.
+                  </p>
+
+                  <nav className="landing-hero__pills" aria-label="CloudLab capabilities">
+                    <a className="landing-hero__pill" href="#features">Browser IDE</a>
+                    <a className="landing-hero__pill" href="#architecture">Isolated workspaces</a>
+                    <a className="landing-hero__pill" href="#features">Real-time collaboration</a>
+                  </nav>
+                </div>
               </div>
 
-              {/* Main Headline */}
-              <h1 className="typo-hero text-white tracking-tight mb-6">
-                Full-stack cloud IDE powered by real Docker containers.{" "}
-                <span className="block mt-2 text-emerald-400 font-extrabold">
-                  CloudLab.
-                </span>
-              </h1>
+              <aside className="landing-signup-card" aria-labelledby="landing-signup-title">
+                <div className="landing-signup-card__brand">
+                  <span className="landing-signup-card__icon"><Code2 size={21} /></span>
+                  <span className="landing-signup-card__brand-copy">
+                    <strong>CloudLab</strong>
+                    <small>YOUR NEXT DEV SPACE</small>
+                  </span>
+                  <span className="landing-signup-card__status"><i /> READY</span>
+                </div>
 
-              {/* Plain-English Explanation */}
-              <p className="typo-body-lg text-slate-300 max-w-2xl mx-auto mb-8 font-normal leading-relaxed">
-                Write code in Monaco, run shell commands in an interactive container terminal,
-                and preview live web applications directly in your browser—without installing
-                runtimes or toolchains locally.
-              </p>
+                <p className="landing-signup-card__eyebrow">START WITH ONE CLICK</p>
+                <h2 id="landing-signup-title">Create your workspace.</h2>
+                <p className="landing-signup-card__intro">
+                  Sign in with GitHub and bring your next idea into a ready-to-code workspace.
+                </p>
 
-              {/* Main Action CTAs */}
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 mb-10">
-                <Link
-                  href="/sign-up"
-                  className="cl-btn cl-btn-primary w-full sm:w-auto px-7 h-12 text-[15px] font-bold shadow-lg shadow-emerald-500/20"
-                >
-                  <span>Start Coding Free</span>
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
+                <div className="landing-signup-card__form">
+                  <GitHubSignupButton />
+                </div>
 
-                <a
-                  href="#architecture"
-                  className="cl-btn cl-btn-secondary w-full sm:w-auto px-6 h-12 text-[14px] font-medium"
-                >
-                  Explore Architecture
-                </a>
-              </div>
+                <div className="landing-signup-card__divider"><span>WHAT YOU GET</span></div>
 
-              {/* Quick Feature Checklist */}
-              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-slate-400 font-medium">
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  Monaco Code Editor
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  Dedicated Linux Container
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  Live WebSocket Terminal
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  Dynamic Reverse Proxy
-                </span>
-              </div>
+                <div className="landing-signup-card__ready">
+                  <span className="landing-signup-card__ready-icon"><Sparkles size={17} /></span>
+                  <div>
+                    <span className="landing-signup-card__ready-label">ZERO LOCAL SETUP</span>
+                    <h3>Ready when you are</h3>
+                    <p>Open your browser and get straight to building.</p>
+                  </div>
+                </div>
+
+                <ul className="landing-signup-card__checklist">
+                  <li><CheckCircle2 size={16} /> Browser IDE and interactive terminal</li>
+                  <li><CheckCircle2 size={16} /> Isolated Docker workspaces</li>
+                  <li><CheckCircle2 size={16} /> Real-time collaboration and previews</li>
+                </ul>
+
+                <p className="landing-signup-card__footer">
+                  Already have an account? <Link href="/sign-in">Sign in <ArrowRight size={14} /></Link>
+                </p>
+              </aside>
             </div>
 
             {/* 3D / Isometric Architecture Story Walkthrough */}
-            <div className="w-full">
+            <div className="landing-hero__architecture w-full">
               <ArchitectureWalkthrough3D />
             </div>
           </div>

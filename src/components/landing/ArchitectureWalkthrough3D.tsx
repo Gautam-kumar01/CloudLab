@@ -20,6 +20,7 @@ import {
   Maximize2,
   Info,
 } from "lucide-react";
+import DockerWorkflowScene3D from "./DockerWorkflowScene3D";
 
 export interface ArchitectureStage {
   id: string;
@@ -218,7 +219,7 @@ export default function ArchitectureWalkthrough3D() {
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono">
             <Activity className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Interactive Architecture Walkthrough</span>
+            <span>Interactive Docker Container Workflow</span>
           </span>
           <span className="text-[11px] text-slate-400 hidden sm:inline">
             (Demo illustration — verified container flow)
@@ -364,89 +365,14 @@ export default function ArchitectureWalkthrough3D() {
 
             {/* 3D Isometric Viewport */}
             {viewMode === "3d" ? (
-              <div
-                className="w-full max-w-[540px] py-6 sm:py-10 flex items-center justify-center relative z-10"
-                style={{
-                  perspective: "1100px",
+              <DockerWorkflowScene3D
+                stages={ARCHITECTURE_STAGES}
+                activeStageIdx={activeStageIdx}
+                onSelectStage={(idx) => {
+                  setActiveStageIdx(idx);
+                  setIsPlaying(false);
                 }}
-              >
-                <div
-                  className="w-full grid grid-cols-2 sm:grid-cols-3 gap-3.5 transition-transform duration-500 ease-out"
-                  style={{
-                    transform: "rotateX(18deg) rotateZ(-4deg) translateY(-8px)",
-                    transformStyle: "preserve-3d",
-                  }}
-                >
-                  {ARCHITECTURE_STAGES.map((stage, idx) => {
-                    const Icon = stage.icon;
-                    const isActive = idx === activeStageIdx;
-                    return (
-                      <div
-                        key={stage.id}
-                        onClick={() => {
-                          setActiveStageIdx(idx);
-                          setIsPlaying(false);
-                        }}
-                        className={`cursor-pointer rounded-xl p-4 transition-all duration-300 relative border select-none ${
-                          isActive
-                            ? "bg-[#0f1d2e] border-emerald-400 shadow-xl shadow-emerald-500/20"
-                            : "bg-[#0b1325]/90 border-white/10 hover:border-white/20 hover:bg-[#0f172a]"
-                        }`}
-                        style={{
-                          transform: isActive
-                            ? "translateZ(28px) scale(1.04)"
-                            : "translateZ(0px)",
-                          boxShadow: isActive
-                            ? "0 20px 40px -10px rgba(16, 185, 129, 0.35), 0 0 20px rgba(16, 185, 129, 0.2)"
-                            : "0 4px 12px rgba(0,0,0,0.4)",
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            setActiveStageIdx(idx);
-                            setIsPlaying(false);
-                          }
-                        }}
-                        aria-label={`Select stage ${stage.step}: ${stage.name}`}
-                      >
-                        {/* Active glow tag */}
-                        {isActive && (
-                          <div className="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-emerald-500 text-[10px] font-bold text-black font-mono shadow">
-                            ACTIVE
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] font-mono font-bold text-emerald-400">
-                            {stage.step}
-                          </span>
-                          <div
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-                              isActive
-                                ? "bg-emerald-500/20 text-emerald-300"
-                                : "bg-white/5 text-slate-400"
-                            }`}
-                          >
-                            <Icon className="w-4 h-4" />
-                          </div>
-                        </div>
-
-                        <h4
-                          className={`text-xs font-semibold leading-tight line-clamp-1 ${
-                            isActive ? "text-white" : "text-slate-300"
-                          }`}
-                        >
-                          {stage.shortName}
-                        </h4>
-                        <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">
-                          {stage.tag}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              />
             ) : (
               /* Flat 2D Flow Viewport */
               <div className="w-full max-w-[540px] flex flex-col gap-2.5 py-3 relative z-10">

@@ -46,10 +46,8 @@ export default function Navbar() {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled
-            ? "bg-[#030712]/90 backdrop-blur-md border-b border-white/10 shadow-lg"
-            : "bg-transparent border-b border-transparent"
+        className={`cloudlab-nav fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          scrolled ? "cloudlab-nav--scrolled" : ""
         }`}
       >
         <div className="cl-container w-full h-16 flex items-center justify-between gap-4">
@@ -62,14 +60,14 @@ export default function Navbar() {
             </div>
             <span className="font-bold text-[18px] tracking-tight text-white flex items-center gap-1">
               Cloud<span className="text-emerald-400">Lab</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 ml-1">
+              <span className="cloudlab-nav__brand-tag text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 ml-1">
                 Docker IDE
               </span>
             </span>
           </Link>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-7" aria-label="Primary Navigation">
+          <nav className="hidden lg:flex items-center gap-7" aria-label="Primary Navigation">
             {navLinks.map((l) => (
               <a
                 key={l.href}
@@ -82,14 +80,14 @@ export default function Navbar() {
           </nav>
 
           {/* Action CTAs */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             <ThemeToggle />
 
             <a
               href="https://github.com/Gautam-kumar01/CloudLab"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/5 transition"
+              className="cloudlab-nav__github flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/5 transition"
               aria-label="GitHub Repository"
             >
               <GithubIcon className="w-4 h-4" />
@@ -113,7 +111,7 @@ export default function Navbar() {
           </div>
 
           {/* Mobile Actions & Hamburger */}
-          <div className="flex md:hidden items-center gap-2">
+          <div className="flex lg:hidden items-center gap-2">
             <ThemeToggle />
             <button
               type="button"
@@ -130,7 +128,7 @@ export default function Navbar() {
       {/* Mobile Drawer */}
       {mobileOpen && (
         <div
-          className="md:hidden fixed inset-0 z-40 pt-16"
+          className="lg:hidden fixed inset-0 z-40 pt-16"
           onClick={() => setMobileOpen(false)}
         >
           <div className="absolute inset-0 bg-black/85 backdrop-blur-md" />
