@@ -281,7 +281,7 @@ export default function OpenFolderButton() {
                         {progress?.stage === 'done' && 'Opening CloudLab IDE...'}
                       </div>
                       <div className="text-[11px] text-slate-400 mt-0.5">
-                        Transferring files into isolated microVM storage
+                        Transferring files into your Docker-backed workspace
                       </div>
                     </div>
                   </div>
@@ -289,7 +289,7 @@ export default function OpenFolderButton() {
                   <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-400">
                     <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-900/60 border border-white/5">
                       <HardDrive size={13} className="text-teal-400" />
-                      <span>Local NVMe Sync</span>
+                      <span>Workspace file sync</span>
                     </div>
                     <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-900/60 border border-white/5">
                       <FileCode size={13} className="text-emerald-400" />

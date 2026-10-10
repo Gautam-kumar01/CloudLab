@@ -364,7 +364,7 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
             <div className="flex flex-wrap gap-2 text-xs">
               <div className="flex-1 min-w-[120px] p-2.5 rounded-xl bg-slate-950/80 border border-white/5 flex items-center gap-2 text-slate-300">
                 <ShieldCheck size={14} className="text-emerald-400 shrink-0" />
-                <span className="text-xs font-medium whitespace-normal">Rootless Sandbox</span>
+                <span className="text-xs font-medium whitespace-normal">Docker container</span>
               </div>
               <div className="flex-1 min-w-[100px] p-2.5 rounded-xl bg-slate-950/80 border border-white/5 flex items-center gap-2 text-slate-300">
                 <Globe size={14} className="text-blue-400 shrink-0" />

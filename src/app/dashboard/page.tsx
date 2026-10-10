@@ -136,13 +136,10 @@ export default async function Dashboard() {
             </span>
           </div>
 
-          {/* Operational Status Pill */}
+          {/* Runtime type — intentionally not shown as live health telemetry */}
           <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span>NVMe Sandboxes Online</span>
+            <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+            <span>Docker-backed workspaces</span>
           </div>
 
           {/* User Profile & Actions */}

@@ -84,7 +84,7 @@ export default function DashboardClient({
           </div>
           <h1 className="dash-title">Your Repositories & Workspaces</h1>
           <p className="dash-subtitle">
-            Click any repository to launch a dedicated rootless microVM container with instant NVMe storage and live WebSockets.
+            Open a project in a Docker-backed Linux workspace with a browser IDE, terminal, and live collaboration tools.
           </p>
         </div>
 
@@ -117,27 +117,27 @@ export default function DashboardClient({
         <div className="dash-telemetry-card">
           <div className="dash-telemetry-label">
             <Zap size={13} className="text-amber-400" />
-            <span>Cold Start</span>
+            <span>Workspace runtime</span>
           </div>
           <div className="dash-telemetry-val" style={{ color: '#34d399' }}>
-            140ms
+            Docker container
           </div>
         </div>
 
         <div className="dash-telemetry-card">
           <div className="dash-telemetry-label">
             <Cpu size={13} className="text-blue-400" />
-            <span>Runtime CPU</span>
+            <span>Workspace limits</span>
           </div>
-          <div className="dash-telemetry-val">2 vCPU / Box</div>
+          <div className="dash-telemetry-val">1 vCPU / 1 GB RAM</div>
         </div>
 
         <div className="dash-telemetry-card">
           <div className="dash-telemetry-label">
             <CheckCircle2 size={13} className="text-emerald-400" />
-            <span>Isolation</span>
+            <span>Kernel model</span>
           </div>
-          <div className="dash-telemetry-val">Strict MicroVM</div>
+          <div className="dash-telemetry-val">Shared Linux kernel</div>
         </div>
       </div>
 

@@ -206,7 +206,7 @@ export default function NewProjectButton() {
                       Create New Workspace
                     </h2>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Select a high-performance starter template or launch an empty sandbox container.
+                      Choose a starter template or launch a Docker-backed Linux workspace.
                     </p>
                   </div>
                 </div>
@@ -339,26 +339,26 @@ export default function NewProjectButton() {
                   </div>
                 </div>
 
-                {/* Telemetry Hardware Spec Banner */}
+                {/* Workspace container limits from the current Docker configuration */}
                 <div className="p-3.5 rounded-xl bg-slate-950/80 border border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
                   <div className="flex items-center gap-2">
                     <Zap size={14} className="text-emerald-400" />
-                    <span><strong className="text-white font-semibold">2 vCPU</strong> Dedicated</span>
+                    <span><strong className="text-white font-semibold">1 vCPU</strong> Limit</span>
                   </div>
                   <div className="hidden sm:block w-px h-3.5 bg-white/10" />
                   <div className="flex items-center gap-2">
                     <Server size={14} className="text-blue-400" />
-                    <span><strong className="text-white font-semibold">4 GB</strong> Memory</span>
+                    <span><strong className="text-white font-semibold">1 GB</strong> Memory limit</span>
                   </div>
                   <div className="hidden sm:block w-px h-3.5 bg-white/10" />
                   <div className="flex items-center gap-2">
-                    <Rocket size={14} className="text-amber-400" />
-                    <span><strong className="text-white font-semibold">140ms</strong> Cold Boot</span>
+                    <Cpu size={14} className="text-amber-400" />
+                    <span><strong className="text-white font-semibold">100</strong> Process limit</span>
                   </div>
                   <div className="hidden sm:block w-px h-3.5 bg-white/10" />
                   <div className="flex items-center gap-2">
                     <ShieldCheck size={14} className="text-emerald-400" />
-                    <span className="text-emerald-400 font-mono text-[11px]">Strict Isolation</span>
+                    <span className="text-emerald-400 font-mono text-[11px]">Shared host kernel</span>
                   </div>
                 </div>
 

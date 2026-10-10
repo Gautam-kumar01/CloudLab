@@ -27,16 +27,16 @@
 
 ## 📖 Overview
 
-**CloudLab** is an open-source, enterprise-grade Cloud Development Environment (CDE) engineered for modern developer teams. Combining an in-browser VS Code-class IDE powered by **Monaco Editor**, isolated **rootless container sandboxes**, conflict-free real-time **CRDT multiplayer collaboration (Yjs)**, a native **interactive PTY Turbo terminal**, AI-assisted pair programming, and a **Railway-inspired visual infrastructure canvas**, CloudLab lets you spin up complete dev environments in under 140ms.
+**CloudLab** is an open-source, browser-first Cloud Development Environment (CDE) for developers and teams. It combines an in-browser IDE powered by **Monaco Editor**, Docker-backed Linux workspaces, real-time **CRDT collaboration (Yjs)**, an interactive terminal, AI-assisted pair programming, and a visual infrastructure walkthrough. Workspace startup time depends on the host, image, and project; CloudLab does not claim a fixed 140 ms cold start.
 
 ---
 
 ## ✨ Key Capabilities
 
-### 1. ⚡ Instant MicroVM & Container Sandboxing
-- **140ms Cold Starts:** Instant workspace provisioning using lightweight, rootless Docker containers.
-- **Strict Isolation:** Process, filesystem, and network isolation with configurable CPU, memory, and storage caps.
-- **Custom Runtimes:** Out-of-the-box support for Node.js, Python, Rust, Go, and polyglot dev stacks.
+### 1. Docker Container Workspaces
+- **Configured resource limits:** Current workspace launch code sets 1.0 CPU, 1 GB memory, and a 100-process limit.
+- **Defense in depth:** Workspace containers use a Docker bridge network, dropped Linux capabilities, `no-new-privileges`, and a restricted temporary filesystem.
+- **Honest isolation model:** Workspaces use standard Linux containers that share the host kernel; they are not hardware microVMs.
 
 ### 2. 👥 Multiplayer Real-Time CRDT Collaboration
 - **Yjs + Monaco Editor Sync:** Low-latency state synchronization with CRDT mathematical convergence.
@@ -58,9 +58,9 @@
 - **Context-Aware Code Actions:** Explain errors, generate boilerplate, fix bugs, and refactor code directly inside the editor.
 - **Token Analytics & Audit:** Built-in tracking of AI token consumption and audit logging for enterprise governance.
 
-### 6. 🌐 Instant Edge Deployments & Preview
-- **One-Click Previews:** Instant live preview URLs with automated SSL termination.
-- **Lighthouse 100/100 Optimization:** Sub-18ms edge latency with automated build triggers and health probes.
+### 6. Browser Previews & Deployments
+- **In-browser previews:** Route a running workspace application through CloudLab's preview proxy.
+- **Queued deployments:** Build and deployment work can run asynchronously through the background worker.
 
 ---
 
@@ -88,8 +88,8 @@ flowchart TD
 
     subgraph Runtimes["Sandbox Infrastructure"]
         DockerEngine["Docker Daemon / Container Runtimes"]
-        MicroVM1["Workspace Container A (Node.js)"]
-        MicroVM2["Workspace Container B (Python)"]
+        Workspace1["Workspace Container A (Node.js)"]
+        Workspace2["Workspace Container B (Python)"]
     end
 
     subgraph Data["Data & External Services"]
@@ -111,8 +111,8 @@ flowchart TD
 
     PTYBridge <--> DockerEngine
     JobQueue --> DockerEngine
-    DockerEngine --> MicroVM1
-    DockerEngine --> MicroVM2
+    DockerEngine --> Workspace1
+    DockerEngine --> Workspace2
 ```
 
 ---
@@ -269,7 +269,7 @@ For containerized deployment with Docker socket access, refer to the [Local Deve
 ## 📚 Detailed Documentation
 
 - 🏛️ [System Architecture](docs/ARCHITECTURE.md) — Detailed component hierarchy, CRDT sync, and PTY lifecycle.
-- 🔒 [Security Model](docs/SECURITY_MODEL.md) — Multi-tenant sandbox isolation, rootless containers, and API rate limiting.
+- 🔒 [Security Model](docs/SECURITY_MODEL.md) — Docker workspace controls, resource limits, authorization, and secret hygiene.
 - 💻 [Local Development Guide](docs/LOCAL_DEVELOPMENT.md) — Step-by-step developer environment setup.
 - 📡 [REST API Specification](docs/openapi.yaml) — OpenAPI 3.0 specs for workspaces, deployments, and admin endpoints.
 - 🤝 [Contributing Guidelines](docs/CONTRIBUTING.md) — Code style, pull request workflow, and issue reporting.

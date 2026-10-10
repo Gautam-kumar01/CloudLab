@@ -34,7 +34,7 @@ const ARCHITECTURE_FACTS = [
     icon: Network,
     title: "Isolated Bridge Network",
     summary:
-      "All workspace containers attach to a dedicated bridge network (cloudlab-net). Workspaces cannot access internal host ports or administrative services.",
+      "Workspace containers attach to the Docker bridge network (cloudlab-net), not host networking. Host-service reachability also depends on the deployed host firewall and routing rules.",
     verifiedDetail: "--network cloudlab-net --tmpfs /tmp",
     badge: "Network Isolation",
   },

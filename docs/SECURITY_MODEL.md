@@ -1,16 +1,16 @@
 # CloudLab Security Model
 
-CloudLab executes arbitrary user code within a browser-based environment. This necessitates strict security boundaries to prevent abuse, host compromise, and data leakage.
+CloudLab executes arbitrary user code within a browser-based environment. It uses defense-in-depth controls to reduce the risk of abuse, host compromise, and data leakage; standard containers are not a hypervisor boundary.
 
 ## 1. Container Isolation
-All workspace processes, including the terminal and code execution, run inside Docker containers.
-- **Base Image Restrictions:** We use a stripped-down `cloudlab-base-image`.
-- **Privilege Dropping:** Containers run with `--security-opt="no-new-privileges:true"` to prevent privilege escalation.
-- **Resource Quotas:** Containers are constrained by CPU (`--cpus="1.0"`) and Memory limits (`--memory="1g"`) to prevent Denial of Service (DoS) attacks on the host system.
+Workspace processes, including terminal commands and user code, run inside standard Docker Linux containers. Containers share the host kernel; they are not hardware microVMs.
+- **Base Image:** The workspace launcher uses the configured `cloudlab-base-image`.
+- **Privilege Reduction:** The launcher applies `--cap-drop ALL` and `--security-opt no-new-privileges:true`. This is defense in depth, not a guarantee that arbitrary code cannot attack the host.
+- **Resource Limits:** The current workspace launcher sets `--cpus=1.0`, `--memory=1g`, and `--pids-limit=100`.
 
 ## 2. Networking
-CloudLab currently uses Docker's `--network="host"` (Option A) to easily expose application preview ports (like `localhost:3000`) to the host machine. 
-> **Warning:** This is acceptable for a local/MVP environment or dedicated single-tenant VMs. For a multi-tenant production environment (Option B), containers should be placed in isolated bridge networks, and a reverse proxy (like Traefik or an Ingress controller) should be used to route external subdomains to internal container IPs.
+The current workspace and deployment launchers attach containers to the Docker bridge network `cloudlab-net`; they do not use Docker's host network mode. Preview routing is handled separately by CloudLab's proxy configuration.
+> **Caveat:** A Docker bridge network does not by itself prove that every host service is unreachable. Host firewall rules, daemon configuration, and routing must also be reviewed for the actual deployment environment.
 
 ## 3. Authentication & Authorization
 - **NextAuth.js:** Secures all sessions. Session tokens are stored in HttpOnly, secure cookies.
@@ -25,8 +25,7 @@ CloudLab currently uses Docker's `--network="host"` (Option A) to easily expose 
 - **Symlink Jail (`assertSafeRealPath`):** File and download routes enforce realpath verification against the workspace root to prevent symlink traversal outside authorized directories.
 
 ## 5. Deployment Sandboxing
-- Deployment containers inherit the same strict isolation constraints as workspace containers: `--cpus=1.0`, `--memory=1g`, `--pids-limit=100`, `--security-opt="no-new-privileges:true"`, `--cap-drop="ALL"`, and restricted tmpfs.
+- The current deployment launch paths configure `--cpus=1.0`, `--memory=1g`, `--pids-limit=100`, `--security-opt no-new-privileges:true`, `--cap-drop ALL`, and a restricted tmpfs. Verify the deployed runtime and host policy as well; these flags do not make a Docker container equivalent to a microVM.
 
 ## 6. Audit Logging
 Administrative actions (e.g., forcefully killing a workspace container) are logged into the `AuditLog` table for accountability.
-

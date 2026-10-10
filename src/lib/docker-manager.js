@@ -130,6 +130,71 @@ const DockerManager = {
   },
 
   /**
+   * Reads normalized health and actual resource limits for one authorized workspace.
+   * The caller must authorize the project before invoking this method.
+   */
+  async getWorkspaceHealth(workspaceId) {
+    const checkedAt = new Date().toISOString();
+    try {
+      const { stdout } = await docker(['inspect', containerName(workspaceId)], 10000);
+      const inspected = JSON.parse(stdout);
+      const info = Array.isArray(inspected) ? inspected[0] : inspected;
+      if (!info || typeof info !== 'object') {
+        return { status: 'unknown', limits: null, usage: null, checkedAt };
+      }
+
+      const state = info.State?.Status;
+      const allowedStates = new Set(['running', 'exited', 'created', 'restarting', 'paused', 'dead', 'removing']);
+      const status = allowedStates.has(state) ? state : 'unknown';
+      const hostConfig = info.HostConfig || {};
+      const nanoCpus = Number(hostConfig.NanoCpus);
+      const cpuQuota = Number(hostConfig.CpuQuota);
+      const cpuPeriod = Number(hostConfig.CpuPeriod);
+      const cpus = nanoCpus > 0
+        ? nanoCpus / 1e9
+        : cpuQuota > 0 && cpuPeriod > 0
+          ? cpuQuota / cpuPeriod
+          : null;
+      const memoryBytes = Number(hostConfig.Memory);
+      const processLimit = Number(hostConfig.PidsLimit);
+      const limits = {
+        cpus: cpus === null ? null : Number(cpus.toFixed(2)),
+        memoryBytes: memoryBytes > 0 ? memoryBytes : null,
+        processLimit: processLimit > 0 ? processLimit : null,
+      };
+
+      let usage = null;
+      if (status === 'running') {
+        try {
+          const { stdout: statsOutput } = await docker([
+            'stats', '--no-stream', '--format', '{{json .}}', containerName(workspaceId),
+          ], 10000);
+          const stats = JSON.parse(statsOutput.trim().split('\n')[0]);
+          const validPercent = (value) => typeof value === 'string' && /^\d+(?:\.\d+)?%$/.test(value) ? value : null;
+          const memoryUsage = typeof stats.MemUsage === 'string' && /^[\d.,]+\s*[KMGT]?i?B\s*\/\s*[\d.,]+\s*[KMGT]?i?B$/i.test(stats.MemUsage)
+            ? stats.MemUsage
+            : null;
+          usage = {
+            cpuPercent: validPercent(stats.CPUPerc),
+            memoryUsage,
+            memoryPercent: validPercent(stats.MemPerc),
+          };
+        } catch (error) {
+          // Keep lifecycle/limit data available when Docker stats is unsupported or unavailable.
+        }
+      }
+
+      return { status, limits, usage, checkedAt };
+    } catch (error) {
+      const message = `${error?.stderr || ''} ${error?.message || ''}`;
+      if (/no such (?:object|container)/i.test(message)) {
+        return { status: 'stopped', limits: null, usage: null, checkedAt };
+      }
+      return { status: 'unavailable', limits: null, usage: null, checkedAt };
+    }
+  },
+
+  /**
    * Lists all running CloudLab workspace and deployment containers.
    */
   async listContainers() {

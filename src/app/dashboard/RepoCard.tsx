@@ -9,6 +9,8 @@ import {
   Loader2,
   Calendar,
   Code2,
+  RefreshCw,
+  Server,
 } from 'lucide-react';
 import { getErrorMessage } from '@/lib/error-utils';
 
@@ -23,6 +25,13 @@ interface ProjectData {
   isPrivate?: boolean;
   stars?: number;
   defaultBranch?: string;
+}
+
+interface WorkspaceHealth {
+  status: 'running' | 'exited' | 'created' | 'restarting' | 'paused' | 'dead' | 'removing' | 'stopped' | 'unavailable' | 'unknown';
+  limits: { cpus: number | null; memoryBytes: number | null; processLimit: number | null } | null;
+  usage: { cpuPercent: string | null; memoryUsage: string | null; memoryPercent: string | null } | null;
+  checkedAt: string;
 }
 
 const languageColors: Record<string, { bg: string; text: string; border: string; label: string }> = {
@@ -41,6 +50,9 @@ export default function RepoCard({ project }: { project: ProjectData }) {
   const router = useRouter();
   const [isCloning, setIsCloning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [health, setHealth] = useState<WorkspaceHealth | null>(null);
+  const [healthError, setHealthError] = useState<string | null>(null);
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
 
   const langConfig = languageColors[project.language || ''] || {
     bg: 'rgba(16, 185, 129, 0.15)',
@@ -48,6 +60,46 @@ export default function RepoCard({ project }: { project: ProjectData }) {
     border: 'rgba(16, 185, 129, 0.35)',
     label: (project.language || 'CODE').slice(0, 3).toUpperCase(),
   };
+
+  const handleHealthCheck = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (isCheckingHealth) return;
+
+    setIsCheckingHealth(true);
+    setHealthError(null);
+    try {
+      const response = await fetch(`/api/workspace/health?workspaceId=${encodeURIComponent(project.id)}`, { cache: 'no-store' });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || 'Unable to check workspace status.');
+      setHealth(body?.data?.health ?? null);
+    } catch (error) {
+      setHealthError(getErrorMessage(error, 'Unable to check workspace status.'));
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  };
+
+  const healthLabel = health?.status === 'running' ? 'Running'
+    : health?.status === 'exited' || health?.status === 'stopped' ? 'Stopped'
+      : health?.status === 'created' ? 'Created'
+        : health?.status === 'restarting' ? 'Restarting'
+          : health?.status === 'paused' ? 'Paused'
+            : health?.status === 'dead' ? 'Failed'
+              : health?.status === 'removing' ? 'Stopping'
+                : health?.status === 'unavailable' ? 'Runtime unavailable'
+                  : health?.status === 'unknown' ? 'Unknown'
+                    : 'Not checked';
+  const healthDotColor = health?.status === 'running' ? '#34d399'
+    : health?.status === 'unavailable' || health?.status === 'unknown' ? '#fbbf24'
+      : health?.status ? '#94a3b8' : '#64748b';
+  const limitSummary = health?.limits
+    ? [
+        health.limits.cpus ? `${health.limits.cpus} vCPU` : null,
+        health.limits.memoryBytes ? `${(health.limits.memoryBytes / (1024 ** 3)).toFixed(1)} GiB RAM` : null,
+        health.limits.processLimit ? `${health.limits.processLimit} processes` : null,
+      ].filter(Boolean).join(' · ')
+    : null;
 
   const handleOpen = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -141,7 +193,7 @@ export default function RepoCard({ project }: { project: ProjectData }) {
         <h3 className="dash-card-title">{project.name}</h3>
 
         <p className="dash-card-desc">
-          {project.description || `CloudLab instant cloud runtime sandbox for ${project.name}.`}
+          {project.description || `Docker-backed development workspace for ${project.name}.`}
         </p>
       </div>
 
@@ -163,17 +215,42 @@ export default function RepoCard({ project }: { project: ProjectData }) {
           </div>
         )}
 
-        <div className="dash-card-bottom">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '12px', color: '#94a3b8' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)' }} />
-              <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '12px' }}>Ready</span>
+        <div className="dash-health-panel" role="group" aria-label={`Runtime health for ${project.name}`} onClick={(event) => event.stopPropagation()}>
+          <div className="dash-health-panel__head">
+            <span className="dash-health-panel__state" data-status={health?.status || 'not-checked'} aria-live="polite">
+              <i style={{ background: healthDotColor }} />
+              {healthLabel}
+            </span>
+            <button
+              type="button"
+              className="dash-health-panel__refresh"
+              onClick={handleHealthCheck}
+              disabled={isCheckingHealth}
+              aria-label={`${isCheckingHealth ? 'Checking' : 'Check'} runtime health for ${project.name}`}
+            >
+              <RefreshCw size={12} className={isCheckingHealth ? 'animate-spin' : ''} />
+              {isCheckingHealth ? 'Checking…' : health ? 'Refresh' : 'Check runtime'}
+            </button>
+          </div>
+          {health && (
+            <div className="dash-health-panel__details" aria-live="polite">
+              {limitSummary && <span><Server size={11} /> Limits: {limitSummary}</span>}
+              {health.usage && <span>Usage: CPU {health.usage.cpuPercent || '—'} · RAM {health.usage.memoryUsage || 'unavailable'}</span>}
+              {health.status === 'running' && !health.usage && <span>Live CPU/RAM sample unavailable on this host.</span>}
+              {health.status === 'stopped' && <span>No workspace container is currently present.</span>}
+              {health.status === 'exited' && <span>The workspace container is stopped.</span>}
+              {health.status === 'unavailable' && <span>Docker runtime status is unavailable from this server.</span>}
+              <small>Checked {new Date(health.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</small>
             </div>
+          )}
+          {healthError && <p className="dash-health-panel__error" role="status">{healthError}</p>}
+          {!health && !healthError && !isCheckingHealth && <p className="dash-health-panel__hint">Check the container state and configured limits on demand.</p>}
+        </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b', fontFamily: 'var(--font-geist-mono), monospace' }}>
-              <Calendar size={11} />
-              <span>{project.lastAccessed}</span>
-            </div>
+        <div className="dash-card-bottom">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b', fontFamily: 'var(--font-geist-mono), monospace' }}>
+            <Calendar size={11} />
+            <span>Last opened {project.lastAccessed}</span>
           </div>
 
           <button

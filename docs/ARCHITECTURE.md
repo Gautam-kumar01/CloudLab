@@ -18,7 +18,7 @@ CloudLab is a browser-based cloud development environment designed to provide a 
 
 3. **Workspace Runtime (Docker)**
    - **Isolation:** Every project runs inside its own isolated Docker container.
-   - **Network Model:** Currently utilizes `--network="host"` (Option A) to easily bind ports like `3000` to the host, allowing seamless previewing.
+   - **Network Model:** Workspace and deployment launchers attach containers to the Docker bridge network `cloudlab-net`; preview traffic is routed separately through CloudLab's proxy configuration.
    - **Lifecycle Management:** Controlled by `DockerManager` (`src/lib/docker-manager.js`), ensuring containers are started, stopped, and cleaned up efficiently. Terminal sessions drop the user directly into these persistent containers via `docker exec`.
 
 ## Request Flow: Browser Terminal to Docker

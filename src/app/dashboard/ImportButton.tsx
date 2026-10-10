@@ -117,7 +117,7 @@ export default function ImportButton() {
                       Import Git Repository
                     </h2>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Clone any public or private repository into a dedicated microVM sandbox.
+                      Clone a repository into a Docker-backed Linux workspace.
                     </p>
                   </div>
                 </div>
@@ -215,11 +215,11 @@ export default function ImportButton() {
                 <div className="pt-2 pb-1 grid grid-cols-3 gap-2 text-[11px] text-slate-400 font-medium">
                   <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-900/60 border border-white/5">
                     <Zap size={13} className="text-amber-400 shrink-0" />
-                    <span className="truncate">NVMe Hot Storage</span>
+                    <span className="truncate">Workspace storage</span>
                   </div>
                   <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-900/60 border border-white/5">
                     <ShieldCheck size={13} className="text-emerald-400 shrink-0" />
-                    <span className="truncate">Rootless Sandbox</span>
+                    <span className="truncate">Docker container</span>
                   </div>
                   <div className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-900/60 border border-white/5">
                     <Sparkles size={13} className="text-cyan-400 shrink-0" />

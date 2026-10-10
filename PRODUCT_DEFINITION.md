@@ -31,6 +31,8 @@ CloudLab is designed for:
 | **Container Hours**| 50 hours/month | Unlimited |
 | **AI Usage** | Limited (Basic Model) | Unlimited (Advanced Models) |
 
+> **Implementation note:** This table is a proposal, not an active billing or runtime policy. The current Docker workspace launcher configures each workspace with `--cpus 1.0`, `--memory 1g`, and `--pids-limit 100`. Do not advertise or enforce the proposed tier limits until product policy, billing, and runtime configuration are implemented together.
+
 ## 4. Core User Journeys
 1. **Onboarding:** User lands on homepage -> Clicks "Get Started" -> Authenticates via GitHub (OAuth).
 2. **Workspace Creation:** User enters Dashboard -> Clicks "New Workspace" -> Selects a template (e.g., Next.js, Python) or imports a GitHub repository -> Workspace container provisions in < 5 seconds.

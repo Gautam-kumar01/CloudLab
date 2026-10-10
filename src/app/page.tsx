@@ -8,10 +8,13 @@ import HowItWorksSteps from "@/components/landing/HowItWorksSteps";
 import DockerSecurityDeepDive from "@/components/landing/DockerSecurityDeepDive";
 import WorkspaceCapabilities from "@/components/landing/WorkspaceCapabilities";
 import FAQSection from "@/components/landing/FAQSection";
+import HomeParticles from "@/components/landing/HomeParticles";
+import SampleProjectDemo from "@/components/landing/SampleProjectDemo";
 
 export default function LandingPage() {
   return (
     <div className="cloudlab-landing min-h-screen text-slate-100 flex flex-col font-sans selection:bg-[#ccff00] selection:text-black">
+      <HomeParticles />
       {/* Navigation Bar */}
       <Navbar />
 
@@ -107,6 +110,11 @@ export default function LandingPage() {
             HOW TO USE CLOUDLAB (STEP-BY-STEP)
             ============================================================ */}
         <HowItWorksSteps />
+
+        {/* ============================================================
+            SAMPLE STARTER TEMPLATE DEMO
+            ============================================================ */}
+        <SampleProjectDemo />
 
         {/* ============================================================
             DOCKER CONTAINER ARCHITECTURE & HONEST SECURITY
