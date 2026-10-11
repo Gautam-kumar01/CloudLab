@@ -263,6 +263,7 @@ npm start
 ```
 
 For containerized deployment with Docker socket access, refer to the [Local Development & Production Guide](docs/LOCAL_DEVELOPMENT.md).
+For project-specific allowlisted runtime presets, see the [CloudLab Runtime Manifest Guide](docs/CLOUDLAB_YAML.md).
 
 ---
 
@@ -270,6 +271,7 @@ For containerized deployment with Docker socket access, refer to the [Local Deve
 
 - 🏛️ [System Architecture](docs/ARCHITECTURE.md) — Detailed component hierarchy, CRDT sync, and PTY lifecycle.
 - 🔒 [Security Model](docs/SECURITY_MODEL.md) — Docker workspace controls, resource limits, authorization, and secret hygiene.
+- 🧰 [Runtime Manifest Guide](docs/CLOUDLAB_YAML.md) — Supported `cloudlab.yaml` presets, queued deployments, and secret-handling boundaries.
 - 💻 [Local Development Guide](docs/LOCAL_DEVELOPMENT.md) — Step-by-step developer environment setup.
 - 📡 [REST API Specification](docs/openapi.yaml) — OpenAPI 3.0 specs for workspaces, deployments, and admin endpoints.
 - 🤝 [Contributing Guidelines](docs/CONTRIBUTING.md) — Code style, pull request workflow, and issue reporting.

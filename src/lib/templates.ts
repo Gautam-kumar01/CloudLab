@@ -36,7 +36,8 @@ export const builtInTemplates: Template[] = [
     language: 'python',
     icon: 'Terminal',
     files: {
-      'main.py': "print('Hello from Python!')\n\n# Try running 'python main.py'"
+      'main.py': "print('Hello from Python!')\n\n# Try running 'python main.py'",
+      'cloudlab.yaml': 'version: 1\nruntime: python3.12\ninstall: none\nstart: python-http\nport: 8000\nenv: []\n'
     }
   },
   {
@@ -51,7 +52,8 @@ export const builtInTemplates: Template[] = [
       'index.html': "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>Vite + React</title>\n  </head>\n  <body>\n    <div id=\"root\"></div>\n    <script type=\"module\" src=\"/src/main.tsx\"></script>\n  </body>\n</html>",
       'src/main.tsx': "import React from 'react'\nimport ReactDOM from 'react-dom/client'\nimport App from './App.tsx'\nimport './index.css'\n\nReactDOM.createRoot(document.getElementById('root')!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>,\n)",
       'src/App.tsx': "import React from 'react'\n\nfunction App() {\n  return (\n    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>\n      <h1>Hello React + Vite 🚀</h1>\n      <p>Start editing src/App.tsx to see changes!</p>\n    </div>\n  )\n}\n\nexport default App\n",
-      'src/index.css': "body {\n  margin: 0;\n  background: #f0f2f5;\n  color: #333;\n}"
+      'src/index.css': "body {\n  margin: 0;\n  background: #f0f2f5;\n  color: #333;\n}",
+      'cloudlab.yaml': 'version: 1\nruntime: node20\ninstall: npm-install\nstart: vite-dev\nport: 5173\nenv: []\n'
     }
   },
   {
@@ -94,7 +96,8 @@ export const builtInTemplates: Template[] = [
       'package.json': "{\n  \"name\": \"nextjs-app\",\n  \"version\": \"0.1.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"dev\": \"next dev\",\n    \"build\": \"next build\",\n    \"start\": \"next start\"\n  },\n  \"dependencies\": {\n    \"react\": \"^19.0.0\",\n    \"react-dom\": \"^19.0.0\",\n    \"next\": \"15.1.0\"\n  }\n}",
       'app/page.tsx': "export default function Home() {\n  return (\n    <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>\n      <h1>Welcome to Next.js on CloudLab 🚀</h1>\n      <p>Edit app/page.tsx to build your application.</p>\n    </main>\n  );\n}\n",
       'app/layout.tsx': "export default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang=\"en\">\n      <body>{children}</body>\n    </html>\n  );\n}\n",
-      'README.md': "# Next.js Project\n\nRun `npm run dev` to start the local development server."
+      'README.md': "# Next.js Project\n\nRun `npm run dev` to start the local development server.",
+      'cloudlab.yaml': 'version: 1\nruntime: node20\ninstall: npm-install\nstart: next-dev\nport: 3000\nenv: []\n'
     }
   }
 ];
@@ -125,4 +128,3 @@ export function getTemplate(id?: string): Template {
   const found = builtInTemplates.find((t) => t.id === norm || t.id === id);
   return found || builtInTemplates[0];
 }
-

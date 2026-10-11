@@ -3,12 +3,13 @@ import { auth } from '@/auth';
 import { canAccessWorkspace } from '@/lib/workspace-auth';
 import { apiError } from '@/lib/api-utils';
 import { workspacePath } from '@/lib/workspace-paths';
+import { readCloudLabConfigFile, ALLOWED_PREVIEW_PORTS as RUNTIME_PREVIEW_PORTS } from '@/lib/runtime-config';
 import { promises as fs } from 'fs';
 import path from 'path';
 import http from 'http';
 
 // Allowed development server ports for preview routing (blocks SSRF to internal services/DBs/Docker daemon)
-export const ALLOWED_PREVIEW_PORTS = new Set([3000, 3001, 3002, 5173, 5174, 8000, 8080, 4200, 5000]);
+export const ALLOWED_PREVIEW_PORTS = new Set(RUNTIME_PREVIEW_PORTS);
 
 // Safe headers to forward upstream to the workspace preview application
 const ALLOWED_FORWARD_REQUEST_HEADERS = [
@@ -39,6 +40,13 @@ export const MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024; // 10MB
 export const MAX_RESPONSE_BODY_BYTES = 15 * 1024 * 1024; // 15MB
 
 export async function resolveWorkspaceInternalPort(workspaceId: string): Promise<number> {
+  try {
+    const manifest = await readCloudLabConfigFile(workspacePath(workspaceId));
+    if (manifest && ALLOWED_PREVIEW_PORTS.has(manifest.port)) return manifest.port;
+  } catch {
+    // A missing/invalid manifest does not broaden routing; keep the existing safe stack detection.
+  }
+
   try {
     const root = workspacePath(workspaceId);
     const pkgPath = path.join(root, 'package.json');

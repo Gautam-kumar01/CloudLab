@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import { addJob } from '@/lib/queue';
-import { canManageWorkspace, canAccessWorkspace } from '@/lib/workspace-auth';
+import { getWorkspaceProject } from '@/lib/workspace-auth';
+import { workspacePath } from '@/lib/workspace-paths';
+import { readCloudLabConfigFile } from '@/lib/runtime-config';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -13,21 +15,22 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const projectId = url.searchParams.get('projectId');
 
-  if (!projectId) {
+  if (typeof projectId !== 'string' || !projectId.trim() || projectId.length > 128) {
     return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
   }
 
-  if (!(await canAccessWorkspace(session.user.id, projectId))) {
+  const project = await getWorkspaceProject(session.user.id, projectId);
+  if (!project) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const deployments = await db.deployment.findMany({
-    where: { projectId },
+    where: { projectId: project.id },
     orderBy: { createdAt: 'desc' },
     take: 50,
   });
 
-  return NextResponse.json({ deployments });
+  return NextResponse.json({ deployments }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
 
 export async function POST(req: NextRequest) {
@@ -36,47 +39,55 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { projectId } = body;
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 });
+  }
+  const projectId = body?.projectId;
 
-  if (!projectId) {
+  if (typeof projectId !== 'string' || !projectId.trim() || projectId.length > 128) {
     return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
   }
 
-  if (!(await canManageWorkspace(session.user.id, projectId))) {
+  const authorizedProject = await getWorkspaceProject(session.user.id, projectId);
+  if (!authorizedProject || authorizedProject.ownerId !== session.user.id) {
     return NextResponse.json({ error: 'Only project owners can deploy' }, { status: 403 });
   }
-  const project = await db.project.findUnique({ where: { id: projectId } });
+  const project = await db.project.findUnique({ where: { id: authorizedProject.id } });
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+
+  try {
+    await readCloudLabConfigFile(workspacePath(project.id));
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || 'Invalid cloudlab.yaml configuration' }, { status: 400 });
+  }
 
   // 1. Create Deployment Record
   const deployment = await db.deployment.create({
     data: {
-      projectId,
+      projectId: project.id,
       status: 'QUEUED',
     }
   });
 
-  // 2. Fetch Env Vars
-  const envVarsRecords = await db.environmentVariable.findMany({
-    where: { projectId }
-  });
-  const envVars = envVarsRecords.reduce((acc: Record<string, string>, curr: any) => {
-    acc[curr.key] = curr.value;
-    return acc;
-  }, {} as Record<string, string>);
-
-  await addJob(
-    'deployment',
-    { deploymentId: deployment.id, projectId, envVars, userId: session.user.id },
-    { singletonKey: deployment.id }
-  );
+  try {
+    await addJob(
+      'deployment',
+      { deploymentId: deployment.id, projectId: project.id, userId: session.user.id },
+      { singletonKey: deployment.id }
+    );
+  } catch {
+    await db.deployment.update({ where: { id: deployment.id }, data: { status: 'FAILED' } }).catch(() => {});
+    return NextResponse.json({ error: 'Deployment queue is temporarily unavailable.' }, { status: 503 });
+  }
 
   const { logAuditEvent } = await import('@/lib/audit');
   await logAuditEvent(session.user.id, 'DEPLOYMENT_START', {
-    workspaceId: projectId,
+    workspaceId: project.id,
     deploymentId: deployment.id,
   });
 
-  return NextResponse.json({ deployment });
+  return NextResponse.json({ deployment }, { headers: { 'Cache-Control': 'private, no-store' } });
 }

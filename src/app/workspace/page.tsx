@@ -76,6 +76,11 @@ const COMMAND_ITEMS = [
   { id: 'new-file', label: 'File: New File', icon: '📄' },
   { id: 'new-folder', label: 'File: New Folder', icon: '📂' },
   { id: 'search-workspace', label: 'View: Find in Files (Global Search)', icon: '🔍' },
+  { id: 'open-explorer', label: 'View: Show Explorer', icon: '📁' },
+  { id: 'open-source-control', label: 'View: Show Source Control', icon: '🌿' },
+  { id: 'open-deploy-panel', label: 'Docker: Show Deployment Panel', icon: '🐳' },
+  { id: 'toggle-terminal', label: 'Terminal: Show or Hide Terminal', icon: '⌨️' },
+  { id: 'open-preview', label: 'Preview: Open Live Preview', icon: '🌐' },
   { id: 'toggle-split', label: 'View: Toggle Side-by-Side Split Editor (Ctrl+\\)', icon: '◫' },
   { id: 'split-terminal', label: 'Terminal: Toggle Split Terminal (Side-by-Side)', icon: '◫' },
   { id: 'toggle-wrap', label: 'View: Toggle Word Wrap (Alt+Z)', icon: '↩' },
@@ -901,6 +906,21 @@ export default function Workspace() {
       case 'toggle-preview':
         setShowPreview((prev) => !prev);
         break;
+      case 'open-preview':
+        setShowPreview(true);
+        break;
+      case 'toggle-terminal':
+        setActiveBottomTab((prev) => (prev === 'terminal' ? '' : 'terminal'));
+        break;
+      case 'open-explorer':
+        setActiveSidebar('explorer');
+        break;
+      case 'open-source-control':
+        setActiveSidebar('git');
+        break;
+      case 'open-deploy-panel':
+        setActiveSidebar('deploy');
+        break;
       case 'refresh-files':
         fetchWorkspace();
         break;
@@ -910,8 +930,16 @@ export default function Workspace() {
   // Global Keyboard Shortcuts (VS Code shortcuts)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Command Palette: Ctrl/Cmd+K (CloudLab shortcut)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteMode('commands');
+        setCommandQuery('');
+        setSelectedPaletteIndex(0);
+        setShowCommandPalette(true);
+      }
       // Quick Open Files: Ctrl+P or Cmd+P (without shift)
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p' && !e.shiftKey) {
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p' && !e.shiftKey) {
         e.preventDefault();
         setPaletteMode('files');
         setCommandQuery('');
@@ -1122,21 +1150,6 @@ export default function Workspace() {
       setActiveMenu(null);
     }
   };
-
-  // Handle Save (Ctrl+S)
-  useEffect(() => {
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault(); // Prevent browser save dialog
-        handleSave();
-      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
-        e.preventDefault();
-        setShowCommandPalette((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeFile, files]);
 
   // Close menus when clicking outside
   useEffect(() => {

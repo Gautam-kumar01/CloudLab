@@ -39,13 +39,20 @@ async function startWorker() {
 
   await queue.work('deployment', async (jobs: any[]) => {
     for (const job of jobs) {
-      const { deploymentId, projectId, envVars } = job.data as {
+      const { deploymentId, projectId } = job.data as {
         deploymentId: string;
         projectId: string;
-        envVars: Record<string, string>;
       };
       await db.deployment.update({ where: { id: deploymentId }, data: { status: 'RUNNING' } });
       try {
+        const envRecords = await db.environmentVariable.findMany({ where: { projectId } });
+        const { decryptEnvironmentValue } = require('./src/lib/environment-secrets') as {
+          decryptEnvironmentValue: (value: string) => string;
+        };
+        const envVars = envRecords.reduce((values, item) => {
+          values[item.key] = decryptEnvironmentValue(item.value);
+          return values;
+        }, {} as Record<string, string>);
         const result = await new LocalDockerDeployer().deploy(projectId, envVars);
         await db.deployment.update({
           where: { id: deploymentId },

@@ -74,7 +74,7 @@ async function startWorker() {
 
   // 3. Deployment queue worker: processes asynchronous deployments
   await boss.work('deployment', async (job) => {
-    const { deploymentId, projectId, envVars, userId } = job.data;
+    const { deploymentId, projectId, userId } = job.data;
     console.log(`[Job deployment] Starting deployment ${deploymentId} for project ${projectId}`);
     const prisma = getDb();
 
@@ -84,6 +84,12 @@ async function startWorker() {
     });
 
     try {
+      const envRecords = await prisma.environmentVariable.findMany({ where: { projectId } });
+      const { decryptEnvironmentValue } = require('./src/lib/environment-secrets');
+      const envVars = envRecords.reduce((values, item) => {
+        values[item.key] = decryptEnvironmentValue(item.value);
+        return values;
+      }, {});
       const { LocalDockerDeployer } = require('./src/lib/deployer');
       const deployer = new LocalDockerDeployer();
       const result = await deployer.deploy(projectId, envVars || {});

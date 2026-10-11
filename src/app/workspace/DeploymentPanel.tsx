@@ -40,6 +40,20 @@ interface StackDetection {
   dockerReason?: string;
 }
 
+interface RuntimeConfigInfo {
+  found: boolean;
+  valid: boolean;
+  canDeploy: boolean;
+  config: { runtime: string; install: string; start: string; port: number; env: string[] } | null;
+  error?: string;
+}
+
+interface QueuedDeployment {
+  id: string;
+  status: string;
+  url?: string | null;
+}
+
 export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
   const [status, setStatus] = useState<string>('loading');
   const [containerName, setContainerName] = useState<string>('');
@@ -55,6 +69,16 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
   const [dockerAvailable, setDockerAvailable] = useState<boolean | null>(null);
   const [dockerReason, setDockerReason] = useState<string | null>(null);
   const [runCommand, setRunCommand] = useState<string>('npm run dev');
+  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfigInfo | null>(null);
+  const [manifestDeployment, setManifestDeployment] = useState<QueuedDeployment | null>(null);
+  const [isManifestDeploying, setIsManifestDeploying] = useState(false);
+  const [manifestError, setManifestError] = useState<string | null>(null);
+  const [environmentKeys, setEnvironmentKeys] = useState<string[]>([]);
+  const [environmentKeyInput, setEnvironmentKeyInput] = useState('');
+  const [environmentValueInput, setEnvironmentValueInput] = useState('');
+  const [environmentError, setEnvironmentError] = useState<string | null>(null);
+  const [environmentNotice, setEnvironmentNotice] = useState<string | null>(null);
+  const [isSavingEnvironment, setIsSavingEnvironment] = useState(false);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -123,6 +147,104 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
     } catch (e) {}
   }, [workspaceId]);
 
+  const fetchRuntimeConfig = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/workspace/runtime-config?id=${encodeURIComponent(workspaceId)}`);
+      const data = await res.json();
+      if (res.ok) setRuntimeConfig(data);
+    } catch {
+      // The regular Docker deploy panel remains usable when manifest inspection is unavailable.
+    }
+  }, [workspaceId]);
+
+  const refreshQueuedDeployment = useCallback(async (deploymentId: string) => {
+    try {
+      const res = await fetch(`/api/deployments?projectId=${encodeURIComponent(workspaceId)}`);
+      const data = await res.json();
+      const deployment = (data.deployments || []).find((item: QueuedDeployment) => item.id === deploymentId);
+      if (deployment) {
+        setManifestDeployment({ id: deployment.id, status: deployment.status, url: deployment.url });
+      }
+    } catch {
+      // Keep the last known status; the polling effect will retry.
+    }
+  }, [workspaceId]);
+
+  const fetchEnvironmentKeys = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/workspace/environment?id=${encodeURIComponent(workspaceId)}`);
+      const data = await res.json();
+      if (res.ok) setEnvironmentKeys((data.variables || []).map((item: { key: string }) => item.key));
+    } catch {
+      // Environment settings remain optional if this request is unavailable.
+    }
+  }, [workspaceId]);
+
+  const saveEnvironmentValue = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setEnvironmentError(null);
+    setEnvironmentNotice(null);
+    const key = environmentKeyInput.trim();
+    if (environmentKeys.includes(key) && !window.confirm(`Replace the stored value for ${key}?`)) return;
+    setIsSavingEnvironment(true);
+    try {
+      const res = await fetch('/api/workspace/environment', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, key, value: environmentValueInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(getErrorMessage(data, 'Could not save environment variable'));
+      setEnvironmentKeyInput('');
+      setEnvironmentValueInput('');
+      setEnvironmentNotice(`${data.key} saved securely.`);
+      await fetchEnvironmentKeys();
+    } catch (error: any) {
+      setEnvironmentError(error?.message || 'Could not save environment variable');
+    } finally {
+      setIsSavingEnvironment(false);
+    }
+  };
+
+  const removeEnvironmentValue = async (key: string) => {
+    if (!window.confirm(`Remove ${key} from this workspace? Deployments that require it will fail until it is added again.`)) return;
+    setEnvironmentError(null);
+    setEnvironmentNotice(null);
+    try {
+      const params = new URLSearchParams({ id: workspaceId, key });
+      const res = await fetch(`/api/workspace/environment?${params}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(getErrorMessage(data, 'Could not remove environment variable'));
+      setEnvironmentNotice(`${key} removed.`);
+      await fetchEnvironmentKeys();
+    } catch (error: any) {
+      setEnvironmentError(error?.message || 'Could not remove environment variable');
+    }
+  };
+
+  const handleManifestDeploy = async () => {
+    setIsManifestDeploying(true);
+    setManifestError(null);
+    try {
+      const res = await fetch('/api/deployments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: workspaceId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.deployment?.id) {
+        throw new Error(getErrorMessage(data, 'Could not queue manifest deployment'));
+      }
+      const deployment = { id: data.deployment.id, status: data.deployment.status || 'QUEUED', url: null };
+      setManifestDeployment(deployment);
+      await refreshQueuedDeployment(deployment.id);
+    } catch (error: any) {
+      setManifestError(error?.message || 'Could not queue manifest deployment');
+    } finally {
+      setIsManifestDeploying(false);
+    }
+  };
+
   useEffect(() => {
     fetchStatus();
     fetchStack();
@@ -135,6 +257,17 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
     }, 4000);
     return () => clearInterval(interval);
   }, [fetchStatus, fetchStack, fetchLogs, status, isDeploying]);
+
+  useEffect(() => {
+    fetchRuntimeConfig();
+    fetchEnvironmentKeys();
+  }, [fetchRuntimeConfig, fetchEnvironmentKeys]);
+
+  useEffect(() => {
+    if (!manifestDeployment || !['QUEUED', 'RUNNING'].includes(manifestDeployment.status)) return;
+    const interval = setInterval(() => refreshQueuedDeployment(manifestDeployment.id), 3000);
+    return () => clearInterval(interval);
+  }, [manifestDeployment?.id, manifestDeployment?.status, refreshQueuedDeployment]);
 
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -294,6 +427,129 @@ export default function DeploymentPanel({ workspaceId }: DeploymentPanelProps) {
               </div>
             </div>
           </div>
+        )}
+
+        {runtimeConfig && (
+          <>
+          <section className="p-4 rounded-2xl bg-[#0a1018] border border-emerald-500/20 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-white">
+                <FileCode size={14} className="text-emerald-400" />
+                <span>cloudlab.yaml</span>
+              </div>
+              <span className={`text-[10px] rounded-full px-2 py-0.5 border ${runtimeConfig.valid ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/25' : 'text-slate-400 bg-white/5 border-white/10'}`}>
+                {runtimeConfig.found ? (runtimeConfig.valid ? 'Valid' : 'Needs attention') : 'Not added'}
+              </span>
+            </div>
+
+            {!runtimeConfig.found ? (
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Add a strict manifest to the workspace root to choose an allowlisted Node/Python runtime, start preset, preview port, and named environment-variable references.
+              </p>
+            ) : runtimeConfig.valid && runtimeConfig.config ? (
+              <>
+                <div className="flex flex-wrap gap-1.5 text-[10px] font-mono">
+                  <span className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-slate-200">{runtimeConfig.config.runtime}</span>
+                  <span className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-slate-200">port {runtimeConfig.config.port}</span>
+                  <span className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-slate-200">{runtimeConfig.config.start}</span>
+                </div>
+                <p className="text-[10.5px] text-slate-400 leading-relaxed">
+                  Queued deploy uses a staged build context, non-root runtime image, fixed container limits, and only the environment-variable names listed in the manifest. Secret values stay server-side.
+                </p>
+                {runtimeConfig.config.env.length > 0 && (
+                  <p className="text-[10px] text-slate-500 font-mono break-words">Env references: {runtimeConfig.config.env.join(', ')}</p>
+                )}
+                {runtimeConfig.canDeploy ? (
+                  <button
+                    type="button"
+                    disabled={isManifestDeploying || ['QUEUED', 'RUNNING'].includes(manifestDeployment?.status || '')}
+                    onClick={handleManifestDeploy}
+                    className="w-full py-2.5 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-200 text-xs font-semibold border border-emerald-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isManifestDeploying || ['QUEUED', 'RUNNING'].includes(manifestDeployment?.status || '')
+                      ? 'Manifest deployment queued…'
+                      : 'Deploy using cloudlab.yaml'}
+                  </button>
+                ) : (
+                  <p className="text-[10px] text-slate-500">Only the workspace owner can queue a deployment.</p>
+                )}
+                {manifestDeployment && (
+                  <div className="flex items-center justify-between gap-2 text-[10.5px] text-slate-300" aria-live="polite">
+                    <span>Job: {manifestDeployment.status.toLowerCase()}</span>
+                    {manifestDeployment.status === 'SUCCESS' && manifestDeployment.url && (
+                      <a href={manifestDeployment.url} target="_blank" rel="noreferrer" className="text-emerald-300 hover:text-emerald-200 underline underline-offset-2">Open preview</a>
+                    )}
+                  </div>
+                )}
+                {manifestError && <p role="alert" className="text-[10.5px] text-rose-300 break-words">{manifestError}</p>}
+              </>
+            ) : (
+              <p role="alert" className="text-[11px] text-amber-300 leading-relaxed">{runtimeConfig.error || 'The manifest is not valid. Review cloudlab.yaml and the supported schema.'}</p>
+            )}
+          </section>
+          {runtimeConfig.canDeploy && (
+            <section className="mt-3 p-4 rounded-2xl bg-[#0a1018] border border-white/10 space-y-3">
+              <div>
+                <h3 className="text-xs font-bold text-white">Workspace environment secrets</h3>
+                <p className="mt-1 text-[10.5px] text-slate-400 leading-relaxed">
+                  Values are encrypted before database storage and are never displayed again. Set the same stable CLOUDLAB_ENV_ENCRYPTION_KEY (at least 32 UTF-8 bytes) for the app and worker; if unset, CloudLab uses a stable AUTH_SECRET/NEXTAUTH_SECRET of the same minimum length.
+                </p>
+              </div>
+              {environmentKeys.length > 0 ? (
+                <ul className="space-y-1.5" aria-label="Saved environment variable names">
+                  {environmentKeys.map((key) => (
+                    <li key={key} className="flex items-center justify-between gap-2 rounded-lg bg-black/30 border border-white/5 px-2.5 py-2">
+                      <span className="text-[10.5px] font-mono text-slate-200 break-all">{key}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeEnvironmentValue(key)}
+                        className="shrink-0 text-[10px] text-rose-300 hover:text-rose-200 underline underline-offset-2"
+                        aria-label={`Remove ${key}`}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[10px] text-slate-500">No environment variable names saved yet.</p>
+              )}
+              <form onSubmit={saveEnvironmentValue} className="space-y-2">
+                <label className="block text-[10px] font-semibold text-slate-400" htmlFor="cloudlab-env-key">Variable name</label>
+                <input
+                  id="cloudlab-env-key"
+                  value={environmentKeyInput}
+                  onChange={(event) => setEnvironmentKeyInput(event.target.value)}
+                  maxLength={64}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="e.g. DATABASE_URL"
+                  className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-xs font-mono text-white outline-none focus:border-emerald-500/50"
+                />
+                <label className="block text-[10px] font-semibold text-slate-400" htmlFor="cloudlab-env-value">Secret value</label>
+                <input
+                  id="cloudlab-env-value"
+                  type="password"
+                  value={environmentValueInput}
+                  onChange={(event) => setEnvironmentValueInput(event.target.value)}
+                  maxLength={4096}
+                  autoComplete="new-password"
+                  placeholder="Value is write-only"
+                  className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-2 text-xs font-mono text-white outline-none focus:border-emerald-500/50"
+                />
+                <button
+                  type="submit"
+                  disabled={isSavingEnvironment || !environmentKeyInput.trim()}
+                  className="w-full rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-2 text-xs font-semibold text-slate-200 disabled:opacity-50"
+                >
+                  {isSavingEnvironment ? 'Encrypting and saving…' : 'Add / replace environment value'}
+                </button>
+              </form>
+              {environmentError && <p role="alert" className="text-[10.5px] text-rose-300 break-words">{environmentError}</p>}
+              {environmentNotice && <p role="status" className="text-[10.5px] text-emerald-300 break-words">{environmentNotice}</p>}
+            </section>
+          )}
+          </>
         )}
 
         {/* Live Container Status Banner */}
