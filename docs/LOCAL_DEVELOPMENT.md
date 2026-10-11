@@ -62,6 +62,23 @@ npm run dev
 
 This runs `node server.js`, which wraps Next.js and attaches the WebSocket upgrade handlers.
 
+## Docker runtime requirements for terminals
+
+Interactive terminals run inside a separate workspace container. Installing Docker CLI in the CloudLab app image is not enough: the app service must be able to reach a Docker Engine, and that engine must be able to see the workspace directory at the same host path.
+
+For Docker Compose, prepare the bind-mount directory and pass the host Docker socket's numeric group ID before starting the services:
+
+```bash
+mkdir -p workspaces
+sudo chown -R 1001:1001 workspaces
+export DOCKER_GID="$(getent group docker | cut -d: -f3)"
+docker compose up --build
+```
+
+The web service and worker share `./workspaces` and the Docker socket. The terminal image is built automatically the first time a workspace container is started. If the terminal reports that no Docker Engine is reachable, configure Docker socket access on the host; do not enable host-shell execution as a workaround.
+
+Platforms that do not expose a Docker Engine/socket to application containers cannot run CloudLab's isolated interactive terminals as deployed. Use a Docker-capable VM/host with a shared workspace filesystem, or configure a properly secured compatible runtime. Never expose an unauthenticated Docker TCP socket: it grants effectively root-level host control.
+
 ## 6. Accessing the App
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.

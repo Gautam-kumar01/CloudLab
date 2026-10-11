@@ -28,9 +28,13 @@ services:
     environment:
       - DATABASE_URL=postgresql://cloudlab:cloudlab_password@postgres:5432/cloudlab_dev
       - NODE_ENV=production
+      - CLOUDLAB_DOCKER_WORKSPACES_ROOT=${PWD}/workspaces
       # Add other necessary env vars here (e.g. NEXTAUTH_URL, GITHUB_ID, etc.)
+    group_add:
+      - "${DOCKER_GID:-999}"
     volumes:
-      - workspaces_data:/app/workspaces
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./workspaces:/app/workspaces
       - backups_data:/app/backups
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
@@ -50,9 +54,12 @@ services:
     environment:
       - DATABASE_URL=postgresql://cloudlab:cloudlab_password@postgres:5432/cloudlab_dev
       - NODE_ENV=production
+      - CLOUDLAB_DOCKER_WORKSPACES_ROOT=${PWD}/workspaces
+    group_add:
+      - "${DOCKER_GID:-999}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - workspaces_data:/app/workspaces
+      - ./workspaces:/app/workspaces
       - backups_data:/app/backups
     depends_on:
       postgres:
@@ -62,5 +69,4 @@ services:
 
 volumes:
   postgres_data:
-  workspaces_data:
   backups_data:

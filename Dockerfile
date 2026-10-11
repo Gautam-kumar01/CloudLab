@@ -38,7 +38,7 @@ ENV HOME=/app/workspaces
 
 # Install git, python3, and essential runtime tools for workspace cloning and terminal execution
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git openssl ca-certificates curl bash tar gzip python3 procps \
+    git openssl ca-certificates curl bash tar gzip python3 procps docker.io \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system --gid 1001 nodejs && \
@@ -60,6 +60,7 @@ COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/Dockerfile.workspace ./Dockerfile.workspace
 
 USER nextjs
 

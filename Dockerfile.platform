@@ -62,6 +62,7 @@ COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/Dockerfile.workspace ./Dockerfile.workspace
 
 USER nextjs
 

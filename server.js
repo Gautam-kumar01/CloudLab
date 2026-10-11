@@ -554,7 +554,7 @@ app.prepare().then(() => {
 
       // Cross-platform shell resolution
       if (effectiveShellType === 'docker') {
-        const { DockerManager } = require('./src/lib/docker-manager');
+        const { DockerManager, getTerminalStartupMessage } = require('./src/lib/docker-manager');
         
         try {
           const started = await DockerManager.startWorkspace(resolvedWorkspaceId, workspacePath);
@@ -562,12 +562,12 @@ app.prepare().then(() => {
             throw new Error('Failed to start container');
           }
           shell = 'docker';
-          args = ['exec', '-it', DockerManager.containerName(resolvedWorkspaceId), '/bin/bash'];
+          args = ['exec', '-it', '--workdir', '/workspace', DockerManager.containerName(resolvedWorkspaceId), '/bin/bash'];
         } catch (error) {
           console.error('Docker Error:', error);
           socket.emit('terminal.incData', {
             id,
-            data: '\r\n\x1b[31m[Error: Failed to attach to workspace container]\x1b[0m\r\n',
+            data: `\r\n\x1b[31m[Error: ${getTerminalStartupMessage(error)}]\x1b[0m\r\n`,
           });
           return;
         }

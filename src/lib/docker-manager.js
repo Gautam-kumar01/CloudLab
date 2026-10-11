@@ -1,6 +1,7 @@
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const path = require('node:path');
+const fs = require('node:fs');
 
 const execFileAsync = promisify(execFile);
 const WORKSPACES_ROOT = path.resolve(process.cwd(), 'workspaces');
@@ -12,6 +13,23 @@ function assertWorkspaceId(workspaceId) {
 function containerName(workspaceId) {
   assertWorkspaceId(workspaceId);
   return `cloudlab-workspace-${workspaceId}`;
+}
+
+function getTerminalStartupMessage(error) {
+  const details = `${error?.stderr || ''} ${error?.message || ''}`;
+  if (/spawn docker ENOENT|docker(?:\.exe)? is not recognized|command not found/i.test(details)) {
+    return 'Docker CLI is missing from the CloudLab server. Rebuild and redeploy the app image with Docker CLI support.';
+  }
+  if (/permission denied.*docker\.sock|docker\.sock.*permission denied/i.test(details)) {
+    return 'CloudLab cannot access the Docker socket. Grant the app service access to /var/run/docker.sock using the socket group ID.';
+  }
+  if (/cannot connect to the docker daemon|is the docker daemon running|docker\.sock|no such file or directory.*docker/i.test(details)) {
+    return 'No Docker Engine is reachable from this app. Run CloudLab on a Docker-capable host and mount /var/run/docker.sock (or configure a supported Docker Engine endpoint).';
+  }
+  if (/Dockerfile\.workspace|cloudlab-base-image/i.test(details)) {
+    return 'CloudLab could not prepare its workspace terminal image. Check that Dockerfile.workspace is present and Docker can build images.';
+  }
+  return 'CloudLab could not start the workspace container. Check Docker Engine access and the server logs, then retry.';
 }
 
 async function docker(args, timeout = 30000) {
@@ -32,11 +50,31 @@ const DockerManager = {
       try {
         await docker(['network', 'create', '--driver', 'bridge', networkName]);
         console.log(`[DockerManager] Created bridge network: ${networkName}`);
-      } catch (err) {
-        // Network might already exist or concurrent creation
+      } catch (createError) {
+        try {
+          await docker(['network', 'inspect', networkName]);
+        } catch {
+          throw createError;
+        }
       }
     }
     return networkName;
+  },
+
+  async ensureWorkspaceImage() {
+    const imageName = 'cloudlab-base-image';
+    try {
+      await docker(['image', 'inspect', imageName]);
+      return imageName;
+    } catch {
+      const dockerfile = path.resolve(process.cwd(), 'Dockerfile.workspace');
+      if (!fs.existsSync(dockerfile)) {
+        throw new Error('Dockerfile.workspace is missing from the CloudLab server image');
+      }
+      console.log('[DockerManager] Building the workspace terminal image on first use');
+      await docker(['build', '--tag', imageName, '--file', dockerfile, process.cwd()], 10 * 60 * 1000);
+      return imageName;
+    }
   },
 
   /**
@@ -66,6 +104,7 @@ const DockerManager = {
       throw new Error('Workspace path is outside the workspace root');
     }
     try {
+      await docker(['info', '--format={{.ServerVersion}}'], 10000);
       this.touchActivity(workspaceId);
       const status = await this.getWorkspaceStatus(workspaceId);
       if (status === 'running') return true;
@@ -74,14 +113,17 @@ const DockerManager = {
         return true;
       }
 
+      const imageName = await this.ensureWorkspaceImage();
       await this.ensureNetwork();
       const previewDomain = process.env.PREVIEW_BASE_DOMAIN || 'preview.localhost:3000';
       const now = Date.now();
+      const dockerWorkspaceRoot = path.resolve(process.env.CLOUDLAB_DOCKER_WORKSPACES_ROOT || WORKSPACES_ROOT);
+      const dockerWorkspacePath = path.join(dockerWorkspaceRoot, workspaceId);
 
       await docker([
         'run', '-d', '--name', name,
         '--network', 'cloudlab-net',
-        '--volume', `${root}:/workspace:rw`,
+        '--volume', `${dockerWorkspacePath}:/workspace:rw`,
         '--cpus', '1.0', '--memory', '1g', '--pids-limit', '100',
         '--security-opt', 'no-new-privileges:true', '--cap-drop', 'ALL',
         '--tmpfs', '/tmp:rw,noexec,nosuid,size=256m',
@@ -91,12 +133,12 @@ const DockerManager = {
         '--label', 'traefik.enable=true',
         '--label', `traefik.http.routers.${workspaceId}.rule=Host(\`${workspaceId}.${previewDomain}\`)`,
         '--label', `caddy=${workspaceId}.${previewDomain}`,
-        'cloudlab-base-image', 'sleep', 'infinity',
+        imageName, 'sleep', 'infinity',
       ], 60000);
       return true;
     } catch (error) {
       console.error(`Failed to start Docker workspace ${workspaceId}:`, error);
-      return false;
+      throw error;
     }
   },
 
@@ -297,4 +339,4 @@ const DockerManager = {
   containerName,
 };
 
-module.exports = { DockerManager };
+module.exports = { DockerManager, getTerminalStartupMessage };
