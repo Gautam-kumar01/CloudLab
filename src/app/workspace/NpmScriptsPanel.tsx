@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Code2,
 } from 'lucide-react';
+import { buildPackageScriptCommand } from '@/lib/terminal-commands';
 
 interface NpmScriptsPanelProps {
   workspaceId: string;
@@ -270,30 +271,37 @@ export default function NpmScriptsPanel({
                 }}
               >
                 {filteredScripts.map(([scriptName, cmd]) => (
-                  <div
+                  <button
+                    type="button"
                     key={scriptName}
-                    className="group"
+                    aria-label={`Run ${data.packageManager || 'npm'} script ${scriptName}`}
                     style={{
+                      width: '100%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '5px 8px',
-                      borderRadius: '4px',
+                      minHeight: '38px',
+                      padding: '6px 8px',
+                      borderRadius: '5px',
+                      border: '1px solid transparent',
                       background: 'transparent',
+                      color: 'inherit',
+                      textAlign: 'left',
                       cursor: 'pointer',
+                      touchAction: 'manipulation',
                       transition: 'background 0.15s',
                     }}
                     onMouseOver={(e) =>
-                      (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')
+                      (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)')
                     }
                     onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
                     onClick={() =>
                       onRunScript(
                         scriptName,
-                        `${data.packageManager || 'npm'} run ${scriptName}`,
+                        buildPackageScriptCommand(data.packageManager || 'npm', scriptName),
                       )
                     }
-                    title={`${data.packageManager || 'npm'} run ${scriptName}\nCommand: ${cmd}`}
+                    title={`${buildPackageScriptCommand(data.packageManager || 'npm', scriptName)}\nCommand: ${cmd}`}
                   >
                     <div
                       style={{
@@ -304,30 +312,23 @@ export default function NpmScriptsPanel({
                         flex: 1,
                       }}
                     >
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRunScript(
-                            scriptName,
-                            `${data.packageManager || 'npm'} run ${scriptName}`,
-                          );
-                        }}
+                      <span
                         style={{
                           background: 'rgba(16, 185, 129, 0.15)',
                           border: '1px solid rgba(16, 185, 129, 0.3)',
                           color: '#34d399',
-                          cursor: 'pointer',
-                          padding: '3px',
-                          borderRadius: '4px',
+                          width: '24px',
+                          height: '24px',
+                          flexShrink: 0,
+                          borderRadius: '5px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
-                        title={`Run "${scriptName}"`}
+                        aria-hidden="true"
                       >
-                        <Play size={10} fill="#34d399" />
-                      </button>
+                        <Play size={12} fill="#34d399" />
+                      </span>
 
                       <div
                         style={{
@@ -385,7 +386,7 @@ export default function NpmScriptsPanel({
                         {data.packageManager}
                       </span>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </>

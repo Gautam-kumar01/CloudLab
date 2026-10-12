@@ -29,7 +29,13 @@ function getTerminalStartupMessage(error) {
   if (/Dockerfile\.workspace|cloudlab-base-image/i.test(details)) {
     return 'CloudLab could not prepare its workspace terminal image. Check that Dockerfile.workspace is present and Docker can build images.';
   }
-  return 'CloudLab could not start the workspace container. Check Docker Engine access and the server logs, then retry.';
+  if (/invalid mount config|bind source path does not exist|mounts denied/i.test(details)) {
+    return 'Docker cannot mount this workspace. The Docker Engine host must share the configured workspace directory with the CloudLab app.';
+  }
+  if (/no space left on device|disk quota exceeded/i.test(details)) {
+    return 'The Docker host is out of workspace storage. Free disk space on the sandbox host, then retry.';
+  }
+  return 'No isolated workspace terminal could start. CloudLab will not run commands on the shared app host. Check Docker Engine/socket access and the workspace bind mount, or connect a dedicated isolated runner.';
 }
 
 async function docker(args, timeout = 30000) {

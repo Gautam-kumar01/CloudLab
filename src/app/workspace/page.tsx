@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { getErrorMessage } from '@/lib/error-utils';
+import { sendTerminalInput } from '@/lib/terminal-commands';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -556,6 +557,8 @@ export default function Workspace() {
     Record<string, { term: any; fitAddon: any; container: HTMLDivElement }>
   >({});
   const pendingTerminalData = useRef<Record<string, string[]>>({});
+  const pendingTerminalInput = useRef<Record<string, string[]>>({});
+  const readyTerminals = useRef<Set<string>>(new Set());
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const getLanguage = (fname: string) => {
@@ -1163,6 +1166,38 @@ export default function Workspace() {
     setActiveMenu(activeMenu === menu ? null : menu);
   };
 
+  const spawnTerminal = (id: string) => {
+    const socket = socketRef.current;
+    if (!socket?.connected || spawnedTerminals.current.has(id)) return false;
+
+    spawnedTerminals.current.add(id);
+    const inst = xtermInstances.current[id];
+    const shellType = terminalsRef.current.find((terminal) => terminal.id === id)?.shellType || 'default';
+    socket.emit('terminal.spawn', {
+      id,
+      shellType,
+      workspaceId: workspaceIdRef.current,
+      cols: inst?.term?.cols || 80,
+      rows: inst?.term?.rows || 30,
+    });
+    return true;
+  };
+
+  const sendOrQueueTerminalInput = (id: string, data: string) => {
+    const socket = socketRef.current;
+    if (!socket?.connected || !id || !data) return false;
+    if (readyTerminals.current.has(id)) {
+      return sendTerminalInput(socket, id, data);
+    }
+
+    const queued = pendingTerminalInput.current[id] || [];
+    const queuedLength = queued.reduce((total, chunk) => total + chunk.length, 0);
+    if (queuedLength + data.length > 64 * 1024) return false;
+    pendingTerminalInput.current[id] = [...queued, data];
+    spawnTerminal(id);
+    return true;
+  };
+
   useEffect(() => {
     // 1. Initialize Socket.io with explicit reconnect/backoff
     const socket = io({
@@ -1177,18 +1212,14 @@ export default function Workspace() {
     socket.on('connect', () => {
       console.log('[Socket] Connected. Syncing terminals...');
       (terminalsRef.current || []).forEach((term) => {
-        if (!spawnedTerminals.current.has(term.id)) {
-          spawnedTerminals.current.add(term.id);
-          const inst = xtermInstances.current[term.id];
-          socket.emit('terminal.spawn', {
-            id: term.id,
-            shellType: term.shellType || 'default',
-            workspaceId: workspaceIdRef.current,
-            cols: inst?.term?.cols || 80,
-            rows: inst?.term?.rows || 30,
-          });
-        }
+        spawnTerminal(term.id);
       });
+    });
+
+    socket.on('disconnect', () => {
+      spawnedTerminals.current.clear();
+      readyTerminals.current.clear();
+      pendingTerminalInput.current = {};
     });
 
     socket.on('connect_error', (err) => {
@@ -1204,6 +1235,21 @@ export default function Workspace() {
         }
         pendingTerminalData.current[id].push(data);
       }
+    });
+
+    socket.on('terminal.ready', ({ id }) => {
+      if (!id) return;
+      readyTerminals.current.add(id);
+      const queued = pendingTerminalInput.current[id] || [];
+      delete pendingTerminalInput.current[id];
+      queued.forEach((data) => sendTerminalInput(socket, id, data));
+    });
+
+    socket.on('terminal.error', ({ id }) => {
+      if (!id) return;
+      readyTerminals.current.delete(id);
+      spawnedTerminals.current.delete(id);
+      delete pendingTerminalInput.current[id];
     });
 
     return () => {
@@ -1295,20 +1341,10 @@ export default function Workspace() {
         } catch (e) {}
 
         // Spawn terminal if socket is already connected and not yet spawned
-        if (socketRef.current?.connected && !spawnedTerminals.current.has(id)) {
-          spawnedTerminals.current.add(id);
-          const shellType = terminalsRef.current.find((t) => t.id === id)?.shellType || 'default';
-          socketRef.current.emit('terminal.spawn', {
-            id,
-            shellType,
-            workspaceId: workspaceIdRef.current,
-            cols: term.cols,
-            rows: term.rows,
-          });
-        }
+        spawnTerminal(id);
 
         term.onData((data) => {
-          socketRef.current?.emit('terminal.toTerm', { id, data });
+          sendOrQueueTerminalInput(id, data);
         });
 
         term.onResize(({ cols, rows }) => {
@@ -1355,6 +1391,8 @@ export default function Workspace() {
   const handleKillTerminal = (id: string) => {
     socketRef.current?.emit('terminal.kill', { id });
     spawnedTerminals.current.delete(id);
+    readyTerminals.current.delete(id);
+    delete pendingTerminalInput.current[id];
     if (splitTerminalId === id) {
       setIsTerminalSplit(false);
       setSplitTerminalId(null);
@@ -1408,11 +1446,12 @@ export default function Workspace() {
 
   const handleRunNpmScript = (scriptName: string, command: string) => {
     setActiveBottomTab('terminal');
-    if (socketRef.current) {
-      socketRef.current.emit('terminal.data', {
-        id: activeTerminalId,
-        data: `${command}\r`,
-      });
+    const sent = sendOrQueueTerminalInput(activeTerminalId, `${command}\r`);
+    if (!sent) {
+      xtermInstances.current[activeTerminalId]?.term?.write(
+        '\r\n\x1b[33m[Terminal is offline or its startup queue is full. Reconnect, then run the script again.]\x1b[0m\r\n',
+      );
+    } else {
       setTimeout(() => {
         try {
           xtermInstances.current[activeTerminalId]?.term?.focus();

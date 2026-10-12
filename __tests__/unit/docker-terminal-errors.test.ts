@@ -24,6 +24,6 @@ describe('workspace terminal startup diagnostics', () => {
 
   it('does not expose arbitrary Docker error output to the terminal client', () => {
     expect(getTerminalStartupMessage({ stderr: 'private-host-path and private-secret-value' }))
-      .toBe('CloudLab could not start the workspace container. Check Docker Engine access and the server logs, then retry.');
+      .toBe('No isolated workspace terminal could start. CloudLab will not run commands on the shared app host. Check Docker Engine/socket access and the workspace bind mount, or connect a dedicated isolated runner.');
   });
 });

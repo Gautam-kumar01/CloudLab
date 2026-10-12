@@ -504,6 +504,7 @@ app.prepare().then(() => {
     socket.on('terminal.spawn', async ({ id, shellType = 'default', workspaceId, cols = 80, rows = 30 }) => {
       // If this terminal is already active and healthy, don't kill or re-spawn it
       if (terminals[id] && !terminals[id].hasExited) {
+        socket.emit('terminal.ready', { id });
         return;
       }
 
@@ -512,6 +513,7 @@ app.prepare().then(() => {
           id,
           data: '\r\n\x1b[31m[Error: Missing or invalid workspace identifier]\x1b[0m\r\n',
         });
+        socket.emit('terminal.error', { id });
         return;
       }
 
@@ -521,6 +523,7 @@ app.prepare().then(() => {
           id,
           data: `\r\n\x1b[31m[Error: Forbidden - ${authCheck.reason || 'You do not have permission to execute commands in this workspace'}]\x1b[0m\r\n`,
         });
+        socket.emit('terminal.error', { id });
         return;
       }
 
@@ -533,6 +536,7 @@ app.prepare().then(() => {
           id,
           data: '\r\n\x1b[31m[Error: Invalid workspace directory boundary]\x1b[0m\r\n',
         });
+        socket.emit('terminal.error', { id });
         return;
       }
 
@@ -569,6 +573,7 @@ app.prepare().then(() => {
             id,
             data: `\r\n\x1b[31m[Error: ${getTerminalStartupMessage(error)}]\x1b[0m\r\n`,
           });
+          socket.emit('terminal.error', { id });
           return;
         }
       } else if (effectiveShellType === 'node') {
@@ -689,12 +694,14 @@ app.prepare().then(() => {
         ptyProcess.workspaceId = resolvedWorkspaceId;
         ptyProcess.role = authCheck.role;
         terminals[id] = ptyProcess;
+        socket.emit('terminal.ready', { id });
       } catch (e) {
         console.error('[Terminal Spawn Error]', e);
         socket.emit('terminal.incData', {
           id,
           data: `\r\n\x1b[31m[Error spawning terminal: ${e.message}]\x1b[0m\r\n`,
         });
+        socket.emit('terminal.error', { id });
       }
     });
 
